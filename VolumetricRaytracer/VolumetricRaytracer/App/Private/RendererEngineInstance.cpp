@@ -12,38 +12,29 @@
 	copies or substantial portions of the Software.
 */
 
+#include "../Public/RendererEngineInstance.h"
+#include "WindowFactory.h"
 #include "Window.h"
 
-VolumeRaytracer::UI::VWindow::VWindow()
+void VolumeRaytracer::App::RendererEngineInstance::OnEngineInitialized(Engine::VEngine* owningEngine)
 {
+	Engine = owningEngine;
+
+	CreateRendererWindow();
 }
 
-VolumeRaytracer::UI::VWindow::~VWindow()
+void VolumeRaytracer::App::RendererEngineInstance::OnEngineShutdown()
 {
+	Engine = nullptr;
 }
 
-void VolumeRaytracer::UI::VWindow::Tick(const float& deltaSeconds)
+void VolumeRaytracer::App::RendererEngineInstance::OnEngineUpdate(const float& deltaTime)
 {
 	
 }
 
-void VolumeRaytracer::UI::VWindow::Initialize()
+void VolumeRaytracer::App::RendererEngineInstance::CreateRendererWindow()
 {
-	InitializeWindow();
-}
-
-void VolumeRaytracer::UI::VWindow::BeginDestroy()
-{
-	CloseWindow();
-}
-
-const bool VolumeRaytracer::UI::VWindow::CanEverTick() const
-{
-	return true;
-}
-
-bool VolumeRaytracer::UI::VWindow::ShouldTick() const
-{
-	return true;
+	Window = VolumeRaytracer::UI::VWindowFactory::NewWindow();
 }
 

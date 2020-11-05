@@ -12,38 +12,30 @@
 	copies or substantial portions of the Software.
 */
 
-#include "Window.h"
+#pragma once
+#include <list>
 
-VolumeRaytracer::UI::VWindow::VWindow()
+namespace VolumeRaytracer
 {
-}
+	class VObject;
 
-VolumeRaytracer::UI::VWindow::~VWindow()
-{
-}
+	class VGlobalTickManager
+	{
+	public:
+		void AddTickableObject(VObject* obj);
+		void RemoveTickableObject(VObject* obj);
+		void CallTickOnAllAllowedObjects(const float& deltaTime);
 
-void VolumeRaytracer::UI::VWindow::Tick(const float& deltaSeconds)
-{
-	
-}
+		bool IsAllowedToAddObject(VObject* obj) const;
 
-void VolumeRaytracer::UI::VWindow::Initialize()
-{
-	InitializeWindow();
-}
+		static VGlobalTickManager& Instance()
+		{
+			static VGlobalTickManager instance;
 
-void VolumeRaytracer::UI::VWindow::BeginDestroy()
-{
-	CloseWindow();
-}
+			return instance;
+		}
 
-const bool VolumeRaytracer::UI::VWindow::CanEverTick() const
-{
-	return true;
+	private:
+		std::list<VObject*> TickableObjects;
+	};
 }
-
-bool VolumeRaytracer::UI::VWindow::ShouldTick() const
-{
-	return true;
-}
-

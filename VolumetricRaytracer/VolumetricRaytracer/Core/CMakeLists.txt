@@ -15,6 +15,12 @@ file(GLOB_RECURSE core_private
 
 # Add source to this project's executable.
 add_library (VCore ${core_public} ${core_private})
+add_dependencies (VCore spdlog)
+
 target_include_directories(VCore PUBLIC "Public")
+include_directories(${spdlogIncludeDir})
+
+
+#target_include_directories(VCore PUBLIC spdlogIncludeDir)
 
 # TODO: Add tests and install targets if needed.

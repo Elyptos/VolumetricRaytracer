@@ -12,38 +12,15 @@
 	copies or substantial portions of the Software.
 */
 
-#include "Window.h"
+#pragma once
 
-VolumeRaytracer::UI::VWindow::VWindow()
+#include <string>
+
+namespace VolumeRaytracer
 {
+	namespace Engine
+	{
+		const long MIN_ENGINE_TICK_TIME_MICROSECONDS = 2000L;
+		const std::string PATH_LOG = "Logs";
+	}
 }
-
-VolumeRaytracer::UI::VWindow::~VWindow()
-{
-}
-
-void VolumeRaytracer::UI::VWindow::Tick(const float& deltaSeconds)
-{
-	
-}
-
-void VolumeRaytracer::UI::VWindow::Initialize()
-{
-	InitializeWindow();
-}
-
-void VolumeRaytracer::UI::VWindow::BeginDestroy()
-{
-	CloseWindow();
-}
-
-const bool VolumeRaytracer::UI::VWindow::CanEverTick() const
-{
-	return true;
-}
-
-bool VolumeRaytracer::UI::VWindow::ShouldTick() const
-{
-	return true;
-}
-

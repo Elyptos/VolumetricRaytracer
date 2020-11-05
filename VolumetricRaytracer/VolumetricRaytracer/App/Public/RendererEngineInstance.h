@@ -12,38 +12,33 @@
 	copies or substantial portions of the Software.
 */
 
-#include "Window.h"
+#pragma once
 
-VolumeRaytracer::UI::VWindow::VWindow()
+#include "IEngineInstance.h"
+#include "Object.h"
+
+namespace VolumeRaytracer
 {
-}
+	namespace UI
+	{
+		class VWindow;
+	}
 
-VolumeRaytracer::UI::VWindow::~VWindow()
-{
-}
+	namespace App
+	{
+		class RendererEngineInstance : public Engine::IEngineInstance
+		{
+		public:
+			void OnEngineInitialized(Engine::VEngine* owningEngine) override;
+			void OnEngineShutdown() override;
+			void OnEngineUpdate(const float& deltaTime) override;
 
-void VolumeRaytracer::UI::VWindow::Tick(const float& deltaSeconds)
-{
-	
-}
+		private:
+			void CreateRendererWindow();
 
-void VolumeRaytracer::UI::VWindow::Initialize()
-{
-	InitializeWindow();
+		private:
+			Engine::VEngine* Engine = nullptr;
+			VObjectPtr<UI::VWindow> Window = nullptr;
+		};
+	}
 }
-
-void VolumeRaytracer::UI::VWindow::BeginDestroy()
-{
-	CloseWindow();
-}
-
-const bool VolumeRaytracer::UI::VWindow::CanEverTick() const
-{
-	return true;
-}
-
-bool VolumeRaytracer::UI::VWindow::ShouldTick() const
-{
-	return true;
-}
-

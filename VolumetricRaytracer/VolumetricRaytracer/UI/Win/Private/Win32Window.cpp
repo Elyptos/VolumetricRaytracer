@@ -1,5 +1,20 @@
+/*
+	Copyright (c) 2020 Thomas Schöngrundner
+
+	Permission is hereby granted, free of charge, to any person obtaining a copy
+	of this software and associated documentation files (the "Software"), to deal
+	in the Software without restriction, including without limitation the rights
+	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+	copies of the Software, and to permit persons to whom the Software is
+	furnished to do so, subject to the following conditions:
+
+	The above copyright notice and this permission notice shall be included in all
+	copies or substantial portions of the Software.
+*/
+
 #include "Win32Window.h"
 #include "Win32Resources.h"
+#include <boost/unordered_map.hpp>
 
 namespace VolumeRaytracer
 {
@@ -12,13 +27,15 @@ namespace VolumeRaytracer
 			public:
 				void RegisterWindow(VWin32Window* window)
 				{
-
+					RegisteredWindows[window->GetHWND()] = window;
 				}
 
 				void UnregisterWindow(VWin32Window* window)
 				{
-
+					RegisteredWindows.erase(window->GetHWND());
 				}
+
+				boost::unordered_map<HWND, VWin32Window*> RegisteredWindows;
 			};
 
 			VWin32MessageDistributor WinMessageDistributor;
@@ -28,10 +45,10 @@ namespace VolumeRaytracer
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	/*if (VolumeRaytracer::UI::Win32::WinMessageDistributor.RegisteredWindows.find(hWnd) != V_UI::WINMessageDistributor.RegisteredWindows.end())
+	if (VolumeRaytracer::UI::Win32::WinMessageDistributor.RegisteredWindows.find(hWnd) != VolumeRaytracer::UI::Win32::WinMessageDistributor.RegisteredWindows.end())
 	{
-		return V_UI::WINMessageDistributor.RegisteredWindows[hWnd]->MessageHandler(hWnd, message, wParam, lParam);
-	}*/
+		return VolumeRaytracer::UI::Win32::WinMessageDistributor.RegisteredWindows[hWnd]->MessageHandler(hWnd, message, wParam, lParam);
+	}
 
 	return DefWindowProcW(hWnd, message, wParam, lParam);
 }
@@ -60,6 +77,47 @@ unsigned int VolumeRaytracer::UI::Win32::VWin32Window::GetWidth() const
 unsigned int VolumeRaytracer::UI::Win32::VWin32Window::GetHeight() const
 {
 	return Height;
+}
+
+HWND VolumeRaytracer::UI::Win32::VWin32Window::GetHWND() const
+{
+	return WindowHandle;
+}
+
+HINSTANCE VolumeRaytracer::UI::Win32::VWin32Window::GetHInstance() const
+{
+	return HInstance;
+}
+
+LRESULT CALLBACK VolumeRaytracer::UI::Win32::VWin32Window::MessageHandler(HWND hwnd, UINT msg, WPARAM p1, LPARAM p2)
+{
+	switch (msg)
+	{
+	case WM_DESTROY:
+	{
+		PostQuitMessage(0);
+		break;
+	}
+	case WM_CLOSE:
+	{
+		PostQuitMessage(0);
+		break;
+	}
+	case WM_SYSCHAR:
+	{
+		break;
+	}
+	case WM_SIZE:
+	{
+		//RECT windowRect = {};
+
+		//GetClientRect(hwnd, &windowRect);
+
+		//OnSizeChanged(windowRect.right - windowRect.left, windowRect.bottom - windowRect.top);
+	}
+	break;
+	}
+	return DefWindowProcW(hwnd, msg, p1, p2);
 }
 
 void VolumeRaytracer::UI::Win32::VWin32Window::InitializeWindow()
@@ -127,6 +185,16 @@ void VolumeRaytracer::UI::Win32::VWin32Window::CloseWindow()
 
 void VolumeRaytracer::UI::Win32::VWin32Window::Tick(const float& deltaSeconds)
 {
+	VWindow::Tick(deltaSeconds);
+
+	MSG message;
+
+	ZeroMemory(&message, sizeof(MSG));
+
+	if (PeekMessageW(&message, WindowHandle, 0, 0, PM_REMOVE))
+	{
+		DispatchMessageW(&message);
+	}
 }
 
 

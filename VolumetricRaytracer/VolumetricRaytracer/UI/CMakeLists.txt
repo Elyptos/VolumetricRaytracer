@@ -29,6 +29,10 @@ if (WIN32)
 		"Win/Private/*"
 	)
 
+	if(Boost_FOUND)
+		include_directories(${Boost_INCLUDE_DIRS})
+	endif()
+
 	add_library (VUI ${ui_public} ${ui_private} ${ui_win_public} ${ui_win_private})
 	target_include_directories(VUI PUBLIC "Public")
 	target_link_libraries(VUI VCore)
