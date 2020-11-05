@@ -22,19 +22,62 @@ VolumeRaytracer::UI::VWindow::~VWindow()
 {
 }
 
+void VolumeRaytracer::UI::VWindow::Show()
+{
+	if (!IsWindowOpen())
+	{
+		InitializeWindow();
+	}
+}
+
+void VolumeRaytracer::UI::VWindow::Close()
+{
+	if (IsWindowOpen())
+	{
+		CloseWindow();
+	}
+}
+
 void VolumeRaytracer::UI::VWindow::Tick(const float& deltaSeconds)
 {
 	
 }
 
-void VolumeRaytracer::UI::VWindow::Initialize()
+bool VolumeRaytracer::UI::VWindow::IsWindowOpen() const
 {
-	InitializeWindow();
+	return WindowOpen;
 }
+
+boost::signals2::connection VolumeRaytracer::UI::VWindow::OnWindowOpened_Bind(const WindowDelegate::slot_type& del)
+{
+	return OnWindowOpened.connect(del);
+}
+
+boost::signals2::connection VolumeRaytracer::UI::VWindow::OnWindowClosed_Bind(const WindowDelegate::slot_type& del)
+{
+	return OnWindowClosed.connect(del);
+}
+
+void VolumeRaytracer::UI::VWindow::InitializeWindow()
+{
+	WindowOpen = true;
+
+	OnWindowOpened();
+}
+
+void VolumeRaytracer::UI::VWindow::CloseWindow()
+{
+	WindowOpen = false;
+
+	OnWindowClosed();
+}
+
+void VolumeRaytracer::UI::VWindow::Initialize()
+{}
 
 void VolumeRaytracer::UI::VWindow::BeginDestroy()
 {
-	CloseWindow();
+	Close();
 }
 
 const bool VolumeRaytracer::UI::VWindow::CanEverTick() const
@@ -44,6 +87,6 @@ const bool VolumeRaytracer::UI::VWindow::CanEverTick() const
 
 bool VolumeRaytracer::UI::VWindow::ShouldTick() const
 {
-	return true;
+	return IsWindowOpen();
 }
 

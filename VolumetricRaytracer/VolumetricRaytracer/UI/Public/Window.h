@@ -15,6 +15,7 @@
 #pragma once
 
 #include <string>
+#include <boost/signals2.hpp>
 #include "Object.h"
 
 namespace VolumeRaytracer
@@ -23,6 +24,8 @@ namespace VolumeRaytracer
 	{
 		class VWindow : public VObject
 		{
+			typedef boost::signals2::signal<void()> WindowDelegate;
+
 		public:
 			VWindow();
 			virtual ~VWindow();
@@ -33,17 +36,31 @@ namespace VolumeRaytracer
 			virtual unsigned int GetWidth() const = 0;
 			virtual unsigned int GetHeight() const = 0;
 
+			void Show();
+			void Close();
+
 			void Tick(const float& deltaSeconds) override;
 
+			bool IsWindowOpen() const;
+
+			boost::signals2::connection OnWindowOpened_Bind(const WindowDelegate::slot_type& del);
+			boost::signals2::connection OnWindowClosed_Bind(const WindowDelegate::slot_type& del);
+
 		protected:
-			virtual void InitializeWindow() = 0;
-			virtual void CloseWindow() = 0;
+			virtual void InitializeWindow();
+			virtual void CloseWindow();
 
 			void Initialize() override;
 			void BeginDestroy() override;
 
 			bool const CanEverTick() const override;
 			bool ShouldTick() const override;
+
+		private:
+			bool WindowOpen = false;
+
+			WindowDelegate OnWindowOpened;
+			WindowDelegate OnWindowClosed;
 		};
 	}
 }

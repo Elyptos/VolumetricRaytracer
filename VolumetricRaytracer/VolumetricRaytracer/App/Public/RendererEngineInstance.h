@@ -16,6 +16,8 @@
 
 #include "IEngineInstance.h"
 #include "Object.h"
+#include <boost/signals2/connection.hpp>
+#include <boost/bind.hpp>
 
 namespace VolumeRaytracer
 {
@@ -36,9 +38,13 @@ namespace VolumeRaytracer
 		private:
 			void CreateRendererWindow();
 
+			void OnWindowClosed();
+
 		private:
 			Engine::VEngine* Engine = nullptr;
 			VObjectPtr<UI::VWindow> Window = nullptr;
+
+			boost::signals2::connection OnWindowClosedHandle;
 		};
 	}
 }

@@ -96,11 +96,13 @@ LRESULT CALLBACK VolumeRaytracer::UI::Win32::VWin32Window::MessageHandler(HWND h
 	case WM_DESTROY:
 	{
 		PostQuitMessage(0);
+		Close();
 		break;
 	}
 	case WM_CLOSE:
 	{
 		PostQuitMessage(0);
+		Close();
 		break;
 	}
 	case WM_SYSCHAR:
@@ -170,6 +172,8 @@ void VolumeRaytracer::UI::Win32::VWin32Window::InitializeWindow()
 
 	ShowWindow(WindowHandle, SW_SHOW);
 	UpdateWindow(WindowHandle);
+
+	VWindow::InitializeWindow();
 }
 
 void VolumeRaytracer::UI::Win32::VWin32Window::CloseWindow()
@@ -181,6 +185,8 @@ void VolumeRaytracer::UI::Win32::VWin32Window::CloseWindow()
 
 	UnregisterClassW(std::wstring(L"VolumeRaytracer").c_str(), HInstance);
 	HInstance = nullptr;
+
+	VWindow::CloseWindow();
 }
 
 void VolumeRaytracer::UI::Win32::VWin32Window::Tick(const float& deltaSeconds)

@@ -15,26 +15,44 @@
 #include "../Public/RendererEngineInstance.h"
 #include "WindowFactory.h"
 #include "Window.h"
+#include "Engine.h"
 
 void VolumeRaytracer::App::RendererEngineInstance::OnEngineInitialized(Engine::VEngine* owningEngine)
 {
 	Engine = owningEngine;
 
 	CreateRendererWindow();
+	Window->Show();
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::OnEngineShutdown()
 {
 	Engine = nullptr;
+	
+	if (Window.IsValid())
+	{
+		Window->Close();
+
+		OnWindowClosedHandle.disconnect();
+		Window = nullptr;
+	}
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::OnEngineUpdate(const float& deltaTime)
 {
-	
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::CreateRendererWindow()
 {
 	Window = VolumeRaytracer::UI::VWindowFactory::NewWindow();
+	OnWindowClosedHandle = Window->OnWindowClosed_Bind(boost::bind(&RendererEngineInstance::OnWindowClosed, this));
+}
+
+void VolumeRaytracer::App::RendererEngineInstance::OnWindowClosed()
+{
+	if (Engine != nullptr)
+	{
+		Engine->Shutdown();
+	}
 }
 

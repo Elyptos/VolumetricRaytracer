@@ -148,12 +148,12 @@ void VolumeRaytracer::Engine::VEngine::EngineLoop()
 			TickEngineInstance(prevDeltaTime);
 			CallVObjectTicks(prevDeltaTime);
 		}
+
+		std::this_thread::sleep_for(std::chrono::microseconds(MIN_ENGINE_TICK_TIME_MICROSECONDS));
 		auto tStampEnd = std::chrono::high_resolution_clock::now();
 
 		long long frameTime = std::chrono::duration_cast<std::chrono::microseconds>(tStampEnd - tStampBegin).count();
-		EngineDeltaTime = frameTime * 1000.f * 1000.f;
-
-		std::this_thread::sleep_for(std::chrono::microseconds(MIN_ENGINE_TICK_TIME_MICROSECONDS));
+		EngineDeltaTime = frameTime * 0.001f * 0.001f;
 	}
 
 	V_LOG("Engine loop exited");
