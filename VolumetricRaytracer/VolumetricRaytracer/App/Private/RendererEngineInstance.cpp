@@ -14,6 +14,7 @@
 
 #include "../Public/RendererEngineInstance.h"
 #include "WindowFactory.h"
+#include "WindowRenderTargetFactory.h"
 #include "Window.h"
 #include "Engine.h"
 
@@ -23,13 +24,16 @@ void VolumeRaytracer::App::RendererEngineInstance::OnEngineInitialized(Engine::V
 
 	CreateRendererWindow();
 	Window->Show();
+
+	VObjectPtr<Renderer::VRenderTarget> renderTarget = UI::VWindowRenderTargetFactory::CreateRenderTarget(Engine->GetRenderer(), Window);
+	Window->SetRenderTarget(renderTarget);
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::OnEngineShutdown()
 {
 	Engine = nullptr;
 	
-	if (Window.IsValid())
+	if (Window)
 	{
 		Window->Close();
 

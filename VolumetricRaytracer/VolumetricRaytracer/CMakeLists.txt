@@ -6,6 +6,7 @@ cmake_minimum_required (VERSION 3.8)
 add_subdirectory("Core")
 add_subdirectory("UI")
 add_subdirectory("Engine")
+add_subdirectory("Renderer")
 
 file(GLOB_RECURSE app_public
 	CONFIGURE_DEPENDS

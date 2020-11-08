@@ -14,19 +14,29 @@
 
 #pragma once
 
+#include <memory>
+#include <type_traits>
+
 namespace VolumeRaytracer
 {
+	template<typename T>
+	using VObjectPtr = std::shared_ptr<T>;
+
 	class VObject
 	{
 	public:
 		virtual ~VObject();
 
 		template<typename T, class... _Types>
-		static T* CreateObject(_Types&&... args)
+		static std::shared_ptr<T> CreateObject(_Types&&... args)
 		{
-			T* res = new T(std::forward<_Types>(args)...);
+			static_assert(std::is_base_of<VObject, T>::value, "T must inherit from VObject");
 
-			VObject* objectCast = dynamic_cast<VObject*>(res);
+			std::shared_ptr<T> res(new T(std::forward<_Types>(args)...), [](T* ptr) {
+				DestroyObject(dynamic_cast<VObject*>(ptr));
+			});
+
+			VObject* objectCast = dynamic_cast<VObject*>(res.get());
 
 			if (objectCast != nullptr)
 			{
@@ -41,6 +51,7 @@ namespace VolumeRaytracer
 			return res;
 		}
 
+	private:
 		static void DestroyObject(VObject* obj)
 		{
 			if (obj != nullptr)
@@ -55,6 +66,7 @@ namespace VolumeRaytracer
 			}
 		}
 
+	public:
 		virtual void Tick(const float& deltaSeconds) {}
 
 		virtual const bool CanEverTick() const { return false; }
@@ -69,160 +81,187 @@ namespace VolumeRaytracer
 		void UnregisterFromTickManager();
 	};
 
-	template<typename T>
-	class VObjectPtr
-	{
-	private:
-		class VObjectPtrCounter
-		{
-		public:
-			VObjectPtrCounter()
-				:Counter(0){};
+	//class VObjectPtrBase
+	//{
+	//protected:
+	//	class VObjectPtrCounter
+	//	{
+	//	public:
+	//		VObjectPtrCounter()
+	//			:Counter(0) {};
 
-			VObjectPtrCounter(const VObjectPtrCounter& other) = delete;
-			VObjectPtrCounter& operator=(const VObjectPtrCounter& other) = delete;
+	//		VObjectPtrCounter(const VObjectPtrCounter& other) = delete;
+	//		VObjectPtrCounter& operator=(const VObjectPtrCounter& other) = delete;
 
-			~VObjectPtrCounter() {}
+	//		~VObjectPtrCounter() {}
 
-			void Reset()
-			{
-				Counter = 0;
-			}
+	//		void Reset()
+	//		{
+	//			Counter = 0;
+	//		}
 
-			unsigned int GetCounter()
-			{
-				return Counter;
-			}
+	//		unsigned int GetCounter()
+	//		{
+	//			return Counter;
+	//		}
 
-			void operator++()
-			{
-				Counter++;
-			}
+	//		void operator++()
+	//		{
+	//			Counter++;
+	//		}
 
-			void operator++(int)
-			{
-				Counter++;
-			}
+	//		void operator++(int)
+	//		{
+	//			Counter++;
+	//		}
 
-			void operator--()
-			{
-				Counter--;
-			}
+	//		void operator--()
+	//		{
+	//			Counter--;
+	//		}
 
-			void operator--(int)
-			{
-				Counter--;
-			}
+	//		void operator--(int)
+	//		{
+	//			Counter--;
+	//		}
 
-		private:
-			unsigned int Counter;
-		};
+	//	private:
+	//		unsigned int Counter;
+	//	};
 
-	public:
-		VObjectPtr()
-		{}
+	//protected:
+	//	VObjectPtrCounter* Counter = nullptr;
+	//};
 
-		VObjectPtr(T* ptr)
-		{
-			Ptr = ptr;
-			Counter = new VObjectPtrCounter();
+	//template<typename T>
+	//class VObjectPtr : public VObjectPtrBase
+	//{
+	//public:
+	//	VObjectPtr()
+	//	{}
 
-			AddReference();
-		}
+	//	VObjectPtr(T* ptr)
+	//	{
+	//		Ptr = ptr;
+	//		Counter = new VObjectPtrCounter();
 
-		VObjectPtr(VObjectPtr<T>& other)
-		{
-			Ptr = other.Ptr;
-			Counter = other.Counter;
+	//		AddReference();
+	//	}
 
-			AddReference();
-		}
+	//	//template<typename U>
+	//	//VObjectPtr(U* ptr)
+	//	//{
+	//	//	Ptr = ptr;
+	//	//	Counter = new VObjectPtrCounter();
 
-		template<class... _Types>
-		static VObjectPtr<T> Create(_Types&&... args)
-		{
-			T* obj = VObject::CreateObject<T>(std::forward<_Types>(args)...);
+	//	//	AddReference();
+	//	//}
 
-			return VObjectPtr<T>(obj);
-		}
+	//	VObjectPtr(VObjectPtr<T>& other)
+	//	{
+	//		Ptr = other.Ptr;
+	//		Counter = other.Counter;
 
-		VObjectPtr& operator=(const VObjectPtr& other)
-		{
-			ReleaseReference();
+	//		AddReference();
+	//	}
 
-			Ptr = other.Ptr;
-			Counter = other.Counter;
+	//	template<typename U>
+	//	VObjectPtr(VObjectPtr& other)
+	//	{
+	//		Ptr = other.Get();
+	//		Counter = other.Counter;
 
-			AddReference();
+	//		AddReference();
+	//	}
 
-			return *this;
-		}
+	//	template<class... _Types>
+	//	static VObjectPtr<T> Create(_Types&&... args)
+	//	{
+	//		T* obj = VObject::CreateObject<T>(std::forward<_Types>(args)...);
 
-		~VObjectPtr()
-		{
-			ReleaseReference();
-		}
+	//		return VObjectPtr<T>(obj);
+	//	}
 
-		bool IsValid()
-		{
-			return Ptr != nullptr && Counter != nullptr;
-		}
+	//	VObjectPtr& operator=(const VObjectPtr& other)
+	//	{
+	//		ReleaseReference();
 
-		T* Get()
-		{
-			return Ptr;
-		}
+	//		Ptr = other.Ptr;
+	//		Counter = other.Counter;
 
-		T& operator*()
-		{
-			return *Ptr;
-		}
+	//		AddReference();
 
-		T* operator->()
-		{
-			return Ptr;
-		}
+	//		return *this;
+	//	}
 
-	private:
-		void ReleaseReference()
-		{
-			if (IsValid())
-			{
-				(*Counter)--;
+	//	//template<typename U>
+	//	//operator VObjectPtr<U> const
+	//	//{
+	//	//	return VObjectPtr<U>(*this);
+	//	//}
 
-				if (Counter->GetCounter() <= 0)
-				{
-					delete Counter;
+	//	~VObjectPtr()
+	//	{
+	//		ReleaseReference();
+	//	}
 
-					VObject* obj = dynamic_cast<VObject*>(Ptr);
+	//	bool IsValid()
+	//	{
+	//		return Ptr != nullptr && Counter != nullptr;
+	//	}
 
-					if (obj != nullptr)
-					{
-						VObject::DestroyObject(obj);
-					}
-					else
-					{
-						delete Ptr;
-					}
+	//	T* Get() const
+	//	{
+	//		return Ptr;
+	//	}
 
-					Counter = nullptr;
-					Ptr = nullptr;
-				}
-			}
-		}
+	//	T& operator*()
+	//	{
+	//		return *Ptr;
+	//	}
 
-		void AddReference()
-		{
-			if (IsValid())
-			{
-				(*Counter)++;
-			}
-		}
+	//	T* operator->()
+	//	{
+	//		return Ptr;
+	//	}
 
-	private:
-		T* Ptr = nullptr;
-		VObjectPtrCounter* Counter = nullptr;
-	};
+	//private:
+	//	void ReleaseReference()
+	//	{
+	//		if (IsValid())
+	//		{
+	//			(*Counter)--;
 
-	
+	//			if (Counter->GetCounter() <= 0)
+	//			{
+	//				delete Counter;
+
+	//				VObject* obj = dynamic_cast<VObject*>(Ptr);
+
+	//				if (obj != nullptr)
+	//				{
+	//					VObject::DestroyObject(obj);
+	//				}
+	//				else
+	//				{
+	//					delete Ptr;
+	//				}
+
+	//				Counter = nullptr;
+	//				Ptr = nullptr;
+	//			}
+	//		}
+	//	}
+
+	//	void AddReference()
+	//	{
+	//		if (IsValid())
+	//		{
+	//			(*Counter)++;
+	//		}
+	//	}
+
+	//private:
+	//	T* Ptr = nullptr;
+	//};
 }

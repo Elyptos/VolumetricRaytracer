@@ -17,6 +17,8 @@
 #include "EngineConstants.h"
 #include "IEngineInstance.h"
 #include "TickManager.h"
+#include "Renderer.h"
+#include "RendererFactory.h"
 #include <memory>
 #include <ctime>
 #include <string>
@@ -37,6 +39,7 @@ void VolumeRaytracer::Engine::VEngine::Start()
 	if (IsEngineActive() == false)
 	{
 		InitializeLogger();
+		InitializeRenderer();
 		InitializeEngineInstance();
 		StartEngineLoop();
 	}
@@ -59,7 +62,7 @@ void VolumeRaytracer::Engine::VEngine::InitializeLogger()
 {
 	if (VLogger::IsDefaultLoggerSet() == false)
 	{
-		VObjectPtr<VLogger> logger = VObjectPtr<VLogger>::Create(GetLoggerFilePath());
+		VObjectPtr<VLogger> logger = VObject::CreateObject<VLogger>(GetLoggerFilePath());
 
 		VLogger::SetAsDefaultLogger(logger);
 	}
@@ -75,6 +78,12 @@ void VolumeRaytracer::Engine::VEngine::InitializeEngineInstance()
 	{
 		V_LOG_WARNING("No engine instance specified! Please call VEngine::SetEngineInstance before starting the engine.");
 	}
+}
+
+void VolumeRaytracer::Engine::VEngine::InitializeRenderer()
+{
+	Renderer = Renderer::VRendererFactory::NewRenderer();
+	Renderer->Start();
 }
 
 std::string VolumeRaytracer::Engine::VEngine::GetCurrentDateTimeAsString() const
@@ -137,6 +146,15 @@ void VolumeRaytracer::Engine::VEngine::StopEngineLoop()
 	IsRunning = false;
 }
 
+void VolumeRaytracer::Engine::VEngine::StopRenderer()
+{
+	if (Renderer != nullptr)
+	{
+		Renderer->Stop();
+		Renderer = nullptr;
+	}
+}
+
 void VolumeRaytracer::Engine::VEngine::EngineLoop()
 {
 	while (IsEngineActive())
@@ -166,6 +184,8 @@ void VolumeRaytracer::Engine::VEngine::ShutdownEngineAfterEngineLoopFinishes()
 	if (!IsEngineActive())
 	{
 		V_LOG("Engine loop stopped! Shutting down...");
+
+		StopRenderer();
 
 		if (EngineInstance != nullptr)
 		{

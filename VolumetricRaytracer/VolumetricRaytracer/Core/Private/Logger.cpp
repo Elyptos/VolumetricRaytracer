@@ -94,7 +94,7 @@ void VolumeRaytracer::VLogger::SetAsDefaultLogger(const VObjectPtr<VLogger>& log
 
 bool VolumeRaytracer::VLogger::IsDefaultLoggerSet()
 {
-	return DefaultLogger.IsValid();
+	return DefaultLogger != nullptr;
 }
 
 void VolumeRaytracer::VLogger::HandleNotInitializedError()

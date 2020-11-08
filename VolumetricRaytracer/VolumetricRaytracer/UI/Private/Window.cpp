@@ -13,6 +13,7 @@
 */
 
 #include "Window.h"
+#include "RenderTarget.h"
 
 VolumeRaytracer::UI::VWindow::VWindow()
 {
@@ -20,6 +21,11 @@ VolumeRaytracer::UI::VWindow::VWindow()
 
 VolumeRaytracer::UI::VWindow::~VWindow()
 {
+}
+
+void VolumeRaytracer::UI::VWindow::SetRenderTarget(const VObjectPtr<Renderer::VRenderTarget>& renderTarget)
+{
+	RenderTarget = renderTarget;
 }
 
 void VolumeRaytracer::UI::VWindow::Show()

@@ -37,6 +37,7 @@ if (WIN32)
 
 	target_include_directories(VUI PUBLIC "Public")
 	target_link_libraries(VUI VCore)
+	target_link_libraries(VUI VRenderer)
 
 endif (WIN32)
 

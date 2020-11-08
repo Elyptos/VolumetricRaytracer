@@ -19,6 +19,11 @@
 
 namespace VolumeRaytracer
 {
+	namespace Renderer
+	{
+		class VRenderer;
+	}
+
 	namespace Engine
 	{
 		class IEngineInstance;
@@ -38,9 +43,13 @@ namespace VolumeRaytracer
 
 			bool IsEngineActive() const { return IsRunning; }
 
+			std::weak_ptr<Renderer::VRenderer> GetRenderer() const { return Renderer; }
+
 		private:
 			void InitializeLogger();
 			void InitializeEngineInstance();
+			void InitializeRenderer();
+
 			std::string GetCurrentDateTimeAsString() const;
 			std::string GetLoggerFilePath() const;
 
@@ -49,6 +58,7 @@ namespace VolumeRaytracer
 
 			void StartEngineLoop();
 			void StopEngineLoop();
+			void StopRenderer();
 			void EngineLoop();
 
 			void ShutdownEngineAfterEngineLoopFinishes();
@@ -57,6 +67,7 @@ namespace VolumeRaytracer
 			bool IsRunning = false;
 			float EngineDeltaTime = 0.f;
 
+			std::shared_ptr<Renderer::VRenderer> Renderer; 
 			std::shared_ptr<IEngineInstance> EngineInstance;
 		};
 	}

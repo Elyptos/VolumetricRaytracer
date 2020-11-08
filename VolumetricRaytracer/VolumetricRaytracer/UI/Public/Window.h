@@ -20,6 +20,11 @@
 
 namespace VolumeRaytracer
 {
+	namespace Renderer
+	{
+		class VRenderTarget;
+	}
+
 	namespace UI
 	{
 		class VWindow : public VObject
@@ -35,6 +40,8 @@ namespace VolumeRaytracer
 
 			virtual unsigned int GetWidth() const = 0;
 			virtual unsigned int GetHeight() const = 0;
+
+			void SetRenderTarget(const VObjectPtr<Renderer::VRenderTarget>& renderTarget);
 
 			void Show();
 			void Close();
@@ -58,6 +65,8 @@ namespace VolumeRaytracer
 
 		private:
 			bool WindowOpen = false;
+
+			VObjectPtr<Renderer::VRenderTarget> RenderTarget;
 
 			WindowDelegate OnWindowOpened;
 			WindowDelegate OnWindowClosed;
