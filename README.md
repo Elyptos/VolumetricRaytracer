@@ -14,3 +14,4 @@ This application is in a very early stage of development.
 ## External dependencies
 - [spdlog](https://github.com/gabime/spdlog) | *version* *1.8.1* | [MIT License](https://github.com/gabime/spdlog/blob/v1.x/LICENSE)
 - [boost](https://www.boost.org) | *version* *1.74.0* | [Boost Software License](https://www.boost.org/users/license.html)
+- [d3dx12](https://github.com/microsoft/DirectX-Graphics-Samples) | *version* *v1.5-dxr* | [MIT License](https://github.com/microsoft/DirectX-Graphics-Samples/blob/v1.5-dxr/LICENSE)
