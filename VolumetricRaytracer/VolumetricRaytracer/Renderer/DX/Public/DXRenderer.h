@@ -85,6 +85,8 @@ namespace VolumeRaytracer
 
 				void ReleaseInternalVariables();
 
+				void ClearAllRenderTargets();
+
 			private:
 				CPtr<ID3D12Device5> Device;
 				CPtr<ID3D12CommandQueue> CommandQueue;

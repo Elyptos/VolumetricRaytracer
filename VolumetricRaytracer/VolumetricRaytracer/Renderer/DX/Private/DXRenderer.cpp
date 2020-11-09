@@ -15,6 +15,7 @@
 #include "DXRenderer.h"
 #include "Logger.h"
 #include "DXRenderTarget.h"
+#include "d3dx12.h"
 #include <string>
 #include <sstream>
 #include <vector>
@@ -23,7 +24,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::Render()
 {
 	if (IsActive())
 	{
-		
+		ClearAllRenderTargets();
 	}
 	else
 	{
@@ -386,6 +387,8 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::AddRenderTargetToActiveMap(VDXR
 
 	registrationContainer.RenderTarget = renderTarget;
 	registrationContainer.RenderTargetReleaseDelegateHandle = renderTarget->OnRenderTargetReleased_Bind(boost::bind(&VDXRenderer::OnRenderTargetPendingRelease, this, boost::placeholders::_1));
+
+	ActiveRenderTargets[renderTarget] = registrationContainer;
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::RemoveRenderTargetFromActiveMap(VDXRenderTarget* renderTarget)
@@ -531,6 +534,52 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseInternalVariables()
 
 		Device.Reset();
 		Device = nullptr;
+	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::ClearAllRenderTargets()
+{
+	unsigned int renderTargetViewDescriptorSize = 0;
+	renderTargetViewDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+	for (auto elem : ActiveRenderTargets)
+	{
+		VDXRenderTarget* renderTarget = elem.first;
+
+		CPtr<ID3D12Resource> buffer = renderTarget->GetBuffers()[renderTarget->GetBufferIndex()];
+
+		CommandAllocator->Reset();
+		CommandList->Reset(CommandAllocator.Get(), nullptr);
+
+		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(buffer.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+		CommandList->ResourceBarrier(1, &barrier);
+
+		float color[] = { 0.4f, 0.6f, 0.9f, 1.0f };
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(renderTarget->GetViewHeapDesc()->GetCPUDescriptorHandleForHeapStart(), renderTarget->GetBufferIndex(), renderTargetViewDescriptorSize);
+
+		CommandList->ClearRenderTargetView(cpuHandle, color, 0, nullptr);
+
+		barrier = CD3DX12_RESOURCE_BARRIER::Transition(buffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+
+		CommandList->ResourceBarrier(1, &barrier);
+		CommandList->Close();
+
+		ID3D12CommandList* commandLists[] = {
+				CommandList.Get()
+		};
+
+		CommandQueue->ExecuteCommandLists(1, commandLists);
+
+		renderTarget->FenceValue = SignalFence(CommandQueue, renderTarget->Fence, renderTarget->FenceValue);
+
+		WaitForFenceValue(renderTarget->Fence, renderTarget->FenceValue, renderTarget->FenceEvent);
+
+		unsigned int nextBufferIndex = renderTarget->GetBufferIndex() == 0u ? 1u : 0u;
+
+		renderTarget->SetBufferIndex(nextBufferIndex);
+		renderTarget->GetSwapChain()->Present(0, 0);
 	}
 }
 

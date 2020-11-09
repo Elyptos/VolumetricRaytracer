@@ -55,6 +55,7 @@ namespace VolumeRaytracer
 
 			void CallVObjectTicks(const float& deltaTime);
 			void TickEngineInstance(const float& deltaTime);
+			void ExecuteRenderCommand();
 
 			void StartEngineLoop();
 			void StopEngineLoop();

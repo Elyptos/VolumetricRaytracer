@@ -130,6 +130,11 @@ void VolumeRaytracer::Engine::VEngine::TickEngineInstance(const float& deltaTime
 	}
 }
 
+void VolumeRaytracer::Engine::VEngine::ExecuteRenderCommand()
+{
+	Renderer->Render();
+}
+
 void VolumeRaytracer::Engine::VEngine::StartEngineLoop()
 {
 	IsRunning = true;
@@ -165,6 +170,8 @@ void VolumeRaytracer::Engine::VEngine::EngineLoop()
 
 			TickEngineInstance(prevDeltaTime);
 			CallVObjectTicks(prevDeltaTime);
+
+			ExecuteRenderCommand();
 		}
 
 		std::this_thread::sleep_for(std::chrono::microseconds(MIN_ENGINE_TICK_TIME_MICROSECONDS));

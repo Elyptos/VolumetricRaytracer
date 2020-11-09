@@ -41,7 +41,7 @@ VolumeRaytracer::VObjectPtr<VolumeRaytracer::Renderer::VRenderTarget> VolumeRayt
 	VObjectPtr<VolumeRaytracer::Renderer::VRenderTarget> renderTarget = nullptr;
 	renderTarget = dxRenderer->CreateViewportRenderTarget(win32Window->GetHWND(), win32Window->GetWidth(), win32Window->GetHeight());
 
-	if (renderTarget)
+	if (renderTarget == nullptr)
 	{
 		V_LOG_ERROR("Unable to create render target for window!");
 		return nullptr;

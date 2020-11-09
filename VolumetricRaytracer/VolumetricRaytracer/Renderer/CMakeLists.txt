@@ -25,6 +25,9 @@ if (WIN32)
 	)
 
 	# Add source to this project's executable.
+
+	#include_directories(${d3dx12IncludeDir})
+
 	add_library (VRenderer ${renderer_public} ${renderer_private} ${renderer_dx_public} ${renderer_dx_private})
 
 	if(Boost_FOUND)
@@ -37,4 +40,5 @@ if (WIN32)
 
 	target_include_directories(VRenderer PUBLIC "Public")
 	target_include_directories(VRenderer PUBLIC "DX/Public")
+	target_include_directories(VRenderer PUBLIC ${d3dx12IncludeDir})
 endif(WIN32)
