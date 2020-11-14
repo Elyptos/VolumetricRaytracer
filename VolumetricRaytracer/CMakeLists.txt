@@ -26,7 +26,8 @@ ExternalProject_Add(spdlog
 ExternalProject_Get_Property(spdlog source_dir)
 set(spdlogIncludeDir ${source_dir}/include)
 
-file(DOWNLOAD https://raw.githubusercontent.com/microsoft/DirectX-Graphics-Samples/v1.5-dxr/Libraries/D3DX12/d3dx12.h ${CMAKE_CURRENT_SOURCE_DIR}/ext/d3dx12/include/d3dx12.h)
+#file(DOWNLOAD https://raw.githubusercontent.com/microsoft/DirectX-Graphics-Samples/v1.5-dxr/Libraries/D3DX12/d3dx12.h ${CMAKE_CURRENT_SOURCE_DIR}/ext/d3dx12/include/d3dx12.h)
+file(DOWNLOAD https://raw.githubusercontent.com/microsoft/DirectX-Graphics-Samples/225977/Libraries/D3DX12/d3dx12.h ${CMAKE_CURRENT_SOURCE_DIR}/ext/d3dx12/include/d3dx12.h)
 set(d3dx12IncludeDir ${CMAKE_CURRENT_SOURCE_DIR}/ext/d3dx12/include)
 
 # Boost

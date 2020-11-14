@@ -17,6 +17,8 @@
 #include "Renderer.h"
 #include "DXHelper.h"
 #include "Object.h"
+#include "DXShaderTypes.h"
+#include "d3dx12.h"
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
@@ -69,6 +71,8 @@ namespace VolumeRaytracer
 
 				void CreateSwapChain(HWND hwnd, unsigned int width, unsigned int height, CPtr<IDXGISwapChain3>& outSwapChain);
 				void InitializeRenderTargetBuffers(VDXRenderTarget* renderTarget, const uint32_t& bufferCount);
+				void InitializeRenderTargetResourceDescHeap(VDXRenderTarget* renderTarget);
+				void CreateRenderingOutputTexture(VDXRenderTarget* renderTarget);
 
 				void AddRenderTargetToActiveMap(VDXRenderTarget* renderTarget);
 				void RemoveRenderTargetFromActiveMap(VDXRenderTarget* renderTarget);
@@ -87,13 +91,28 @@ namespace VolumeRaytracer
 
 				void ClearAllRenderTargets();
 
+				void InitializeGlobalRootSignature();
+				void InitRaytracingPipeline();
+				void InitShaders(CD3DX12_STATE_OBJECT_DESC* pipelineDesc);
+				void CreateHitGroups(CD3DX12_STATE_OBJECT_DESC* pipelineDesc);
+
+				void PrepareForRendering(VDXRenderTarget* renderTarget);
+				void DoRendering(VDXRenderTarget* renderTarget);
+
 			private:
 				CPtr<ID3D12Device5> Device;
 				CPtr<ID3D12CommandQueue> CommandQueue;
 				CPtr<IDXGIFactory4> DXGIFactory;
 				CPtr<ID3D12CommandAllocator> CommandAllocator;
-				CPtr<ID3D12GraphicsCommandList4> CommandList;
+				CPtr<ID3D12GraphicsCommandList5> CommandList;
+				CPtr<ID3D12StateObject> DXRStateObject;
 				CPtr<ID3D12PipelineState> PipelineState;
+
+				CPtr<ID3D12Resource> OutputTexture;
+				D3D12_GPU_DESCRIPTOR_HANDLE OutputTextureHandle;
+
+				CPtr<ID3D12RootSignature> GlobalRootSignature;
+				boost::unordered_map<EShaderType, CPtr<ID3D12RootSignature>> LocalRootSignatures;
 
 				boost::unordered_map<VDXRenderTarget*, DXRegisteredRenderTarget> ActiveRenderTargets;
 

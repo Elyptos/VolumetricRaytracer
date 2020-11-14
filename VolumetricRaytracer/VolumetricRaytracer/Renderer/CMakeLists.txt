@@ -28,7 +28,9 @@ if (WIN32)
 
 	#include_directories(${d3dx12IncludeDir})
 
-	add_library (VRenderer ${renderer_public} ${renderer_private} ${renderer_dx_public} ${renderer_dx_private})
+	set(dx_shader_include "DX/Resources/Shaders/RaytracingHlsl.h")
+
+	add_library (VRenderer ${renderer_public} ${renderer_private} ${renderer_dx_public} ${renderer_dx_private} ${dx_shader_include})
 
 	if(Boost_FOUND)
 		target_include_directories(VRenderer PUBLIC ${Boost_INCLUDE_DIRS})
@@ -40,5 +42,6 @@ if (WIN32)
 
 	target_include_directories(VRenderer PUBLIC "Public")
 	target_include_directories(VRenderer PUBLIC "DX/Public")
+	target_include_directories(VRenderer PUBLIC "DX/Resources/Shaders")
 	target_include_directories(VRenderer PUBLIC ${d3dx12IncludeDir})
 endif(WIN32)

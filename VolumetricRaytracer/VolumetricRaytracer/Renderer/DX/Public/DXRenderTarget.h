@@ -16,12 +16,10 @@
 
 #include "RenderTarget.h"
 #include "DXHelper.h"
+#include <d3d12.h>
 #include <vector>
 
-struct ID3D12Resource;
-struct ID3D12DescriptorHeap;
 struct IDXGISwapChain3;
-struct ID3D12Fence;
 
 namespace VolumeRaytracer
 {
@@ -36,21 +34,45 @@ namespace VolumeRaytracer
 			public:
 				CPtr<IDXGISwapChain3> GetSwapChain() const;
 				CPtr<ID3D12DescriptorHeap> GetViewHeapDesc() const;
-				std::vector<CPtr<ID3D12Resource>> GetBuffers() const;
+				CPtr<ID3D12DescriptorHeap> GetResourceDescHeap() const;
 
+				std::vector<CPtr<ID3D12Resource>> GetBuffers() const;
+				CPtr<ID3D12Resource> GetCurrentBuffer() const;
+				unsigned int GetCurrentBufferIndex() const;
+				void SetBufferIndex(const unsigned int& bufferIndex);
+
+				unsigned int GetWidth() const;
+				unsigned int GetHeight() const;
 
 				void Release() override;
+
+				bool AllocateNewResourceDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* descriptorHandle, unsigned int& descriptorIndex);
 
 			protected:
 				void ReleaseInternalVariables();
 
 			private:
 				std::vector<CPtr<ID3D12Resource>> BufferArr;
+
 				CPtr<ID3D12DescriptorHeap> RenderTargetViewHeap = nullptr;
+
+				CPtr<ID3D12DescriptorHeap> ResourceDescHeap = nullptr;
+				unsigned int ResourceDescHeapSize = 0;
+				unsigned int NumResourceDescriptors = 0;
+				unsigned int ResourceDescSize = 0;
+
 				CPtr<IDXGISwapChain3> SwapChain = nullptr;
 				CPtr<ID3D12Fence> Fence = nullptr;
 				HANDLE FenceEvent;
 				uint64_t FenceValue = 0;
+
+				CPtr<ID3D12Resource> OutputTexture = nullptr;
+				unsigned int OutputTextureDescIndex = 0;
+				D3D12_GPU_DESCRIPTOR_HANDLE OutputTextureGPUHandle;
+
+				unsigned int BufferIndex = 0;
+				unsigned int Width = 0;
+				unsigned int Height = 0;
 			};
 		}
 	}

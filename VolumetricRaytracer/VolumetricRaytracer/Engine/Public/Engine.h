@@ -12,7 +12,7 @@
 	copies or substantial portions of the Software.
 */
 
-#pragma once;
+#pragma once
 
 #include <string>
 #include <memory>
