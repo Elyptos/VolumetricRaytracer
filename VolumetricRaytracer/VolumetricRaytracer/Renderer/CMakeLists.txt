@@ -37,6 +37,7 @@ if (WIN32)
 	endif()
 
 	target_link_libraries(VRenderer VCore)
+	target_link_libraries(VRenderer VVoxel)
 	target_link_libraries(VRenderer ${Boost_LIBRARIES})
 	target_link_libraries(VRenderer "d3d12.lib" "dxgi.lib" "d3dcompiler.lib" "dxguid.lib")
 
