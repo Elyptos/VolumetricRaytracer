@@ -14,6 +14,7 @@
 
 #include "VoxelScene.h"
 #include "MathHelpers.h"
+#include "Camera.h"
 
 VolumeRaytracer::Voxel::VVoxelScene::VVoxelScene(const unsigned int& size, const float& voxelSize)
 	:Size(size),
@@ -35,9 +36,14 @@ VolumeRaytracer::VAABB VolumeRaytracer::Voxel::VVoxelScene::GetSceneBounds() con
 	VAABB res;
 
 	res.SetCenterPosition(VVector::ZERO);
-	res.SetExtends(VVector::ONE * GetSize() * VoxelSize * 0.5f);
+	res.SetExtends(VVector::ONE * (float)GetSize() * VoxelSize * 0.5f);
 
 	return res;
+}
+
+VolumeRaytracer::VObjectPtr<VolumeRaytracer::Scene::VCamera> VolumeRaytracer::Voxel::VVoxelScene::GetSceneCamera() const
+{
+	return Camera;
 }
 
 void VolumeRaytracer::Voxel::VVoxelScene::SetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos, const VVoxel& voxel)
@@ -67,8 +73,20 @@ bool VolumeRaytracer::Voxel::VVoxelScene::IsValidVoxelIndex(const unsigned int& 
 	return xPos < Size && yPos < Size && zPos < Size;
 }
 
+VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator VolumeRaytracer::Voxel::VVoxelScene::begin()
+{
+	return VVoxelSceneIterator(*this, 0);
+}
+
+VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator VolumeRaytracer::Voxel::VVoxelScene::end()
+{
+	return VVoxelSceneIterator(*this, GetVoxelCount());
+}
+
 void VolumeRaytracer::Voxel::VVoxelScene::Initialize()
 {
+	Camera = VObject::CreateObject<Scene::VCamera>();
+
 	if (GetSize() > 0)
 	{
 		VoxelArr = new VVoxel[GetVoxelCount()];
@@ -86,4 +104,47 @@ void VolumeRaytracer::Voxel::VVoxelScene::BeginDestroy()
 		delete[] VoxelArr;
 		VoxelArr = nullptr;
 	}
+}
+
+VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator::VVoxelSceneIterator(VVoxelScene& scene, size_t index /*= 0*/)
+	:Scene(scene),
+	Index(index)
+{
+
+}
+
+VolumeRaytracer::Voxel::VVoxelIteratorElement VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator::operator*() const
+{
+	if (Index < 0 || Index >= Scene.GetVoxelCount())
+	{
+		return VVoxelIteratorElement();
+	}
+
+	VVoxelIteratorElement elem;
+
+	elem.Voxel = Scene.VoxelArr[Index];
+	elem.Index = Index;
+	
+	VMathHelpers::Index1DTo3D(Index, Scene.GetSize(), Scene.GetSize(), elem.X, elem.Y, elem.Z);
+
+	return elem;
+}
+
+VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator& VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator::operator++()
+{
+	++Index;
+	return *this;
+}
+
+bool VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator::operator!=(const VVoxelSceneIterator& other) const
+{
+	return Index != other.Index;
+}
+
+VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator::operator++(int)
+{
+	VVoxelSceneIterator res(*this);
+	operator++();
+
+	return res;
 }

@@ -18,6 +18,14 @@ const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::HIT_GROUP(L"HitG
 
 const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADOW_HIT_GROUP(L"HitGroup_ShadowRay");
 
-unsigned int VolumeRaytracer::Renderer::DX::VDXConstants::MAX_RAY_RECURSION_DEPTH = 3;
-
 DXGI_FORMAT VolumeRaytracer::Renderer::DX::VDXConstants::BACK_BUFFER_FORMAT = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM;
+
+const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_RAYGEN(L"VRRaygen");
+
+const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_CLOSEST_HIT(L"VRClosestHit");
+
+const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_INTERSECTION(L"VRIntersection");
+
+const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_MISS(L"VRMiss");
+
+const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_MISS_SHADOW(L"VRMissShadowRay");

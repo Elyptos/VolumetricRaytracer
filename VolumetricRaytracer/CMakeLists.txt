@@ -23,8 +23,21 @@ ExternalProject_Add(spdlog
 	LOG_DOWNLOAD ON
 )
 
+ExternalProject_Add(Eigen3
+	PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/ext/eigen3
+	URL https://gitlab.com/libeigen/eigen/-/archive/3.3.8/eigen-3.3.8.tar.gz
+	UPDATE_COMMAND ""
+	CONFIGURE_COMMAND ""
+	INSTALL_COMMAND ""
+	BUILD_COMMAND ""
+	LOG_DOWNLOAD ON
+)
+
 ExternalProject_Get_Property(spdlog source_dir)
 set(spdlogIncludeDir ${source_dir}/include)
+
+ExternalProject_Get_Property(Eigen3 source_dir)
+set(eigenIncludeDir ${source_dir})
 
 #file(DOWNLOAD https://raw.githubusercontent.com/microsoft/DirectX-Graphics-Samples/v1.5-dxr/Libraries/D3DX12/d3dx12.h ${CMAKE_CURRENT_SOURCE_DIR}/ext/d3dx12/include/d3dx12.h)
 file(DOWNLOAD https://raw.githubusercontent.com/microsoft/DirectX-Graphics-Samples/225977/Libraries/D3DX12/d3dx12.h ${CMAKE_CURRENT_SOURCE_DIR}/ext/d3dx12/include/d3dx12.h)

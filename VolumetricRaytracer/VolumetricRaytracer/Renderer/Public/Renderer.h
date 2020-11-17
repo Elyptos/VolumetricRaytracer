@@ -14,8 +14,16 @@
 
 #pragma once
 
+#include "Object.h"
+#include <memory>
+
 namespace VolumeRaytracer
 {
+	namespace Voxel
+	{
+		class VVoxelScene;
+	}
+
 	namespace Renderer
 	{
 		class VRenderer
@@ -28,6 +36,10 @@ namespace VolumeRaytracer
 			virtual void Stop() = 0;
 
 			virtual bool IsActive() const = 0;
+			virtual void SetSceneToRender(VObjectPtr<Voxel::VVoxelScene> scene);
+
+		protected:
+			std::weak_ptr<Voxel::VVoxelScene> SceneRef;
 		};
 	}
 }

@@ -12,6 +12,9 @@
 	copies or substantial portions of the Software.
 */
 
+#pragma once
+#include <Eigen/Geometry>
+
 namespace VolumeRaytracer
 {
 	struct VVector
@@ -19,6 +22,7 @@ namespace VolumeRaytracer
 	public:
 		VVector();
 		VVector(const float& x, const float& y, const float& z);
+		VVector(const Eigen::Vector3f& eigenVector);
 		VVector(const VVector& other);
 
 		float Length() const;
@@ -35,6 +39,8 @@ namespace VolumeRaytracer
 		VVector operator*(const float& scalar) const;
 		VVector operator/(const VVector& other) const;
 		VVector operator/(const float& scalar) const;
+
+		operator Eigen::Vector3f() const {return Eigen::Vector3f(X, Y, Z);}
 
 	public:
 		static const VVector ZERO;

@@ -23,3 +23,12 @@ void VolumeRaytracer::Renderer::DX::SetDXDebugName(ID3D12DeviceChild* elem, cons
 		elem->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.size(), name.c_str());
 	}
 }
+
+void VolumeRaytracer::Renderer::DX::VD3DBuffer::Release()
+{
+	if (Resource != nullptr)
+	{
+		Resource.Reset();
+		Resource = nullptr;
+	}
+}

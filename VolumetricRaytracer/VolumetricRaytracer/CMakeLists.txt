@@ -8,6 +8,7 @@ add_subdirectory("UI")
 add_subdirectory("Engine")
 add_subdirectory("Renderer")
 add_subdirectory("Voxel")
+add_subdirectory("Scene")
 
 file(GLOB_RECURSE app_public
 	CONFIGURE_DEPENDS

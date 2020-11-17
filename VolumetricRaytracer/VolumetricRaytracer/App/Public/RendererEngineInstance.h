@@ -26,6 +26,11 @@ namespace VolumeRaytracer
 		class VWindow;
 	}
 
+	namespace Voxel
+	{
+		class VVoxelScene;
+	}
+
 	namespace App
 	{
 		class RendererEngineInstance : public Engine::IEngineInstance
@@ -40,9 +45,12 @@ namespace VolumeRaytracer
 
 			void OnWindowClosed();
 
+			void InitScene();
+
 		private:
 			Engine::VEngine* Engine = nullptr;
 			VObjectPtr<UI::VWindow> Window = nullptr;
+			VObjectPtr<Voxel::VVoxelScene> Scene = nullptr;
 
 			boost::signals2::connection OnWindowClosedHandle;
 		};

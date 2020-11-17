@@ -17,13 +17,45 @@
 #include "Voxel.h"
 #include "Object.h"
 #include "AABB.h"
+#include <iterator>
 
 namespace VolumeRaytracer
 {
+	namespace Scene
+	{
+		class VCamera;
+	}
+
 	namespace Voxel
 	{
-		class VVoxelScene : VObject 
+		struct VVoxelIteratorElement
 		{
+		public:
+			VVoxel Voxel;
+			unsigned int X;
+			unsigned int Y;
+			unsigned int Z;
+			unsigned int Index;
+		};
+
+		class VVoxelScene : public VObject 
+		{
+		private:
+			class VVoxelSceneIterator : public std::iterator<std::output_iterator_tag, VVoxelIteratorElement>
+			{
+			public:
+				explicit VVoxelSceneIterator(VVoxelScene& scene, size_t index = 0);
+
+				VVoxelIteratorElement operator*() const;
+				VVoxelSceneIterator& operator++();
+				VVoxelSceneIterator operator++(int);
+				bool operator!=(const VVoxelSceneIterator& other) const;
+
+			private:
+				size_t Index = 0;
+				VVoxelScene& Scene;
+			};
+
 		public:
 			VVoxelScene(const unsigned int& size, const float& voxelSize);
 
@@ -32,9 +64,14 @@ namespace VolumeRaytracer
 
 			VAABB GetSceneBounds() const;
 
+			VObjectPtr<Scene::VCamera> GetSceneCamera() const;
+
 			void SetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos, const VVoxel& voxel);
 			VVoxel GetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
 			bool IsValidVoxelIndex(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
+
+			VVoxelSceneIterator begin();
+			VVoxelSceneIterator end();
 
 		protected:
 			void Initialize() override;
@@ -43,7 +80,9 @@ namespace VolumeRaytracer
 		private:
 			unsigned int Size = 0;
 			float VoxelSize = 0;
-			VVoxel* VoxelArr;
+			VVoxel* VoxelArr = nullptr;
+
+			VObjectPtr<Scene::VCamera> Camera;
 		};
 	}
 }

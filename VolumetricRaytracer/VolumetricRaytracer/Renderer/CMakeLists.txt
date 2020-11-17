@@ -24,11 +24,26 @@ if (WIN32)
 		"DX/Private/*"
 	)
 
+	find_program(hlslCompiler dxc)
+
+	if(hlslCompiler)
+		message("HLSL shader compiler found at path " ${hlslCompiler})
+		message("Compiling shaders")
+
+		execute_process(
+			COMMAND ${hlslCompiler} -Zi -Od -Vn "g_pRaytracing" -Fo "./DX/Resources/Shaders/Compiled/Raytracing.cso" -T "lib_6_3"  -Fh "./DX/Resources/Shaders/Compiled/Raytracing.hlsl.h" "./DX/Resources/Shaders/Raytracing.hlsl"
+			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+			RESULT_VARIABLE hlslCompilerResult
+		)
+	else()
+		message(WARNING "HLSL shader compiler not found")
+	endif()
+
 	# Add source to this project's executable.
 
 	#include_directories(${d3dx12IncludeDir})
 
-	set(dx_shader_include "DX/Resources/Shaders/RaytracingHlsl.h")
+	set(dx_shader_include "DX/Resources/Shaders/RaytracingHlsl.h" "DX/Resources/Shaders/Compiled/Raytracing.hlsl.h")
 
 	add_library (VRenderer ${renderer_public} ${renderer_private} ${renderer_dx_public} ${renderer_dx_private} ${dx_shader_include})
 

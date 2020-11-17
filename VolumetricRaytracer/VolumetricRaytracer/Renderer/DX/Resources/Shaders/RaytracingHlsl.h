@@ -15,29 +15,42 @@
 #pragma once
 
 #ifdef HLSL
-
+typedef float2 XMFLOAT2;
+typedef float3 XMFLOAT3;
+typedef float4 XMFLOAT4;
+typedef float4 XMVECTOR;
+typedef float4x4 XMMATRIX;
+typedef uint UINT;
 #else
-//using namespace DirectX;
+	#include <DirectXMath.h>
+	using namespace DirectX;
 #endif
+
+#define MAX_RAY_RECURSION_DEPTH 3
 
 namespace VolumeRaytracer
 {
 	struct VPrimitiveAttributes
 	{
-	public:
-		//XMFLOAT3 Normal;
+		XMFLOAT3 normal;
 	};
 
 	struct VRayPayload
 	{
-	public:
-		//XMFLOAT4 Color;
-		UINT Depth;
+		XMFLOAT4 color;
+		UINT depth;
 	};
 
 	struct VShadowRayPayload
 	{
-	public:
-		bool Hit;
+		bool hit;
 	};
+
+	struct VSceneConstantBuffer
+	{
+		XMMATRIX projectionToWorld;
+		XMVECTOR cameraPosition;
+	};
+
+	static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
 }

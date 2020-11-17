@@ -17,6 +17,8 @@
 #include "WindowRenderTargetFactory.h"
 #include "Window.h"
 #include "Engine.h"
+#include "Renderer.h"
+#include "VoxelScene.h"
 
 void VolumeRaytracer::App::RendererEngineInstance::OnEngineInitialized(Engine::VEngine* owningEngine)
 {
@@ -27,6 +29,12 @@ void VolumeRaytracer::App::RendererEngineInstance::OnEngineInitialized(Engine::V
 
 	VObjectPtr<Renderer::VRenderTarget> renderTarget = UI::VWindowRenderTargetFactory::CreateRenderTarget(Engine->GetRenderer(), Window);
 	Window->SetRenderTarget(renderTarget);
+
+	InitScene();
+
+	std::shared_ptr<Renderer::VRenderer> renderer = Engine->GetRenderer().lock();
+
+	renderer->SetSceneToRender(Scene);
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::OnEngineShutdown()
@@ -58,5 +66,15 @@ void VolumeRaytracer::App::RendererEngineInstance::OnWindowClosed()
 	{
 		Engine->Shutdown();
 	}
+}
+
+void VolumeRaytracer::App::RendererEngineInstance::InitScene()
+{
+	Scene = VObject::CreateObject<Voxel::VVoxelScene>(10, 50.f);
+
+	Voxel::VVoxel voxelToUse;
+	voxelToUse.Material = 1;
+
+	Scene->SetVoxel(4, 4, 4, voxelToUse);
 }
 

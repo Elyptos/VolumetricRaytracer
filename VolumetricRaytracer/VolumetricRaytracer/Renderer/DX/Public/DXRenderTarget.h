@@ -62,9 +62,6 @@ namespace VolumeRaytracer
 				unsigned int ResourceDescSize = 0;
 
 				CPtr<IDXGISwapChain3> SwapChain = nullptr;
-				CPtr<ID3D12Fence> Fence = nullptr;
-				HANDLE FenceEvent;
-				uint64_t FenceValue = 0;
 
 				CPtr<ID3D12Resource> OutputTexture = nullptr;
 				unsigned int OutputTextureDescIndex = 0;

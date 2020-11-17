@@ -12,9 +12,14 @@
 	copies or substantial portions of the Software.
 */
 
-#include "Renderer.h"
+#include "Camera.h"
 
-void VolumeRaytracer::Renderer::VRenderer::SetSceneToRender(VObjectPtr<Voxel::VVoxelScene> scene)
+void VolumeRaytracer::Scene::VCamera::Initialize()
 {
-	SceneRef = scene;
+	
+}
+
+void VolumeRaytracer::Scene::VCamera::BeginDestroy()
+{
+	
 }

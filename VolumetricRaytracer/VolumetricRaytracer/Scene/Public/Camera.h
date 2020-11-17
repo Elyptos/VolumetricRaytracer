@@ -12,9 +12,28 @@
 	copies or substantial portions of the Software.
 */
 
-#include "Renderer.h"
+#pragma once
+#include "Object.h"
+#include "Vector.h"
+#include "Quat.h"
 
-void VolumeRaytracer::Renderer::VRenderer::SetSceneToRender(VObjectPtr<Voxel::VVoxelScene> scene)
+namespace VolumeRaytracer
 {
-	SceneRef = scene;
+	namespace Scene
+	{
+		class VCamera : public VObject
+		{
+		protected:
+			void Initialize() override;
+			void BeginDestroy() override;
+
+		public:
+			float FOVAngle = 90.f;
+			float NearClipPlane = 0.01f;
+			float FarClipPlane = 125.f;
+			float AspectRatio = 1.7777f;
+			VVector Position = VVector::ZERO;
+			VQuat Rotation = VQuat::IDENTITY;
+		};
+	}
 }

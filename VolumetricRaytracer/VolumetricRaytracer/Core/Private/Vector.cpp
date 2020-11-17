@@ -144,6 +144,10 @@ VolumeRaytracer::VVector::VVector()
 	: VVector(0.f, 0.f, 0.f)
 {}
 
+VolumeRaytracer::VVector::VVector(const Eigen::Vector3f& eigenVector)
+	: VVector(eigenVector.x(), eigenVector.y(), eigenVector.z())
+{}
+
 VolumeRaytracer::VVector::VVector(const VVector& other)
 {
 	X = other.X;

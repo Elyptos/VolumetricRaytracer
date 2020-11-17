@@ -17,7 +17,7 @@
 #include <string>
 #include <wrl/client.h>
 
-struct ID3D12DeviceChild;
+#include <d3d12.h>
 
 namespace VolumeRaytracer
 {
@@ -40,6 +40,26 @@ namespace VolumeRaytracer
 					SetDXDebugName(child.Get(), name);
 				}
 			}
+
+			struct VD3DBuffer
+			{
+			public:
+				CPtr<ID3D12Resource> Resource = nullptr;
+				D3D12_CPU_DESCRIPTOR_HANDLE CPUDescHandle;
+				D3D12_GPU_DESCRIPTOR_HANDLE GPUDescHandle;
+
+				void Release();
+			};
+
+			struct VDXAccelerationStructureBuffers
+			{
+			public:
+				CPtr<ID3D12Resource> Scratch;
+				CPtr<ID3D12Resource> AccelerationStructure;
+				CPtr<ID3D12Resource> InstanceDesc;
+				D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC AccelerationStructureDesc;
+				UINT64 ResultDataMaxSizeInBytes;
+			};
 		}
 	}
 }

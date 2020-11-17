@@ -12,9 +12,31 @@
 	copies or substantial portions of the Software.
 */
 
-#include "Renderer.h"
+#pragma once
+#include "Vector.h"
+#include <Eigen/Geometry>
 
-void VolumeRaytracer::Renderer::VRenderer::SetSceneToRender(VObjectPtr<Voxel::VVoxelScene> scene)
+namespace VolumeRaytracer
 {
-	SceneRef = scene;
+	struct VQuat
+	{
+	public:
+		VQuat();
+		VQuat(const float& x, const float& y, const float& z, const float& w);
+		VQuat(const Eigen::Quaternionf eigenQuat);
+
+		static VQuat FromAxisAngle(const VVector& axis, const float& angle);
+
+		VVector GetUpVector();
+		VVector GetForwardVector();
+		VVector GetRightVector();
+
+		VVector operator*(const VVector& vec) const;
+
+	public:
+		static const VQuat IDENTITY;
+
+	private:
+		Eigen::Quaternionf EigenQuat;
+	};
 }

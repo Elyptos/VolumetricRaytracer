@@ -17,6 +17,8 @@
 #include "DXRenderTarget.h"
 #include "DXConstants.h"
 #include "RaytracingHlsl.h"
+#include "RDXScene.h"
+#include "Compiled/Raytracing.hlsl.h"
 #include <string>
 #include <sstream>
 #include <vector>
@@ -25,11 +27,33 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::Render()
 {
 	if (IsActive())
 	{
-		for (auto elem : ActiveRenderTargets)
+		if (SceneToRender != nullptr && !SceneRef.expired())
 		{
-			VDXRenderTarget* renderTarget = elem.first;
+			SceneToRender->SyncWithScene(SceneRef.lock().get());
 
-			PrepareForRendering(renderTarget);
+			for (auto elem : ActiveRenderTargets)
+			{
+				VDXRenderTarget* renderTarget = elem.first;
+
+				PrepareForRendering(renderTarget);
+				DoRendering(renderTarget);
+				CopyRaytracingOutputToBackbuffer(renderTarget);
+
+				ExecuteCommandList();
+
+				renderTarget->SwapChain->Present(1, 0);
+
+				WaitForGPU();
+
+				if (renderTarget->GetCurrentBufferIndex() == 0)
+				{
+					renderTarget->SetBufferIndex(1);
+				}
+				else
+				{
+					renderTarget->SetBufferIndex(0);
+				}
+			}
 		}
 
 		//ClearAllRenderTargets();
@@ -102,21 +126,34 @@ VolumeRaytracer::VObjectPtr<VolumeRaytracer::Renderer::DX::VDXRenderTarget> Volu
 
 	V_LOG("Creating necessary pipeline variables for render target");
 
-	if (FAILED(Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&res->Fence))))
-	{
-		V_LOG_FATAL("DX Fence creation failed!");
-
-		return false;
-	}
-
-	SetDXDebugName<ID3D12Fence>(res->Fence, "Volume Raytracer Fence");
-
-	res->FenceEvent = CreateEventEx(NULL, FALSE, FALSE, EVENT_ALL_ACCESS);
-	res->FenceValue = 1;
-
 	AddRenderTargetToActiveMap(res.get());
 
 	return res;
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::BuildAccelerationStructure(const VDXAccelerationStructureBuffers& topLevelAS, const VDXAccelerationStructureBuffers& bottomLevelAS)
+{
+	CommandList->Reset(CommandAllocator.Get(), nullptr);
+
+	D3D12_RESOURCE_BARRIER resourceBarrier = CD3DX12_RESOURCE_BARRIER::UAV(bottomLevelAS.AccelerationStructure.Get());
+	CommandList->ResourceBarrier(1, &resourceBarrier);
+
+	CommandList->BuildRaytracingAccelerationStructure(&bottomLevelAS.AccelerationStructureDesc, 0, nullptr);
+	CommandList->BuildRaytracingAccelerationStructure(&topLevelAS.AccelerationStructureDesc, 0, nullptr);
+
+	ExecuteCommandList();
+	WaitForGPU();
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::SetSceneToRender(VObjectPtr<Voxel::VVoxelScene> scene)
+{
+	VRenderer::SetSceneToRender(scene);
+
+	DeleteScene();
+
+	SceneToRender = new VRDXScene();
+	SceneToRender->InitFromScene(scene.get());
+	SceneToRender->BuildStaticResources(this);
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
@@ -201,7 +238,19 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 
 		InitializeGlobalRootSignature();
 		InitRaytracingPipeline();
+		CreateShaderTables();
 
+		if (FAILED(Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&Fence))))
+		{
+			V_LOG_FATAL("DX Fence creation failed!");
+			ReleaseInternalVariables();
+			return;
+		}
+
+		SetDXDebugName<ID3D12Fence>(Fence, "Volume Raytracer Fence");
+
+		FenceEvent = CreateEventEx(NULL, FALSE, FALSE, EVENT_ALL_ACCESS);
+		FenceValue = 1;
 
 		IsInitialized = true;
 
@@ -238,7 +287,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupDebugLayer()
 	debugController->QueryInterface(IID_PPV_ARGS(&debugControllerExtended));
 
 	debugControllerExtended->EnableDebugLayer();
-	debugControllerExtended->SetEnableGPUBasedValidation(true);
+	//debugControllerExtended->SetEnableGPUBasedValidation(true);
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupDebugQueue()
@@ -476,33 +525,20 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseRenderTarget(VDXRenderTa
 
 		if (ActiveRenderTargets.find(renderTarget) != ActiveRenderTargets.end())
 		{
-			if (renderTarget->Fence != nullptr)
-			{
-				V_LOG("Waiting for GPU to free Render Target");
-				FlushRenderTarget(renderTarget);
-				V_LOG("GPU finished. Now releasing Render Target");
+			V_LOG("Waiting for GPU to free Render Target");
+			WaitForGPU();
+			V_LOG("GPU finished. Now releasing Render Target");
 
-				CloseHandle(renderTarget->FenceEvent);
-				RemoveRenderTargetFromActiveMap(renderTarget);
+			RemoveRenderTargetFromActiveMap(renderTarget);
 
-				renderTarget->ReleaseInternalVariables();
+			renderTarget->ReleaseInternalVariables();
 
-				V_LOG("Render Target released!");
-			}
+			V_LOG("Render Target released!");
 		}
 		else
 		{
 			V_LOG_WARNING("Render target cannot be released by this renderer because it was created by another one!");
 		}
-	}
-}
-
-void VolumeRaytracer::Renderer::DX::VDXRenderer::FlushRenderTarget(VDXRenderTarget* renderTarget)
-{
-	if (renderTarget->Fence != nullptr)
-	{
-		uint64_t fenceValueForSignal = SignalFence(CommandQueue, renderTarget->Fence, renderTarget->FenceValue);
-		WaitForFenceValue(renderTarget->Fence, fenceValueForSignal, renderTarget->FenceEvent);
 	}
 }
 
@@ -550,6 +586,36 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseAllRenderTargets()
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseInternalVariables()
 {
+	DeleteScene();
+
+	if (ShaderTableRayGen != nullptr)
+	{
+		ShaderTableRayGen.Reset();
+		ShaderTableRayGen = nullptr;
+	}
+
+	if (ShaderTableMiss != nullptr)
+	{
+		ShaderTableMiss.Reset();
+		ShaderTableMiss = nullptr;
+	}
+
+	if (ShaderTableHitGroups != nullptr)
+	{
+		ShaderTableHitGroups.Reset();
+		ShaderTableHitGroups = nullptr;
+	}
+
+	if (Fence != nullptr)
+	{
+		CloseHandle(FenceEvent);
+
+		Fence.Reset();
+		Fence = nullptr;
+	}
+
+	FenceValue = 0;
+
 	if (PipelineState != nullptr)
 	{
 		PipelineState.Reset();
@@ -604,7 +670,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseInternalVariables()
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::ClearAllRenderTargets()
 {
-	unsigned int renderTargetViewDescriptorSize = 0;
+	/*unsigned int renderTargetViewDescriptorSize = 0;
 	renderTargetViewDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 	for (auto elem : ActiveRenderTargets)
@@ -645,7 +711,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ClearAllRenderTargets()
 
 		renderTarget->SetBufferIndex(nextBufferIndex);
 		renderTarget->GetSwapChain()->Present(0, 0);
-	}
+	}*/
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeGlobalRootSignature()
@@ -657,6 +723,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeGlobalRootSignature()
 	CD3DX12_ROOT_PARAMETER rootParameters[EGlobalRootSignature::Max];
 	rootParameters[EGlobalRootSignature::OutputView].InitAsDescriptorTable(1, &outputViewDescRange);
 	rootParameters[EGlobalRootSignature::AccelerationStructure].InitAsShaderResourceView(0);
+	rootParameters[EGlobalRootSignature::SceneConstant].InitAsConstantBufferView(0);
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(ARRAYSIZE(rootParameters), rootParameters);
 
@@ -695,9 +762,9 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::InitRaytracingPipeline()
 	globalRootSig->SetRootSignature(GlobalRootSignature.Get());
 
 	CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT* pipelineConfig = pipelineDesc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
-	pipelineConfig->Config(VDXConstants::MAX_RAY_RECURSION_DEPTH);
+	pipelineConfig->Config(MAX_RAY_RECURSION_DEPTH);
 
-	if (FAILED(Device->CreateStateObject(pipelineDesc, IID_PPV_ARGS(&PipelineState))))
+	if (FAILED(Device->CreateStateObject(pipelineDesc, IID_PPV_ARGS(&DXRStateObject))))
 	{
 		V_LOG_ERROR("Failed to initialize raytracing pipeline!");
 	}
@@ -707,29 +774,44 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::InitShaders(CD3DX12_STATE_OBJEC
 {
 	CD3DX12_DXIL_LIBRARY_SUBOBJECT* dxilLib = pipelineDesc->CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
 
-	//TODO: Initialize shader library
+	D3D12_SHADER_BYTECODE shaderByteCode = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing, ARRAYSIZE(g_pRaytracing));
+	dxilLib->SetDXILLibrary(&shaderByteCode);
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::CreateHitGroups(CD3DX12_STATE_OBJECT_DESC* pipelineDesc)
 {
-	//TODO: Set shaders here
-
 	//Radiance rays
 	CD3DX12_HIT_GROUP_SUBOBJECT* radianceHitGroup = pipelineDesc->CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
 
-	//hitGroup->SetIntersectionShaderImport()
-	//hitGroup->SetClosestHitShaderImport()
-	
+	radianceHitGroup->SetIntersectionShaderImport(VDXConstants::SHADER_NAME_INTERSECTION.c_str());
+	radianceHitGroup->SetClosestHitShaderImport(VDXConstants::SHADER_NAME_CLOSEST_HIT.c_str());
 	radianceHitGroup->SetHitGroupExport(VDXConstants::HIT_GROUP.c_str());
 	radianceHitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE);
 
 	//Shadow rays
 	CD3DX12_HIT_GROUP_SUBOBJECT* shadowHitGroup = pipelineDesc->CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
 
-	//hitGroup->SetIntersectionShaderImport()
-
+	shadowHitGroup->SetIntersectionShaderImport(VDXConstants::SHADER_NAME_INTERSECTION.c_str());
 	shadowHitGroup->SetHitGroupExport(VDXConstants::SHADOW_HIT_GROUP.c_str());
 	shadowHitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE);
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::CreateShaderTables()
+{
+	CPtr<ID3D12StateObjectProperties> stateObjectProps;
+	DXRStateObject.As(&stateObjectProps);
+
+	void* rayGenShaderID = stateObjectProps->GetShaderIdentifier(VDXConstants::SHADER_NAME_RAYGEN.c_str());
+	void* missShaderID = stateObjectProps->GetShaderIdentifier(VDXConstants::SHADER_NAME_MISS.c_str());
+	void* missShaderShadowID = stateObjectProps->GetShaderIdentifier(VDXConstants::SHADER_NAME_MISS_SHADOW.c_str());
+	void* rayHitGroupID = stateObjectProps->GetShaderIdentifier(VDXConstants::HIT_GROUP.c_str());
+	void* rayHitGroupShadowID = stateObjectProps->GetShaderIdentifier(VDXConstants::SHADOW_HIT_GROUP.c_str());
+
+	UINT strideRayGen = 0;
+
+	ShaderTableRayGen = CreateShaderTable(std::vector<void*>{rayGenShaderID}, strideRayGen);
+	ShaderTableMiss = CreateShaderTable(std::vector<void*>{missShaderID, missShaderShadowID}, StrideShaderTableMiss);
+	ShaderTableHitGroups = CreateShaderTable(std::vector<void*>{rayHitGroupID, rayHitGroupShadowID}, StrideShaderTableHitGroups);
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::PrepareForRendering(VDXRenderTarget* renderTarget)
@@ -739,18 +821,121 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::PrepareForRendering(VDXRenderTa
 
 	D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget->GetCurrentBuffer().Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	CommandList->ResourceBarrier(1, &barrier);
+
+	CommandList->SetComputeRootSignature(GlobalRootSignature.Get());
+
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::DoRendering(VDXRenderTarget* renderTarget)
 {
 	CommandList->SetComputeRootSignature(GlobalRootSignature.Get());
 	
-	D3D12_DISPATCH_RAYS_DESC dispatchRays = {};
-
 	CommandList->SetDescriptorHeaps(1, renderTarget->GetResourceDescHeap().GetAddressOf());
 	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::OutputView, renderTarget->OutputTextureGPUHandle);
-	
+	CommandList->SetComputeRootConstantBufferView(EGlobalRootSignature::SceneConstant, SceneToRender->CopySceneConstantBufferToGPU());
 
+	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::OutputView, renderTarget->OutputTextureGPUHandle);
+
+	CommandList->SetComputeRootShaderResourceView(EGlobalRootSignature::AccelerationStructure, SceneToRender->GetAccelerationStructureTL()->GetGPUVirtualAddress());
+
+	D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
+	dispatchDesc.HitGroupTable.StartAddress = ShaderTableHitGroups->GetGPUVirtualAddress();
+	dispatchDesc.HitGroupTable.SizeInBytes = ShaderTableHitGroups->GetDesc().Width;
+	dispatchDesc.HitGroupTable.StrideInBytes = StrideShaderTableHitGroups;
+	dispatchDesc.MissShaderTable.StartAddress = ShaderTableMiss->GetGPUVirtualAddress();
+	dispatchDesc.MissShaderTable.SizeInBytes = ShaderTableMiss->GetDesc().Width;
+	dispatchDesc.MissShaderTable.StrideInBytes = StrideShaderTableMiss;
+	dispatchDesc.RayGenerationShaderRecord.StartAddress = ShaderTableRayGen->GetGPUVirtualAddress();
+	dispatchDesc.RayGenerationShaderRecord.SizeInBytes = ShaderTableRayGen->GetDesc().Width;
+	dispatchDesc.Width = renderTarget->Width;
+	dispatchDesc.Height = renderTarget->Height;
+	dispatchDesc.Depth = 1;
+	
+	CommandList->SetPipelineState1(DXRStateObject.Get());
+	CommandList->DispatchRays(&dispatchDesc);
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::CopyRaytracingOutputToBackbuffer(VDXRenderTarget* renderTarget)
+{
+	D3D12_RESOURCE_BARRIER preCopyBarriers[2];
+	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget->GetCurrentBuffer().Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
+	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget->OutputTexture.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+	CommandList->ResourceBarrier(2, preCopyBarriers);
+	CommandList->CopyResource(renderTarget->GetCurrentBuffer().Get(), renderTarget->OutputTexture.Get());
+
+	D3D12_RESOURCE_BARRIER postCopyBarriers[2];
+	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget->GetCurrentBuffer().Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget->OutputTexture.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+	CommandList->ResourceBarrier(2, postCopyBarriers);
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::ExecuteCommandList()
+{
+	CommandList->Close();
+
+	ID3D12CommandList* commandLists[] = {
+				CommandList.Get()
+	};
+
+	CommandQueue->ExecuteCommandLists(1, commandLists);
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::WaitForGPU()
+{
+	if (CommandQueue && Fence)
+	{
+		uint64_t fenceValueForSignal = SignalFence(CommandQueue, Fence, FenceValue);
+		WaitForFenceValue(Fence, fenceValueForSignal, FenceEvent);
+	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::DeleteScene()
+{
+	if (SceneToRender != nullptr)
+	{
+		SceneToRender->Cleanup();
+
+		delete SceneToRender;
+		SceneToRender = nullptr;
+	}
+}
+
+VolumeRaytracer::Renderer::DX::CPtr<ID3D12Resource> VolumeRaytracer::Renderer::DX::VDXRenderer::CreateShaderTable(std::vector<void*> shaderIdentifiers, UINT& outShaderTableSize, void* rootArguments /*= nullptr*/, const size_t& rootArgumentsSize /*= 0*/)
+{
+	CPtr<ID3D12Resource> shaderTableRes;
+
+	UINT shaderTableEntrySize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES + rootArgumentsSize;
+	shaderTableEntrySize = (shaderTableEntrySize + 31) & ~31;
+
+	UINT shaderTableSize = shaderTableEntrySize * shaderIdentifiers.size();
+
+	CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(shaderTableSize, D3D12_RESOURCE_FLAG_NONE);
+
+	Device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&shaderTableRes));
+
+	uint8_t* mappedData;
+	CD3DX12_RANGE mappedRange(0, 0);
+
+	shaderTableRes->Map(0, &mappedRange, reinterpret_cast<void**>(&mappedData));
+
+	for (UINT i = 0; i < shaderIdentifiers.size(); i++)
+	{
+		uint8_t* dest = mappedData + (shaderTableEntrySize * i);
+
+		memcpy(dest, shaderIdentifiers[i], D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+
+		if (rootArguments != nullptr)
+		{
+			memcpy(dest + D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, rootArguments, rootArgumentsSize);
+		}
+	}
+
+	shaderTableRes->Unmap(0, nullptr);
+
+	return shaderTableRes;
 }
 
 VolumeRaytracer::Renderer::DX::VDXRenderer::~VDXRenderer()

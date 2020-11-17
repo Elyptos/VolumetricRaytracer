@@ -126,13 +126,5 @@ void VolumeRaytracer::Renderer::DX::VDXRenderTarget::ReleaseInternalVariables()
 		SwapChain.Reset();
 		SwapChain = nullptr;
 	}
-
-	if (Fence != nullptr)
-	{
-		Fence.Reset();
-		Fence = nullptr;
-	}
-
-	FenceValue = 0;
 }
 

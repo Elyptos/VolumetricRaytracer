@@ -12,9 +12,27 @@
 	copies or substantial portions of the Software.
 */
 
-#include "Renderer.h"
+#include "VoxelScene.h"
 
-void VolumeRaytracer::Renderer::VRenderer::SetSceneToRender(VObjectPtr<Voxel::VVoxelScene> scene)
+namespace VolumeRaytracer
 {
-	SceneRef = scene;
+	namespace Renderer
+	{
+		class VRScene
+		{
+		public:
+			VRScene() = default;
+			virtual ~VRScene();
+
+			virtual void InitFromScene(Voxel::VVoxelScene* scene);
+			virtual void SyncWithScene(Voxel::VVoxelScene* scene);
+			virtual void Cleanup();
+
+		protected:
+			Voxel::VVoxel* VoxelArr = nullptr;
+			unsigned int VoxelArrSize = 0;
+			float VoxelSize = 0.f;
+			VAABB Bounds;
+		};
+	}
 }
