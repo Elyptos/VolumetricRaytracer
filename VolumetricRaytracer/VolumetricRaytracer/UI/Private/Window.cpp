@@ -13,7 +13,7 @@
 */
 
 #include "Window.h"
-#include "RenderTarget.h"
+#include "Textures/RenderTarget.h"
 
 VolumeRaytracer::UI::VWindow::VWindow()
 {

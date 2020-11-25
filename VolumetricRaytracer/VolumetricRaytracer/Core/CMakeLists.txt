@@ -23,6 +23,11 @@ target_include_directories(VCore PUBLIC "Public")
 target_include_directories(VCore PUBLIC ${eigenIncludeDir})
 include_directories(${spdlogIncludeDir})
 
+if(Boost_FOUND)
+	target_include_directories(VCore PUBLIC ${Boost_INCLUDE_DIRS})
+endif()
+
+target_link_libraries(VCore ${Boost_LIBRARIES})
 
 #target_include_directories(VCore PUBLIC spdlogIncludeDir)
 

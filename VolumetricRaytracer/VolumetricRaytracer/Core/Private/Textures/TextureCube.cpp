@@ -12,9 +12,19 @@
 	copies or substantial portions of the Software.
 */
 
-#include "Texture.h"
+#include "Textures/TextureCube.h"
 
-size_t VolumeRaytracer::Renderer::VTexture::GetMipCount() const
+size_t VolumeRaytracer::Renderer::VTextureCube::GetWidth() const
 {
-	return MipCount;
+	return Width;
+}
+
+size_t VolumeRaytracer::Renderer::VTextureCube::GetHeight() const
+{
+	return Height;
+}
+
+size_t VolumeRaytracer::Renderer::VTextureCube::GetArraySize() const
+{
+	return ArraySize;
 }

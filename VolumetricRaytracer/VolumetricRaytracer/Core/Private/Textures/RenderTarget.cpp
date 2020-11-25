@@ -12,7 +12,7 @@
 	copies or substantial portions of the Software.
 */
 
-#include "RenderTarget.h"
+#include "Textures/RenderTarget.h"
 
 VolumeRaytracer::Renderer::VRenderTarget::~VRenderTarget()
 {

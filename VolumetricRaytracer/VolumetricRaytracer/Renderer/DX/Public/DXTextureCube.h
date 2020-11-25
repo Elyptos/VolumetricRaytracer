@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include "TextureCube.h"
+#include "Textures/TextureCube.h"
 #include "DXRendererInterfaces.h"
 
 

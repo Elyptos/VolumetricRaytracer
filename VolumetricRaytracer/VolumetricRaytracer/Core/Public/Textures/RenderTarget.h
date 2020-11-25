@@ -14,14 +14,14 @@
 
 #pragma once
 
-#include "Object.h"
+#include "Texture.h"
 #include <boost/signals2.hpp>
 
 namespace VolumeRaytracer
 {
 	namespace Renderer
 	{
-		class VRenderTarget : public VObject
+		class VRenderTarget : public VTexture
 		{
 			typedef boost::signals2::signal<void(VRenderTarget* renderTarget)> GenericRenderTargetDelegate;
 
