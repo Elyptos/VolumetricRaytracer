@@ -61,7 +61,7 @@ VolumeRaytracer::UI::Win32::VWin32Window::~VWin32Window()
 
 void VolumeRaytracer::UI::Win32::VWin32Window::SetTitle(const std::wstring& title)
 {
-	
+	SetWindowTextW(GetHWND(), title.c_str());
 }
 
 void VolumeRaytracer::UI::Win32::VWin32Window::SetSize(const unsigned int& width, const unsigned int& height)
@@ -130,8 +130,8 @@ void VolumeRaytracer::UI::Win32::VWin32Window::InitializeWindow()
 
 	HInstance = GetModuleHandleW(NULL);
 
-	Width = 800;
-	Height = 800;
+	Width = 896;
+	Height = 504;
 
 	wcex.style = CS_HREDRAW | CS_VREDRAW;
 	wcex.lpfnWndProc = WndProc;

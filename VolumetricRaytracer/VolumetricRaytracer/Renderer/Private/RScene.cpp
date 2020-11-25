@@ -15,27 +15,16 @@
 #include "RScene.h"
 
 VolumeRaytracer::Renderer::VRScene::~VRScene()
-{
-	if (VoxelArr != nullptr)
-	{
-		delete[] VoxelArr;
-		VoxelArr = nullptr;
-	}
-}
+{}
 
 void VolumeRaytracer::Renderer::VRScene::InitFromScene(Voxel::VVoxelScene* scene)
 {
 	Cleanup();
 
-	VoxelArr = new Voxel::VVoxel[scene->GetVoxelCount()];
-
-	for (Voxel::VVoxelIteratorElement voxel : *scene)
-	{
-		VoxelArr[voxel.Index] = voxel.Voxel;
-	}
-
-	VoxelArrSize = scene->GetVoxelCount();
 	Bounds = scene->GetSceneBounds();
+	VolumeExtends = scene->GetVolumeExtends();
+	VoxelCountAlongAxis = scene->GetSize();
+	EnvironmentMapPath = scene->GetEnvironmentMapPath();
 }
 
 void VolumeRaytracer::Renderer::VRScene::SyncWithScene(Voxel::VVoxelScene* scene)
@@ -45,9 +34,4 @@ void VolumeRaytracer::Renderer::VRScene::SyncWithScene(Voxel::VVoxelScene* scene
 
 void VolumeRaytracer::Renderer::VRScene::Cleanup()
 {
-	if (VoxelArr != nullptr)
-	{
-		delete[] VoxelArr;
-		VoxelArr = nullptr;
-	}
 }

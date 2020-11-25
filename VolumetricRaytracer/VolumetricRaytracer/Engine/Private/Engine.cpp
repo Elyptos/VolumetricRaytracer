@@ -38,6 +38,7 @@ void VolumeRaytracer::Engine::VEngine::Start()
 {
 	if (IsEngineActive() == false)
 	{
+		InitFPSCounter();
 		InitializeLogger();
 		InitializeRenderer();
 		InitializeEngineInstance();
@@ -56,6 +57,11 @@ void VolumeRaytracer::Engine::VEngine::Shutdown()
 float VolumeRaytracer::Engine::VEngine::GetEngineDeltaTime() const
 {
 	return std::max(EngineDeltaTime, 0.00001f);
+}
+
+unsigned int VolumeRaytracer::Engine::VEngine::GetFPS() const
+{
+	return FPS;
 }
 
 void VolumeRaytracer::Engine::VEngine::InitializeLogger()
@@ -84,6 +90,13 @@ void VolumeRaytracer::Engine::VEngine::InitializeRenderer()
 {
 	Renderer = Renderer::VRendererFactory::NewRenderer();
 	Renderer->Start();
+}
+
+void VolumeRaytracer::Engine::VEngine::InitFPSCounter()
+{
+	TimeSinceFPSUpdate = 0.f;
+	FPS = 0;
+	CurrentFrameCount = 0;
 }
 
 std::string VolumeRaytracer::Engine::VEngine::GetCurrentDateTimeAsString() const
@@ -179,6 +192,8 @@ void VolumeRaytracer::Engine::VEngine::EngineLoop()
 
 		long long frameTime = std::chrono::duration_cast<std::chrono::microseconds>(tStampEnd - tStampBegin).count();
 		EngineDeltaTime = frameTime * 0.001f * 0.001f;
+
+		CountFPS(EngineDeltaTime);
 	}
 
 	V_LOG("Engine loop exited");
@@ -199,5 +214,19 @@ void VolumeRaytracer::Engine::VEngine::ShutdownEngineAfterEngineLoopFinishes()
 			EngineInstance->OnEngineShutdown();
 			EngineInstance = nullptr;
 		}
+	}
+}
+
+void VolumeRaytracer::Engine::VEngine::CountFPS(const float& deltaTime)
+{
+	CurrentFrameCount++;
+
+	TimeSinceFPSUpdate += deltaTime;
+
+	if (TimeSinceFPSUpdate >= 1.f)
+	{
+		FPS = CurrentFrameCount;
+		CurrentFrameCount = 0;
+		TimeSinceFPSUpdate = 0.f;
 	}
 }

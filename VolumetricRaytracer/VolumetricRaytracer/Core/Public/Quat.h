@@ -32,6 +32,7 @@ namespace VolumeRaytracer
 		VVector GetRightVector();
 
 		VVector operator*(const VVector& vec) const;
+		VQuat operator*(const VQuat& other) const;
 
 	public:
 		static const VQuat IDENTITY;

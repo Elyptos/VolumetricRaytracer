@@ -28,7 +28,7 @@ namespace VolumeRaytracer
 			void BeginDestroy() override;
 
 		public:
-			float FOVAngle = 90.f;
+			float FOVAngle = 60.f;
 			float NearClipPlane = 0.01f;
 			float FarClipPlane = 125.f;
 			float AspectRatio = 1.7777f;

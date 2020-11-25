@@ -17,6 +17,7 @@
 #include "Voxel.h"
 #include "Object.h"
 #include "AABB.h"
+#include <string>
 #include <iterator>
 
 namespace VolumeRaytracer
@@ -57,10 +58,11 @@ namespace VolumeRaytracer
 			};
 
 		public:
-			VVoxelScene(const unsigned int& size, const float& voxelSize);
+			VVoxelScene(const unsigned int& size, const float& volumeExtends);
 
 			unsigned int GetSize() const;
 			unsigned int GetVoxelCount() const;
+			float GetVolumeExtends() const;
 
 			VAABB GetSceneBounds() const;
 
@@ -69,6 +71,9 @@ namespace VolumeRaytracer
 			void SetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos, const VVoxel& voxel);
 			VVoxel GetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
 			bool IsValidVoxelIndex(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
+
+			void SetPathToEnvironmentMap(const std::wstring& path);
+			std::wstring GetEnvironmentMapPath() const;
 
 			VVoxelSceneIterator begin();
 			VVoxelSceneIterator end();
@@ -79,10 +84,12 @@ namespace VolumeRaytracer
 
 		private:
 			unsigned int Size = 0;
-			float VoxelSize = 0;
+			float VolumeExtends = 0;
 			VVoxel* VoxelArr = nullptr;
 
 			VObjectPtr<Scene::VCamera> Camera;
+
+			std::wstring EnvironmentMapPath;
 		};
 	}
 }

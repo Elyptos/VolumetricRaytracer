@@ -32,6 +32,8 @@ namespace VolumeRaytracer
 				OutputView = 0,
 				AccelerationStructure,
 				SceneConstant,
+				SceneTextures,
+				SceneSamplers,
 				Max
 			};
 		}

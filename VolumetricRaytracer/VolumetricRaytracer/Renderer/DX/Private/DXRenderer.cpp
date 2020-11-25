@@ -18,6 +18,9 @@
 #include "DXConstants.h"
 #include "RaytracingHlsl.h"
 #include "RDXScene.h"
+#include "DXDescriptorHeap.h"
+#include "Camera.h"
+#include "DXTextureCube.h"
 #include "Compiled/Raytracing.hlsl.h"
 #include <string>
 #include <sstream>
@@ -29,12 +32,14 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::Render()
 	{
 		if (SceneToRender != nullptr && !SceneRef.expired())
 		{
-			SceneToRender->SyncWithScene(SceneRef.lock().get());
+			UploadPendingTexturesToGPU();
 
 			for (auto elem : ActiveRenderTargets)
 			{
 				VDXRenderTarget* renderTarget = elem.first;
 
+				SceneRef.lock()->GetSceneCamera()->AspectRatio = (float)renderTarget->GetWidth() / (float)renderTarget->GetHeight();
+				SceneToRender->SyncWithScene(SceneRef.lock().get());
 				PrepareForRendering(renderTarget);
 				DoRendering(renderTarget);
 				CopyRaytracingOutputToBackbuffer(renderTarget);
@@ -133,12 +138,14 @@ VolumeRaytracer::VObjectPtr<VolumeRaytracer::Renderer::DX::VDXRenderTarget> Volu
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::BuildAccelerationStructure(const VDXAccelerationStructureBuffers& topLevelAS, const VDXAccelerationStructureBuffers& bottomLevelAS)
 {
+	CommandAllocator->Reset();
 	CommandList->Reset(CommandAllocator.Get(), nullptr);
+
+	CommandList->BuildRaytracingAccelerationStructure(&bottomLevelAS.AccelerationStructureDesc, 0, nullptr);
 
 	D3D12_RESOURCE_BARRIER resourceBarrier = CD3DX12_RESOURCE_BARRIER::UAV(bottomLevelAS.AccelerationStructure.Get());
 	CommandList->ResourceBarrier(1, &resourceBarrier);
 
-	CommandList->BuildRaytracingAccelerationStructure(&bottomLevelAS.AccelerationStructureDesc, 0, nullptr);
 	CommandList->BuildRaytracingAccelerationStructure(&topLevelAS.AccelerationStructureDesc, 0, nullptr);
 
 	ExecuteCommandList();
@@ -154,6 +161,64 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetSceneToRender(VObjectPtr<Vox
 	SceneToRender = new VRDXScene();
 	SceneToRender->InitFromScene(scene.get());
 	SceneToRender->BuildStaticResources(this);
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeTexture(VObjectPtr<VTextureCube> cubeTexture, bool uploadToGPU)
+{
+	VObjectPtr<VDXTextureCube> dxCubeTexture = std::dynamic_pointer_cast<VDXTextureCube>(cubeTexture);
+	IDXRenderableTexture* renderableTexture = static_cast<IDXRenderableTexture*>(dxCubeTexture.get());
+
+	if (dxCubeTexture != nullptr)
+	{
+		CPtr<ID3D12Resource> gpuResource = nullptr;
+
+		CD3DX12_RESOURCE_DESC textureDesc = CD3DX12_RESOURCE_DESC::Tex2D(renderableTexture->GetDXGIFormat(), dxCubeTexture->GetWidth(),
+			dxCubeTexture->GetHeight(), dxCubeTexture->GetArraySize(), dxCubeTexture->GetMipCount());
+
+		CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+		Device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &textureDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&gpuResource));
+
+		SetDXDebugName<ID3D12Resource>(gpuResource, "Cubemap");
+
+		renderableTexture->SetDXGPUResource(gpuResource);
+	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::UploadToGPU(VObjectPtr<VTexture> texture)
+{
+	std::shared_ptr<IDXRenderableTexture> renderableTexture = std::dynamic_pointer_cast<IDXRenderableTexture>(texture);
+
+	if (renderableTexture != nullptr && TexturesToUpload.find(renderableTexture.get()) == TexturesToUpload.end())
+	{
+		VDXTextureUploadPayload uploadPayload = renderableTexture->BeginGPUUpload(this);
+		DXTextureUploadInfo uploadInfo;
+		uploadInfo.Texture = renderableTexture;
+		uploadInfo.UploadPayload = uploadPayload;
+
+		TexturesToUpload[renderableTexture.get()] = uploadInfo;
+	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::MakeShaderResourceView(VObjectPtr<VTextureCube> texture)
+{
+	std::shared_ptr<IDXRenderableTexture> renderableTexture = std::dynamic_pointer_cast<IDXRenderableTexture>(texture);
+
+	if (renderableTexture != nullptr)
+	{
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = renderableTexture->GetCPUHandle();
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC resourceViewDesc = {};
+
+		resourceViewDesc.Format = renderableTexture->GetDXGIFormat();
+		resourceViewDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+		resourceViewDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		resourceViewDesc.TextureCube.MostDetailedMip = 0;
+		resourceViewDesc.TextureCube.MipLevels = texture->GetMipCount();
+		resourceViewDesc.TextureCube.ResourceMinLODClamp = 0.0f;
+
+		Device->CreateShaderResourceView(renderableTexture->GetDXGPUResource().Get(), &resourceViewDesc, cpuHandle);
+	}
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
@@ -236,6 +301,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 
 		CommandList->Close();
 
+		InitRendererDescriptorHeap();
 		InitializeGlobalRootSignature();
 		InitRaytracingPipeline();
 		CreateShaderTables();
@@ -446,7 +512,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeRenderTargetResourceD
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	descHeapDesc.NumDescriptors = 1;
 	descHeapDesc.NodeMask = 0;
 
@@ -588,6 +654,18 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseInternalVariables()
 {
 	DeleteScene();
 
+	if (RendererSamplerDescriptorHeap != nullptr)
+	{
+		delete RendererSamplerDescriptorHeap;
+		RendererSamplerDescriptorHeap = nullptr;
+	}
+
+	if (RendererDescriptorHeap != nullptr)
+	{
+		delete RendererDescriptorHeap;
+		RendererDescriptorHeap = nullptr;
+	}
+
 	if (ShaderTableRayGen != nullptr)
 	{
 		ShaderTableRayGen.Reset();
@@ -714,16 +792,33 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ClearAllRenderTargets()
 	}*/
 }
 
+void VolumeRaytracer::Renderer::DX::VDXRenderer::InitRendererDescriptorHeap()
+{
+	if (RendererDescriptorHeap == nullptr)
+	{
+		RendererDescriptorHeap = new VDXDescriptorHeap(GetDXDevice(), 3);
+		RendererDescriptorHeap->SetDebugName("Renderer Descriptor Heap");
+
+		RendererSamplerDescriptorHeap = new VDXDescriptorHeap(GetDXDevice(), 1, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+		RendererSamplerDescriptorHeap->SetDebugName("Renderer Sampler Descriptor Heap");
+	}
+}
+
 void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeGlobalRootSignature()
 {
 	CD3DX12_DESCRIPTOR_RANGE outputViewDescRange = {};
-
 	outputViewDescRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+
+	CD3DX12_DESCRIPTOR_RANGE sceneDescTable[2];
+	sceneDescTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
+	sceneDescTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 1, 0);
 
 	CD3DX12_ROOT_PARAMETER rootParameters[EGlobalRootSignature::Max];
 	rootParameters[EGlobalRootSignature::OutputView].InitAsDescriptorTable(1, &outputViewDescRange);
 	rootParameters[EGlobalRootSignature::AccelerationStructure].InitAsShaderResourceView(0);
 	rootParameters[EGlobalRootSignature::SceneConstant].InitAsConstantBufferView(0);
+	rootParameters[EGlobalRootSignature::SceneTextures].InitAsDescriptorTable(1, &sceneDescTable[0]);
+	rootParameters[EGlobalRootSignature::SceneSamplers].InitAsDescriptorTable(1, &sceneDescTable[1]);
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(ARRAYSIZE(rootParameters), rootParameters);
 
@@ -819,24 +914,30 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::PrepareForRendering(VDXRenderTa
 	CommandAllocator->Reset();
 	CommandList->Reset(CommandAllocator.Get(), nullptr);
 
+	FillDescriptorHeap(renderTarget);
+
 	D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget->GetCurrentBuffer().Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	CommandList->ResourceBarrier(1, &barrier);
 
-	CommandList->SetComputeRootSignature(GlobalRootSignature.Get());
-
+	SceneToRender->BuildVoxelVolume(CommandList);
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::DoRendering(VDXRenderTarget* renderTarget)
 {
 	CommandList->SetComputeRootSignature(GlobalRootSignature.Get());
-	
-	CommandList->SetDescriptorHeaps(1, renderTarget->GetResourceDescHeap().GetAddressOf());
-	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::OutputView, renderTarget->OutputTextureGPUHandle);
+
+	ID3D12DescriptorHeap* descHeaps[2];
+
+	descHeaps[0] = RendererDescriptorHeap->GetDescriptorHeap().Get();
+	descHeaps[1] = RendererSamplerDescriptorHeap->GetDescriptorHeap().Get();
+
+	CommandList->SetDescriptorHeaps(2, &descHeaps[0]);
+	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::OutputView, RendererDescriptorHeap->GetDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
 	CommandList->SetComputeRootConstantBufferView(EGlobalRootSignature::SceneConstant, SceneToRender->CopySceneConstantBufferToGPU());
 
-	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::OutputView, renderTarget->OutputTextureGPUHandle);
-
 	CommandList->SetComputeRootShaderResourceView(EGlobalRootSignature::AccelerationStructure, SceneToRender->GetAccelerationStructureTL()->GetGPUVirtualAddress());
+	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::SceneTextures, RendererDescriptorHeap->GetGPUHandle(1));
+	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::SceneSamplers, RendererSamplerDescriptorHeap->GetGPUHandle(0));
 
 	D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
 	dispatchDesc.HitGroupTable.StartAddress = ShaderTableHitGroups->GetGPUVirtualAddress();
@@ -871,6 +972,53 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::CopyRaytracingOutputToBackbuffe
 	CommandList->ResourceBarrier(2, postCopyBarriers);
 }
 
+void VolumeRaytracer::Renderer::DX::VDXRenderer::UploadPendingTexturesToGPU()
+{
+	bool hasTexturesToUpload = false;
+
+	for (auto& textureUpload : TexturesToUpload)
+	{
+		if (!textureUpload.second.Texture.expired())
+		{
+			if (hasTexturesToUpload == false)
+			{
+				hasTexturesToUpload = true;
+
+				CommandAllocator->Reset();
+				CommandList->Reset(CommandAllocator.Get(), nullptr);
+			}
+
+			VDXTextureUploadPayload& uploadPayload = textureUpload.second.UploadPayload;
+
+			for (UINT64 subResourceIndex = 0; subResourceIndex < uploadPayload.SubResourceCount; subResourceIndex++)
+			{
+				CommandList->CopyTextureRegion(&CD3DX12_TEXTURE_COPY_LOCATION(uploadPayload.GPUBuffer.Get(), subResourceIndex), 0, 0, 0, 
+					&CD3DX12_TEXTURE_COPY_LOCATION(uploadPayload.UploadBuffer.Get(), uploadPayload.SubResourceFootprints[subResourceIndex]), nullptr);
+			}
+		}
+	}
+
+	if (hasTexturesToUpload)
+	{
+		ExecuteCommandList();
+		WaitForGPU();
+	}
+
+	for (auto& textureUpload : TexturesToUpload)
+	{
+		if (!textureUpload.second.Texture.expired())
+		{
+			DXUsedTexture usedTexture; 
+			usedTexture.Texture = textureUpload.second.Texture;
+			usedTexture.Resource = textureUpload.second.UploadPayload.GPUBuffer;
+
+			UploadedTextures[textureUpload.first] = usedTexture;
+		}
+	}
+
+	TexturesToUpload.empty();
+}
+
 void VolumeRaytracer::Renderer::DX::VDXRenderer::ExecuteCommandList()
 {
 	CommandList->Close();
@@ -900,6 +1048,21 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::DeleteScene()
 		delete SceneToRender;
 		SceneToRender = nullptr;
 	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::FillDescriptorHeap(VDXRenderTarget* renderTarget)
+{
+	//D3D12_CPU_DESCRIPTOR_HANDLE destDescriptors[]{ RendererDescriptorHeap->GetCPUHandle(0)/*, RendererDescriptorHeap->GetCPUHandle(0)*/ };
+	//UINT destDescriptorSizes[]{/*RendererDescriptorHeap->GetDescriptorSize(),*/ RendererDescriptorHeap->GetDescriptorSize()};
+
+	//D3D12_CPU_DESCRIPTOR_HANDLE srcDescriptors[]{ renderTarget->ResourceDescHeap->GetCPUDescriptorHandleForHeapStart()/*, SceneToRender->GetSceneDescriptorHeap()->GetCPUHandle(0)*/ };
+	//UINT srcDescriptorSizes[]{/*renderTarget->ResourceDescSize,*/ SceneToRender->GetSceneDescriptorHeap()->GetDescriptorSize()};
+
+	//Device->CopyDescriptors(1, &destDescriptors[0], &destDescriptorSizes[0], 1, &srcDescriptors[0], &srcDescriptorSizes[0], D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	Device->CopyDescriptorsSimple(1, RendererDescriptorHeap->GetCPUHandle(0), renderTarget->ResourceDescHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	Device->CopyDescriptorsSimple(2, RendererDescriptorHeap->GetCPUHandle(1), SceneToRender->GetSceneDescriptorHeap()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	Device->CopyDescriptorsSimple(1, RendererSamplerDescriptorHeap->GetCPUHandle(0), SceneToRender->GetSceneDescriptorHeapSamplers()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 }
 
 VolumeRaytracer::Renderer::DX::CPtr<ID3D12Resource> VolumeRaytracer::Renderer::DX::VDXRenderer::CreateShaderTable(std::vector<void*> shaderIdentifiers, UINT& outShaderTableSize, void* rootArguments /*= nullptr*/, const size_t& rootArgumentsSize /*= 0*/)

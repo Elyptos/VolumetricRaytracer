@@ -30,4 +30,7 @@ endif(WIN32)
 
 target_link_libraries(VolumeRaytracer VEngine)
 
-# TODO: Add tests and install targets if needed.
+# Copy resources
+add_custom_command(TARGET VolumeRaytracer POST_BUILD 
+	COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/VolumetricRaytracer/Resources $<TARGET_FILE_DIR:VolumeRaytracer>/Resources 
+)

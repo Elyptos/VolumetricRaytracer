@@ -55,6 +55,11 @@ VolumeRaytracer::VVector VolumeRaytracer::VQuat::operator*(const VVector& vec) c
 	return EigenQuat * eigenVec;
 }
 
+VolumeRaytracer::VQuat VolumeRaytracer::VQuat::operator*(const VQuat& other) const
+{
+	return EigenQuat * other.EigenQuat;
+}
+
 VolumeRaytracer::VQuat::VQuat(const float& x, const float& y, const float& z, const float& w)
 	:EigenQuat(w, x, y, z)
 {

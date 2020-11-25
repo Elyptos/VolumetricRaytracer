@@ -48,9 +48,20 @@ namespace VolumeRaytracer
 
 	struct VSceneConstantBuffer
 	{
-		XMMATRIX projectionToWorld;
+		XMMATRIX viewMatrixInverted;
+		XMMATRIX projectionMatrixInverted;
 		XMVECTOR cameraPosition;
+		UINT voxelAxisCount;
+		float volumeExtend;
 	};
 
 	static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
+	static const XMFLOAT3 CubeNormals[] = {
+		XMFLOAT3(1.0f, 0.0f, 0.0f),
+		XMFLOAT3(-1.0f, 0.0f, 0.0f),
+		XMFLOAT3(0.0f, 1.0f, 0.0f),
+		XMFLOAT3(0.0f, -1.0f, 0.0f),
+		XMFLOAT3(0.0f, 0.0f, 1.0f),
+		XMFLOAT3(0.0f, 0.0f, -1.0f)
+	};
 }

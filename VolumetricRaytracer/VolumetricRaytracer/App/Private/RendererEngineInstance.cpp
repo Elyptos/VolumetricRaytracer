@@ -18,7 +18,14 @@
 #include "Window.h"
 #include "Engine.h"
 #include "Renderer.h"
+#include "Camera.h"
+#include "Vector.h"
+#include "Quat.h"
 #include "VoxelScene.h"
+
+#define _USE_MATH_DEFINES
+
+#include <math.h>
 
 void VolumeRaytracer::App::RendererEngineInstance::OnEngineInitialized(Engine::VEngine* owningEngine)
 {
@@ -52,6 +59,19 @@ void VolumeRaytracer::App::RendererEngineInstance::OnEngineShutdown()
 
 void VolumeRaytracer::App::RendererEngineInstance::OnEngineUpdate(const float& deltaTime)
 {
+	float rotationAmount = 20.f * deltaTime;
+
+	VolumeRaytracer::VQuat currentRotation = Scene->GetSceneCamera()->Rotation;
+
+	currentRotation = currentRotation * VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, rotationAmount * (M_PI / 180.f));
+
+	Scene->GetSceneCamera()->Rotation = currentRotation;
+
+	std::wstringstream windowTitle;
+
+	windowTitle << L"Volume Raytracer | FPS: " << Engine->GetFPS();
+	
+	Window->SetTitle(windowTitle.str());
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::CreateRendererWindow()
@@ -70,11 +90,15 @@ void VolumeRaytracer::App::RendererEngineInstance::OnWindowClosed()
 
 void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
-	Scene = VObject::CreateObject<Voxel::VVoxelScene>(10, 50.f);
+	Scene = VObject::CreateObject<Voxel::VVoxelScene>(1, 50.f);
+	Scene->GetSceneCamera()->Position = VolumeRaytracer::VVector(300.f, 0.f, 100.f);
+	//Scene->GetSceneCamera()->Rotation = VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 180.f * (M_PI / 180.f));
+
+	Scene->SetPathToEnvironmentMap(L"Resources/Skybox/Skybox.dds");
 
 	Voxel::VVoxel voxelToUse;
 	voxelToUse.Material = 1;
 
-	Scene->SetVoxel(4, 4, 4, voxelToUse);
+	Scene->SetVoxel(0, 0, 0, voxelToUse);
 }
 

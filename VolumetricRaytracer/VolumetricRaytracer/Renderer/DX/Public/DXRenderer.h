@@ -18,6 +18,7 @@
 #include "DXHelper.h"
 #include "Object.h"
 #include "DXShaderTypes.h"
+#include "DXRendererInterfaces.h"
 #include "d3dx12.h"
 
 #include <d3d12.h>
@@ -38,6 +39,7 @@ namespace VolumeRaytracer
 		{
 			class VDXRenderTarget;
 			class VRDXScene;
+			class VDXDescriptorHeap;
 
 			class VDXRenderer : public VRenderer
 			{
@@ -47,6 +49,20 @@ namespace VolumeRaytracer
 				public:
 					VDXRenderTarget* RenderTarget;
 					boost::signals2::connection RenderTargetReleaseDelegateHandle;
+				};
+
+				struct DXTextureUploadInfo
+				{
+				public:
+					std::weak_ptr<IDXRenderableTexture> Texture;
+					VDXTextureUploadPayload UploadPayload;
+				};
+
+				struct DXUsedTexture
+				{
+				public:
+					std::weak_ptr<IDXRenderableTexture> Texture;
+					CPtr<ID3D12Resource> Resource;
 				};
 
 			public:
@@ -66,6 +82,14 @@ namespace VolumeRaytracer
 				void BuildAccelerationStructure(const VDXAccelerationStructureBuffers& topLevelAS, const VDXAccelerationStructureBuffers& bottomLevelAS);
 
 				void SetSceneToRender(VObjectPtr<Voxel::VVoxelScene> scene) override;
+
+
+				void InitializeTexture(VObjectPtr<VTextureCube> cubeTexture, bool uploadToGPU) override;
+
+
+				void UploadToGPU(VObjectPtr<VTexture> texture) override;
+
+				void MakeShaderResourceView(VObjectPtr<VTextureCube> texture);
 
 			private:
 				void SetupRenderer();
@@ -96,6 +120,7 @@ namespace VolumeRaytracer
 
 				void ClearAllRenderTargets();
 
+				void InitRendererDescriptorHeap();
 				void InitializeGlobalRootSignature();
 				void InitRaytracingPipeline();
 				void InitShaders(CD3DX12_STATE_OBJECT_DESC* pipelineDesc);
@@ -107,10 +132,14 @@ namespace VolumeRaytracer
 				void DoRendering(VDXRenderTarget* renderTarget);
 				void CopyRaytracingOutputToBackbuffer(VDXRenderTarget* renderTarget);
 
+				void UploadPendingTexturesToGPU();
+
 				void ExecuteCommandList();
 				void WaitForGPU();
 
 				void DeleteScene();
+
+				void FillDescriptorHeap(VDXRenderTarget* renderTarget);
 
 				CPtr<ID3D12Resource> CreateShaderTable(std::vector<void*> shaderIdentifiers, UINT& outShaderTableSize, void* rootArguments = nullptr, const size_t& rootArgumentsSize = 0);
 
@@ -136,6 +165,9 @@ namespace VolumeRaytracer
 				CPtr<ID3D12Resource> OutputTexture;
 				D3D12_GPU_DESCRIPTOR_HANDLE OutputTextureHandle;
 
+				VDXDescriptorHeap* RendererDescriptorHeap = nullptr;
+				VDXDescriptorHeap* RendererSamplerDescriptorHeap = nullptr;
+
 				CPtr<ID3D12RootSignature> GlobalRootSignature;
 				boost::unordered_map<EShaderType, CPtr<ID3D12RootSignature>> LocalRootSignatures;
 
@@ -144,6 +176,9 @@ namespace VolumeRaytracer
 				bool IsInitialized = false;
 
 				VRDXScene* SceneToRender = nullptr;
+
+				boost::unordered_map<IDXRenderableTexture*, DXTextureUploadInfo> TexturesToUpload;
+				boost::unordered_map<IDXRenderableTexture*, DXUsedTexture> UploadedTextures; 
 			};
 		}
 	}

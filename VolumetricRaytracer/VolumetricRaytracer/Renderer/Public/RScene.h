@@ -29,10 +29,10 @@ namespace VolumeRaytracer
 			virtual void Cleanup();
 
 		protected:
-			Voxel::VVoxel* VoxelArr = nullptr;
-			unsigned int VoxelArrSize = 0;
-			float VoxelSize = 0.f;
+			float VolumeExtends = 0.f;
+			unsigned int VoxelCountAlongAxis;
 			VAABB Bounds;
+			std::wstring EnvironmentMapPath;
 		};
 	}
 }

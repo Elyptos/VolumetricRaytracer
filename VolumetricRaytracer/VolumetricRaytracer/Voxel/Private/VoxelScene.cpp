@@ -16,9 +16,8 @@
 #include "MathHelpers.h"
 #include "Camera.h"
 
-VolumeRaytracer::Voxel::VVoxelScene::VVoxelScene(const unsigned int& size, const float& voxelSize)
-	:Size(size),
-	VoxelSize(voxelSize)
+VolumeRaytracer::Voxel::VVoxelScene::VVoxelScene(const unsigned int& size, const float& volumeExtends) :Size(size),
+	VolumeExtends(volumeExtends)
 {}
 
 unsigned int VolumeRaytracer::Voxel::VVoxelScene::GetSize() const
@@ -31,12 +30,17 @@ unsigned int VolumeRaytracer::Voxel::VVoxelScene::GetVoxelCount() const
 	return Size * Size * Size;
 }
 
+float VolumeRaytracer::Voxel::VVoxelScene::GetVolumeExtends() const
+{
+	return VolumeExtends;
+}
+
 VolumeRaytracer::VAABB VolumeRaytracer::Voxel::VVoxelScene::GetSceneBounds() const
 {
 	VAABB res;
 
 	res.SetCenterPosition(VVector::ZERO);
-	res.SetExtends(VVector::ONE * (float)GetSize() * VoxelSize * 0.5f);
+	res.SetExtends(VVector::ONE * VolumeExtends);
 
 	return res;
 }
@@ -71,6 +75,16 @@ VolumeRaytracer::Voxel::VVoxel VolumeRaytracer::Voxel::VVoxelScene::GetVoxel(con
 bool VolumeRaytracer::Voxel::VVoxelScene::IsValidVoxelIndex(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const
 {
 	return xPos < Size && yPos < Size && zPos < Size;
+}
+
+void VolumeRaytracer::Voxel::VVoxelScene::SetPathToEnvironmentMap(const std::wstring& path)
+{
+	EnvironmentMapPath = path;
+}
+
+std::wstring VolumeRaytracer::Voxel::VVoxelScene::GetEnvironmentMapPath() const
+{
+	return EnvironmentMapPath;
 }
 
 VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator VolumeRaytracer::Voxel::VVoxelScene::begin()

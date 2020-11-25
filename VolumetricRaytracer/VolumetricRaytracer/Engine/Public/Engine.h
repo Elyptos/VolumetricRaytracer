@@ -40,6 +40,7 @@ namespace VolumeRaytracer
 			void Shutdown();
 
 			float GetEngineDeltaTime() const;
+			unsigned int GetFPS() const;
 
 			bool IsEngineActive() const { return IsRunning; }
 
@@ -49,6 +50,7 @@ namespace VolumeRaytracer
 			void InitializeLogger();
 			void InitializeEngineInstance();
 			void InitializeRenderer();
+			void InitFPSCounter();
 
 			std::string GetCurrentDateTimeAsString() const;
 			std::string GetLoggerFilePath() const;
@@ -64,9 +66,15 @@ namespace VolumeRaytracer
 
 			void ShutdownEngineAfterEngineLoopFinishes();
 
+			void CountFPS(const float& deltaTime);
+
 		private:
 			bool IsRunning = false;
 			float EngineDeltaTime = 0.f;
+
+			unsigned int FPS = 0;
+			unsigned int CurrentFrameCount = 0;
+			float TimeSinceFPSUpdate = 0.f;
 
 			std::shared_ptr<Renderer::VRenderer> Renderer; 
 			std::shared_ptr<IEngineInstance> EngineInstance;

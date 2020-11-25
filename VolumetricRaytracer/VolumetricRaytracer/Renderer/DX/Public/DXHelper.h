@@ -60,6 +60,15 @@ namespace VolumeRaytracer
 				D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC AccelerationStructureDesc;
 				UINT64 ResultDataMaxSizeInBytes;
 			};
+
+			class VDXHelper
+			{
+			public:
+				static UINT Align(UINT location, UINT align)
+				{
+					return (location + (align - 1)) & ~(align - 1);
+				}
+			};
 		}
 	}
 }

@@ -26,6 +26,9 @@ namespace VolumeRaytracer
 
 	namespace Renderer
 	{
+		class VTextureCube;
+		class VTexture;
+
 		class VRenderer
 		{
 		public:
@@ -37,6 +40,9 @@ namespace VolumeRaytracer
 
 			virtual bool IsActive() const = 0;
 			virtual void SetSceneToRender(VObjectPtr<Voxel::VVoxelScene> scene);
+
+			virtual void InitializeTexture(VObjectPtr<VTextureCube> cubeTexture, bool uploadToGPU) = 0;
+			virtual void UploadToGPU(VObjectPtr<VTexture> texture) = 0;
 
 		protected:
 			std::weak_ptr<Voxel::VVoxelScene> SceneRef;

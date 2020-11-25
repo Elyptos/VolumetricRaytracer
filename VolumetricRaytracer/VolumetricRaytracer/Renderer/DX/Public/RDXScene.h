@@ -30,6 +30,8 @@ namespace VolumeRaytracer
 		namespace DX
 		{
 			class VDXRenderer;
+			class VDXDescriptorHeap;
+			class VDXTextureCube;
 
 			class VRDXScene : public VRScene
 			{
@@ -44,12 +46,22 @@ namespace VolumeRaytracer
 				void SyncWithScene(Voxel::VVoxelScene* scene) override;
 
 				CPtr<ID3D12Resource> GetAccelerationStructureTL() const;
+				VDXDescriptorHeap* GetSceneDescriptorHeap() const;
+				VDXDescriptorHeap* GetSceneDescriptorHeapSamplers() const;
+
+				CPtr<ID3D12Resource> GetSceneVolume() const;
+
+				void BuildVoxelVolume(CPtr<ID3D12GraphicsCommandList5> commandList);
 
 			private:
+				void InitEnvironmentMap(VDXRenderer* renderer);
 				void AllocSceneConstantBuffer(VDXRenderer* renderer);
+				void AllocSceneVolumeBuffer(VDXRenderer* renderer);
 				void BuildGeometryAABB(VDXRenderer* renderer);
 				void BuildAccelerationStructure(VDXRenderer* renderer);
 				void CleanupStaticResources();
+
+				void PrepareVoxelVolume(Voxel::VVoxelScene* scene);
 
 				VDXAccelerationStructureBuffers BuildBottomLevelAccelerationStructures(VDXRenderer* renderer, D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc);
 				VDXAccelerationStructureBuffers BuildTopLevelAccelerationStructures(VDXRenderer* renderer, const VDXAccelerationStructureBuffers& bottomLevelAS);
@@ -57,13 +69,8 @@ namespace VolumeRaytracer
 				D3D12_RAYTRACING_GEOMETRY_DESC CreateGeometryDesc();
 
 			private:
-				CPtr<ID3D12DescriptorHeap> ResourceDescHeap = nullptr;
-				unsigned int ResourceDescHeapSize = 0;
-				unsigned int NumResourceDescriptors = 0;
-				unsigned int ResourceDescSize = 0;
-
-				CPtr<ID3D12Resource> VoxelVolumeTexture;
-				D3D12_GPU_DESCRIPTOR_HANDLE VoxelVolumeTextureGPUHandle;
+				VDXDescriptorHeap* DXDescriptorHeap = nullptr;
+				VDXDescriptorHeap* DXDescriptorHeapSamplers = nullptr;
 
 				VD3DBuffer AABBBuffer;
 
@@ -72,10 +79,19 @@ namespace VolumeRaytracer
 
 				CPtr<ID3D12Resource> SceneConstantBuffer;
 				uint8_t* SceneConstantBufferDataPtr;
+				D3D12_GPU_DESCRIPTOR_HANDLE SceneConstantBufferGPUHandle;
+
+				CPtr<ID3D12Resource> SceneVolume;
+				CPtr<ID3D12Resource> SceneVolumeUploadBuffer;
+				
+				D3D12_PLACED_SUBRESOURCE_FOOTPRINT UploadBufferFootprint;
+				D3D12_GPU_DESCRIPTOR_HANDLE SceneVolumeTextureGPUHandle;
 
 				DirectX::XMMATRIX ViewMatrix;
 				DirectX::XMMATRIX ProjectionMatrix;
 				DirectX::XMVECTOR CameraPosition;
+
+				VObjectPtr<VDXTextureCube> EnvironmentMap = nullptr;
 			};
 		}
 	}
