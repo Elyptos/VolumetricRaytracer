@@ -41,6 +41,74 @@ namespace VolumeRaytracer
 			class VRDXScene;
 			class VDXDescriptorHeap;
 
+			class VDXWindowRenderTargetHandler
+			{
+			public:
+				VDXWindowRenderTargetHandler(IDXGIFactory4* dxgiFactory, ID3D12Device5* dxDevice, ID3D12CommandQueue* commandQueue, HWND hwnd, const unsigned int& width, const unsigned int& height);
+				~VDXWindowRenderTargetHandler();
+
+				void Resize(ID3D12Device5* dxDevice, const unsigned int& width, const unsigned int& height);
+				void Present(const UINT& syncLevel, const UINT& flags);
+
+				void SetCurrentBufferIndex(const unsigned int& bufferIndex);
+				unsigned int GetCurrentBufferIndex() const;
+
+				unsigned int GetWidth() const;
+				unsigned int GetHeight() const;
+
+				CPtr<ID3D12Resource> GetCurrentRenderTarget() const;
+				CPtr<ID3D12Resource> GetCurrentOutputTexture() const;
+				UINT64 GetCurrentFenceValue() const;
+
+				void SetCurrentFenceValue(const UINT64& fenceValue);
+				void SyncBackBufferIndexWithSwapChain();
+
+				D3D12_CPU_DESCRIPTOR_HANDLE GetOutputTextureCPUHandle() const;
+
+			private:
+				void CreateRenderTargets(IDXGIFactory4* dxgiFactory, ID3D12Device5* dxDevice, ID3D12CommandQueue* commandQueue, HWND hwnd, const unsigned int& width, const unsigned int& height);
+				void CreateBackBuffers(ID3D12Device5* dxDevice);
+
+			public:
+				VDXDescriptorHeap* RTVDescriptorHeap = nullptr;
+				VDXDescriptorHeap* ResourceHeap = nullptr;
+
+				CPtr<IDXGISwapChain3> SwapChain = nullptr;
+
+				std::vector<CPtr<ID3D12Resource>> BackBufferArr;
+				std::vector<CPtr<ID3D12Resource>> OutputTextureArr;
+				std::vector<UINT64> FenceValues;
+
+				unsigned int OutputWidth = 0;
+				unsigned int OutputHeight = 0;
+				unsigned int CurrentBufferIndex = 0;
+			};
+
+			class VDXGPUCommand
+			{
+			public:
+				VDXGPUCommand(ID3D12Device5* device, const D3D12_COMMAND_LIST_TYPE& type, const std::string& debugName);
+				~VDXGPUCommand();
+
+				ID3D12GraphicsCommandList5* StartCommandRecording();
+				void ExecuteCommandQueue();
+				void WaitForGPU();
+
+			private:
+				void InitializeCommandList(ID3D12Device5* device, const D3D12_COMMAND_LIST_TYPE& type, const std::string& debugName);
+
+				void ReleaseInternalVariables();
+
+			private:
+				CPtr<ID3D12CommandQueue> CommandQueue = nullptr;
+				CPtr<ID3D12GraphicsCommandList5> CommandList = nullptr;
+				CPtr<ID3D12CommandAllocator> CommandAllocator = nullptr;
+
+				HANDLE FenceEvent;
+				CPtr<ID3D12Fence> Fence = nullptr;
+				UINT64 FenceValue = 0;
+			};
+
 			class VDXRenderer : public VRenderer
 			{
 			private:
@@ -75,7 +143,10 @@ namespace VolumeRaytracer
 
 				bool IsActive() const override { return IsInitialized; }
 
-				VObjectPtr<VDXRenderTarget> CreateViewportRenderTarget(HWND hwnd, unsigned int width, unsigned int height);
+				void SetWindowHandle(HWND hwnd, unsigned int width, unsigned int height);
+				void ClearWindowHandle();
+
+				void ResizeRenderOutput(unsigned int width, unsigned int height) override;
 
 				CPtr<ID3D12Device5> GetDXDevice() const { return Device; }
 
@@ -91,6 +162,8 @@ namespace VolumeRaytracer
 
 				void MakeShaderResourceView(VObjectPtr<VTextureCube> texture);
 
+				bool HasValidWindow() const;
+
 			private:
 				void SetupRenderer();
 				void DestroyRenderer();
@@ -100,25 +173,12 @@ namespace VolumeRaytracer
 
 				CPtr<IDXGIAdapter3> SelectGPU();
 
-				void CreateSwapChain(HWND hwnd, unsigned int width, unsigned int height, CPtr<IDXGISwapChain3>& outSwapChain);
-				void InitializeRenderTargetBuffers(VDXRenderTarget* renderTarget, const uint32_t& bufferCount);
-				void InitializeRenderTargetResourceDescHeap(VDXRenderTarget* renderTarget);
-				void CreateRenderingOutputTexture(VDXRenderTarget* renderTarget);
-
-				void AddRenderTargetToActiveMap(VDXRenderTarget* renderTarget);
-				void RemoveRenderTargetFromActiveMap(VDXRenderTarget* renderTarget);
-
-				void OnRenderTargetPendingRelease(VRenderTarget* renderTarget);
-				void ReleaseRenderTarget(VDXRenderTarget* renderTarget);
-
 				uint64_t SignalFence(CPtr<ID3D12CommandQueue> commandQueue, CPtr<ID3D12Fence> fence, uint64_t& fenceValue);
 				void WaitForFenceValue(CPtr<ID3D12Fence> fence, const uint64_t fenceValue, HANDLE fenceEvent);
 
-				void ReleaseAllRenderTargets();
+				void ReleaseWindowResources();
 
 				void ReleaseInternalVariables();
-
-				void ClearAllRenderTargets();
 
 				void InitRendererDescriptorHeap();
 				void InitializeGlobalRootSignature();
@@ -128,33 +188,43 @@ namespace VolumeRaytracer
 
 				void CreateShaderTables();
 
-				void PrepareForRendering(VDXRenderTarget* renderTarget);
-				void DoRendering(VDXRenderTarget* renderTarget);
-				void CopyRaytracingOutputToBackbuffer(VDXRenderTarget* renderTarget);
+				void PrepareForRendering();
+				void DoRendering();
+				void CopyRaytracingOutputToBackbuffer();
 
 				void UploadPendingTexturesToGPU();
 
 				void ExecuteCommandList();
 				void WaitForGPU();
 
+				void MoveToNextFrame();
+
 				void DeleteScene();
 
-				void FillDescriptorHeap(VDXRenderTarget* renderTarget);
+				void FillDescriptorHeap();
 
 				CPtr<ID3D12Resource> CreateShaderTable(std::vector<void*> shaderIdentifiers, UINT& outShaderTableSize, void* rootArguments = nullptr, const size_t& rootArgumentsSize = 0);
 
 			private:
+				//Window resources
+				std::vector<CPtr<ID3D12CommandAllocator>> WindowCommandAllocators;
+				VDXWindowRenderTargetHandler* WindowRenderTarget = nullptr;
+
+				//Command lists
+				VDXGPUCommand* UploadCommandHandler = nullptr;
+				VDXGPUCommand* ComputeCommandHandler = nullptr;
+
 				CPtr<ID3D12Device5> Device;
-				CPtr<ID3D12CommandQueue> CommandQueue;
+
+				CPtr<ID3D12CommandQueue> RenderCommandQueue;
+
 				CPtr<IDXGIFactory4> DXGIFactory;
-				CPtr<ID3D12CommandAllocator> CommandAllocator;
 				CPtr<ID3D12GraphicsCommandList5> CommandList;
 				CPtr<ID3D12StateObject> DXRStateObject;
 				CPtr<ID3D12PipelineState> PipelineState;
 
 				CPtr<ID3D12Fence> Fence = nullptr;
 				HANDLE FenceEvent;
-				uint64_t FenceValue = 0;
 
 				CPtr<ID3D12Resource> ShaderTableRayGen;
 				CPtr<ID3D12Resource> ShaderTableHitGroups;
@@ -162,16 +232,11 @@ namespace VolumeRaytracer
 				CPtr<ID3D12Resource> ShaderTableMiss;
 				UINT StrideShaderTableMiss;
 
-				CPtr<ID3D12Resource> OutputTexture;
-				D3D12_GPU_DESCRIPTOR_HANDLE OutputTextureHandle;
-
-				VDXDescriptorHeap* RendererDescriptorHeap = nullptr;
-				VDXDescriptorHeap* RendererSamplerDescriptorHeap = nullptr;
+				VDXDescriptorHeap* RendererDescriptorHeaps = nullptr;
+				VDXDescriptorHeap* RendererSamplerDescriptorHeaps = nullptr;
 
 				CPtr<ID3D12RootSignature> GlobalRootSignature;
 				boost::unordered_map<EShaderType, CPtr<ID3D12RootSignature>> LocalRootSignatures;
-
-				boost::unordered_map<VDXRenderTarget*, DXRegisteredRenderTarget> ActiveRenderTargets;
 
 				bool IsInitialized = false;
 

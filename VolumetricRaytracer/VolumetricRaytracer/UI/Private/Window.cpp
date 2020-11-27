@@ -14,6 +14,7 @@
 
 #include "Window.h"
 #include "Textures/RenderTarget.h"
+#include "../../Renderer/Public/Renderer.h"
 
 VolumeRaytracer::UI::VWindow::VWindow()
 {
@@ -23,9 +24,32 @@ VolumeRaytracer::UI::VWindow::~VWindow()
 {
 }
 
-void VolumeRaytracer::UI::VWindow::SetRenderTarget(const VObjectPtr<Renderer::VRenderTarget>& renderTarget)
+void VolumeRaytracer::UI::VWindow::SetRenderer(std::weak_ptr<Renderer::VRenderer> renderer)
 {
-	RenderTarget = renderTarget;
+	if (!Renderer.expired() && Renderer.lock() != renderer.lock())
+	{
+		RemoveRenderer();
+	}
+
+	Renderer::VRenderer* rendererPtr = renderer.lock().get();
+
+	if (AttachToRenderer(rendererPtr))
+	{
+		Renderer = renderer;
+	}
+}
+
+void VolumeRaytracer::UI::VWindow::RemoveRenderer()
+{
+	if (!Renderer.expired())
+	{
+		Renderer::VRenderer* rendererPtr = Renderer.lock().get();
+
+		if (DetachFromRenderer(rendererPtr))
+		{
+			Renderer.reset();
+		}
+	}
 }
 
 void VolumeRaytracer::UI::VWindow::Show()
@@ -75,6 +99,8 @@ void VolumeRaytracer::UI::VWindow::CloseWindow()
 {
 	WindowOpen = false;
 
+	RemoveRenderer();
+
 	OnWindowClosed();
 }
 
@@ -94,5 +120,13 @@ const bool VolumeRaytracer::UI::VWindow::CanEverTick() const
 bool VolumeRaytracer::UI::VWindow::ShouldTick() const
 {
 	return IsWindowOpen();
+}
+
+void VolumeRaytracer::UI::VWindow::OnSizeChanged(const unsigned int& width, const unsigned int& height)
+{
+	if (!Renderer.expired())
+	{
+		Renderer.lock()->ResizeRenderOutput(width, height);
+	}
 }
 

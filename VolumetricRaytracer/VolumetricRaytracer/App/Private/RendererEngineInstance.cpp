@@ -33,9 +33,7 @@ void VolumeRaytracer::App::RendererEngineInstance::OnEngineInitialized(Engine::V
 
 	CreateRendererWindow();
 	Window->Show();
-
-	VObjectPtr<Renderer::VRenderTarget> renderTarget = UI::VWindowRenderTargetFactory::CreateRenderTarget(Engine->GetRenderer(), Window);
-	Window->SetRenderTarget(renderTarget);
+	Window->SetRenderer(Engine->GetRenderer());
 
 	InitScene();
 

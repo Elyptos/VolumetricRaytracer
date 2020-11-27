@@ -48,6 +48,12 @@ namespace VolumeRaytracer
 
 				void Tick(const float& deltaSeconds) override;
 
+
+				bool AttachToRenderer(Renderer::VRenderer* renderer) override;
+
+
+				bool DetachFromRenderer(Renderer::VRenderer* renderer) override;
+
 			private:
 				uint32_t Width;
 				uint32_t Height;

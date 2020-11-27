@@ -29,6 +29,7 @@
 #include <sstream>
 #include <algorithm>
 
+
 VolumeRaytracer::Engine::VEngine::~VEngine()
 {
 	Shutdown();
@@ -56,7 +57,8 @@ void VolumeRaytracer::Engine::VEngine::Shutdown()
 
 float VolumeRaytracer::Engine::VEngine::GetEngineDeltaTime() const
 {
-	return std::max(EngineDeltaTime, 0.00001f);
+	//return std::max(EngineDeltaTime, 0.00001f);
+	return EngineDeltaTime;
 }
 
 unsigned int VolumeRaytracer::Engine::VEngine::GetFPS() const
@@ -187,11 +189,14 @@ void VolumeRaytracer::Engine::VEngine::EngineLoop()
 			ExecuteRenderCommand();
 		}
 
-		std::this_thread::sleep_for(std::chrono::microseconds(MIN_ENGINE_TICK_TIME_MICROSECONDS));
-		auto tStampEnd = std::chrono::high_resolution_clock::now();
+		//std::this_thread::yield();
 
+		auto tStampEnd = std::chrono::high_resolution_clock::now();
+		
 		long long frameTime = std::chrono::duration_cast<std::chrono::microseconds>(tStampEnd - tStampBegin).count();
 		EngineDeltaTime = frameTime * 0.001f * 0.001f;
+		
+		//std::this_thread::sleep_for(std::chrono::microseconds(MIN_ENGINE_TICK_TIME_MICROSECONDS));
 
 		CountFPS(EngineDeltaTime);
 	}

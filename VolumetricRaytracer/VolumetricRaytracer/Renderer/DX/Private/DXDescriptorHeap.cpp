@@ -38,15 +38,10 @@ UINT VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::GetDescriptorSize() const
 
 void VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::Reset()
 {
+	ResetAllocations();
+
 	MaxNumberOfDescriptors = 0;
 	ResourceDescSize = 0;
-	NumAllocatedDescriptors = 0;
-
-	if (AllocatedDescriptors != nullptr)
-	{
-		delete[] AllocatedDescriptors;
-		AllocatedDescriptors = nullptr;
-	}
 
 	if (DescHeap)
 	{
@@ -70,7 +65,6 @@ void VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::Init(CPtr<ID3D12Device5> 
 	heapDesc.NodeMask = 0;
 
 	dxDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&DescHeap));
-	AllocatedDescriptors = new D3D12_CPU_DESCRIPTOR_HANDLE[MaxNumberOfDescriptors];
 }
 
 bool VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* outHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle, UINT& outDescriptorIndex)
@@ -89,8 +83,6 @@ bool VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::AllocateDescriptor(D3D12_
 
 	outDescriptorIndex = NumAllocatedDescriptors;
 	NumAllocatedDescriptors++;
-
-	AllocatedDescriptors[outDescriptorIndex] = *outHandle;
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::GetCPUHandle(const UINT& index)
@@ -115,4 +107,9 @@ D3D12_GPU_DESCRIPTOR_HANDLE VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::Ge
 	{
 		return CD3DX12_GPU_DESCRIPTOR_HANDLE(DescHeap->GetGPUDescriptorHandleForHeapStart(), index, ResourceDescSize);
 	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::ResetAllocations()
+{
+	NumAllocatedDescriptors = 0;
 }

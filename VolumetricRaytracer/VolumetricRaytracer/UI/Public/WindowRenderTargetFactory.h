@@ -32,7 +32,8 @@ namespace VolumeRaytracer
 		class VWindowRenderTargetFactory
 		{
 		public:
-			static VObjectPtr<Renderer::VRenderTarget> CreateRenderTarget(std::weak_ptr<Renderer::VRenderer> renderer, std::weak_ptr<VWindow> window);
+			static bool AttachWindowToRenderer(std::weak_ptr<VWindow> window, std::weak_ptr<Renderer::VRenderer> renderer);
+			static bool DetachWindowFromRenderer(std::weak_ptr<VWindow> window, std::weak_ptr<Renderer::VRenderer> renderer);
 		};
 	}
 }

@@ -30,6 +30,7 @@ namespace VolumeRaytracer
 			virtual ~VRenderTarget();
 
 			virtual void Release();
+			virtual void Resize(unsigned int width, unsigned int height) const = 0;
 
 			unsigned int GetBufferCount() const;
 			unsigned int GetBufferIndex() const;
@@ -39,11 +40,12 @@ namespace VolumeRaytracer
 			boost::signals2::connection OnRenderTargetReleased_Bind(const GenericRenderTargetDelegate::slot_type& del);
 
 		protected:
-			unsigned int BufferIndex = 0;
-			unsigned int BufferCount = 0;
-
 			void Initialize() override;
 			void BeginDestroy() override;
+
+		protected:
+			unsigned int BufferIndex = 0;
+			unsigned int BufferCount = 0;
 
 		private:
 			GenericRenderTargetDelegate OnRenderTargetReleased;

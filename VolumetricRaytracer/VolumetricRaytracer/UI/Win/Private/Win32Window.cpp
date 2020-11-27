@@ -15,6 +15,8 @@
 #include "Win32Window.h"
 #include "Win32Resources.h"
 #include <boost/unordered_map.hpp>
+#include "../../Renderer/DX/Public/DXRenderer.h"
+#include "../../Core/Public/Logger.h"
 
 namespace VolumeRaytracer
 {
@@ -97,27 +99,36 @@ LRESULT CALLBACK VolumeRaytracer::UI::Win32::VWin32Window::MessageHandler(HWND h
 	{
 		PostQuitMessage(0);
 		Close();
-		break;
+		return 0;
 	}
 	case WM_CLOSE:
 	{
 		PostQuitMessage(0);
 		Close();
-		break;
+		return 0;
 	}
 	case WM_SYSCHAR:
 	{
-		break;
-	}
-	case WM_SIZE:
-	{
-		//RECT windowRect = {};
-
-		//GetClientRect(hwnd, &windowRect);
-
-		//OnSizeChanged(windowRect.right - windowRect.left, windowRect.bottom - windowRect.top);
+		
 	}
 	break;
+	case WM_SIZE:
+	{
+		RECT windowRect = {};
+		GetClientRect(hwnd, &windowRect);
+
+		OnSizeChanged(windowRect.right - windowRect.left, windowRect.bottom - windowRect.top);
+		return 0;
+	}
+	break;
+	case WM_PAINT:
+	{
+		return 0;
+	}
+	case WM_DISPLAYCHANGE:
+	{
+
+	}
 	}
 	return DefWindowProcW(hwnd, msg, p1, p2);
 }
@@ -155,7 +166,7 @@ void VolumeRaytracer::UI::Win32::VWin32Window::InitializeWindow()
 		OutputDebugStringW(buf);
 	}
 
-	WindowHandle = CreateWindowExW(NULL, L"VolumeRaytracer", L"VolumeRaytracer", WS_OVERLAPPEDWINDOW, 0, 0, Width, Height, NULL, NULL, HInstance, NULL);
+	WindowHandle = CreateWindowExW(NULL, L"VolumeRaytracer", L"VolumeRaytracer", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, Width, Height, NULL, NULL, HInstance, NULL);
 
 	WinMessageDistributor.RegisterWindow(this);
 
@@ -197,10 +208,40 @@ void VolumeRaytracer::UI::Win32::VWin32Window::Tick(const float& deltaSeconds)
 
 	ZeroMemory(&message, sizeof(MSG));
 
-	if (PeekMessageW(&message, WindowHandle, 0, 0, PM_REMOVE))
+	if (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
 	{
+		TranslateMessage(&message);
 		DispatchMessageW(&message);
 	}
 }
 
+bool VolumeRaytracer::UI::Win32::VWin32Window::AttachToRenderer(Renderer::VRenderer* renderer)
+{
+	Renderer::DX::VDXRenderer* dxRenderer = dynamic_cast<Renderer::DX::VDXRenderer*>(renderer);
+
+	if (dxRenderer == nullptr)
+	{
+		V_LOG_ERROR("Unable to attach window to renderer! Provided renderer is not a DirectX renderer!");
+		return false;
+	}
+
+	dxRenderer->SetWindowHandle(GetHWND(), GetWidth(), GetHeight());
+
+	return true;
+}
+
+bool VolumeRaytracer::UI::Win32::VWin32Window::DetachFromRenderer(Renderer::VRenderer* renderer)
+{
+	Renderer::DX::VDXRenderer* dxRendererPtr = dynamic_cast<Renderer::DX::VDXRenderer*>(renderer);
+
+	if (dxRendererPtr == nullptr)
+	{
+		V_LOG_ERROR("Unable to detach window from renderer! Renderer is not valid!");
+		return false;
+	}
+
+	dxRendererPtr->ClearWindowHandle();
+
+	return true;
+}
 

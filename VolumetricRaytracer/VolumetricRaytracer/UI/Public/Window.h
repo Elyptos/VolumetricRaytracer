@@ -22,7 +22,7 @@ namespace VolumeRaytracer
 {
 	namespace Renderer
 	{
-		class VRenderTarget;
+		class VRenderer;
 	}
 
 	namespace UI
@@ -41,7 +41,9 @@ namespace VolumeRaytracer
 			virtual unsigned int GetWidth() const = 0;
 			virtual unsigned int GetHeight() const = 0;
 
-			void SetRenderTarget(const VObjectPtr<Renderer::VRenderTarget>& renderTarget);
+			void SetRenderer(std::weak_ptr<Renderer::VRenderer> renderer);
+			void RemoveRenderer();
+			std::weak_ptr<Renderer::VRenderer> GetAttachedRenderer() const { return Renderer; }
 
 			void Show();
 			void Close();
@@ -57,16 +59,21 @@ namespace VolumeRaytracer
 			virtual void InitializeWindow();
 			virtual void CloseWindow();
 
+			virtual bool AttachToRenderer(Renderer::VRenderer* renderer) = 0;
+			virtual bool DetachFromRenderer(Renderer::VRenderer* renderer) = 0;
+
 			void Initialize() override;
 			void BeginDestroy() override;
 
 			bool const CanEverTick() const override;
 			bool ShouldTick() const override;
 
+			virtual void OnSizeChanged(const unsigned int& width, const unsigned int& height);
+
 		private:
 			bool WindowOpen = false;
 
-			VObjectPtr<Renderer::VRenderTarget> RenderTarget;
+			std::weak_ptr<Renderer::VRenderer> Renderer;
 
 			WindowDelegate OnWindowOpened;
 			WindowDelegate OnWindowClosed;

@@ -44,6 +44,8 @@ namespace VolumeRaytracer
 			virtual void InitializeTexture(VObjectPtr<VTextureCube> cubeTexture, bool uploadToGPU) = 0;
 			virtual void UploadToGPU(VObjectPtr<VTexture> texture) = 0;
 
+			virtual void ResizeRenderOutput(unsigned int width, unsigned int height) = 0;
+
 		protected:
 			std::weak_ptr<Voxel::VVoxelScene> SceneRef;
 		};

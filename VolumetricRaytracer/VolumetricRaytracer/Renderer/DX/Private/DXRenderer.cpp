@@ -14,7 +14,6 @@
 
 #include "DXRenderer.h"
 #include "Logger.h"
-#include "DXRenderTarget.h"
 #include "DXConstants.h"
 #include "RaytracingHlsl.h"
 #include "RDXScene.h"
@@ -30,38 +29,22 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::Render()
 {
 	if (IsActive())
 	{
-		if (SceneToRender != nullptr && !SceneRef.expired())
+		if (WindowRenderTarget != nullptr && SceneToRender != nullptr && !SceneRef.expired())
 		{
 			UploadPendingTexturesToGPU();
 
-			for (auto elem : ActiveRenderTargets)
-			{
-				VDXRenderTarget* renderTarget = elem.first;
+			SceneRef.lock()->GetSceneCamera()->AspectRatio = (float)WindowRenderTarget->GetWidth() / (float)WindowRenderTarget->GetHeight();
+			SceneToRender->SyncWithScene(SceneRef.lock().get());
+			PrepareForRendering();
+			DoRendering();
+			CopyRaytracingOutputToBackbuffer();
 
-				SceneRef.lock()->GetSceneCamera()->AspectRatio = (float)renderTarget->GetWidth() / (float)renderTarget->GetHeight();
-				SceneToRender->SyncWithScene(SceneRef.lock().get());
-				PrepareForRendering(renderTarget);
-				DoRendering(renderTarget);
-				CopyRaytracingOutputToBackbuffer(renderTarget);
+			ExecuteCommandList();
 
-				ExecuteCommandList();
+			WindowRenderTarget->Present(0, DXGI_PRESENT_ALLOW_TEARING);
 
-				renderTarget->SwapChain->Present(1, 0);
-
-				WaitForGPU();
-
-				if (renderTarget->GetCurrentBufferIndex() == 0)
-				{
-					renderTarget->SetBufferIndex(1);
-				}
-				else
-				{
-					renderTarget->SetBufferIndex(0);
-				}
-			}
+			MoveToNextFrame();
 		}
-
-		//ClearAllRenderTargets();
 	}
 	else
 	{
@@ -80,76 +63,41 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::Stop()
 	DestroyRenderer();
 }
 
-VolumeRaytracer::VObjectPtr<VolumeRaytracer::Renderer::DX::VDXRenderTarget> VolumeRaytracer::Renderer::DX::VDXRenderer::CreateViewportRenderTarget(HWND hwnd, unsigned int width, unsigned int height)
+void VolumeRaytracer::Renderer::DX::VDXRenderer::SetWindowHandle(HWND hwnd, unsigned int width, unsigned int height)
 {
-	D3D12_DESCRIPTOR_HEAP_DESC renderTargetViewHeapDesc;
-	DXGI_SWAP_CHAIN_DESC swapChainDesc;
-	unsigned int renderTargetViewDescriptorSize = 0;
-	unsigned int bufferCount = 0;
+	ClearWindowHandle();
 
-	V_LOG("Creating render target for window");
+	WindowRenderTarget = new VDXWindowRenderTargetHandler(DXGIFactory.Get(), Device.Get(), RenderCommandQueue.Get(), hwnd, width, height);
+}
 
-	VObjectPtr<VDXRenderTarget> res = VObject::CreateObject<VDXRenderTarget>();
+void VolumeRaytracer::Renderer::DX::VDXRenderer::ClearWindowHandle()
+{
+	WaitForGPU();
+	ReleaseWindowResources();
+}
 
-	V_LOG("Creating Swapchain for render target");
-	CreateSwapChain(hwnd, width, height, res->SwapChain);
-
-	ZeroMemory(&renderTargetViewHeapDesc, sizeof(renderTargetViewHeapDesc));
-	ZeroMemory(&swapChainDesc, sizeof(swapChainDesc));
-
-	if (FAILED(res->SwapChain->GetDesc(&swapChainDesc)))
+void VolumeRaytracer::Renderer::DX::VDXRenderer::ResizeRenderOutput(unsigned int width, unsigned int height)
+{
+	if (HasValidWindow())
 	{
-		V_LOG_ERROR("Unable to create dx render target for viewport! Unable to retrieve swap chain description!");
+		WaitForGPU();
 
-		return nullptr;
+		WindowRenderTarget->Resize(Device.Get(), width, height);
 	}
-
-	bufferCount = swapChainDesc.BufferCount;
-
-	res->BufferCount = bufferCount;
-	res->Width = width;
-	res->Height = height;
-
-	renderTargetViewHeapDesc.NumDescriptors = bufferCount;
-	renderTargetViewHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	renderTargetViewHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-
-	V_LOG("Creating render target buffers");
-
-	if (FAILED(Device->CreateDescriptorHeap(&renderTargetViewHeapDesc, __uuidof(ID3D12DescriptorHeap), (void**)&res->RenderTargetViewHeap)))
-	{
-		V_LOG_ERROR("Unable to create dx render target for viewport!");
-
-		return nullptr;
-	}
-
-	SetDXDebugName<ID3D12DescriptorHeap>(res->RenderTargetViewHeap, "Volume Raytracer View Heap");
-
-	InitializeRenderTargetBuffers(res.get(), bufferCount);
-	InitializeRenderTargetResourceDescHeap(res.get());
-	CreateRenderingOutputTexture(res.get());
-
-	V_LOG("Creating necessary pipeline variables for render target");
-
-	AddRenderTargetToActiveMap(res.get());
-
-	return res;
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::BuildAccelerationStructure(const VDXAccelerationStructureBuffers& topLevelAS, const VDXAccelerationStructureBuffers& bottomLevelAS)
 {
-	CommandAllocator->Reset();
-	CommandList->Reset(CommandAllocator.Get(), nullptr);
+	ID3D12GraphicsCommandList5* commandList =  ComputeCommandHandler->StartCommandRecording();
 
-	CommandList->BuildRaytracingAccelerationStructure(&bottomLevelAS.AccelerationStructureDesc, 0, nullptr);
+	commandList->BuildRaytracingAccelerationStructure(&bottomLevelAS.AccelerationStructureDesc, 0, nullptr);
 
 	D3D12_RESOURCE_BARRIER resourceBarrier = CD3DX12_RESOURCE_BARRIER::UAV(bottomLevelAS.AccelerationStructure.Get());
-	CommandList->ResourceBarrier(1, &resourceBarrier);
+	commandList->ResourceBarrier(1, &resourceBarrier);
 
-	CommandList->BuildRaytracingAccelerationStructure(&topLevelAS.AccelerationStructureDesc, 0, nullptr);
+	commandList->BuildRaytracingAccelerationStructure(&topLevelAS.AccelerationStructureDesc, 0, nullptr);
 
-	ExecuteCommandList();
-	WaitForGPU();
+	ComputeCommandHandler->ExecuteCommandQueue();
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::SetSceneToRender(VObjectPtr<Voxel::VVoxelScene> scene)
@@ -221,6 +169,11 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::MakeShaderResourceView(VObjectP
 	}
 }
 
+bool VolumeRaytracer::Renderer::DX::VDXRenderer::HasValidWindow() const
+{
+	return WindowRenderTarget != nullptr;
+}
+
 void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 {
 	if (!IsActive())
@@ -272,25 +225,30 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 		commandQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 		commandQueueDesc.NodeMask = 0;
 
-		if (FAILED(Device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&CommandQueue))))
+		if (FAILED(Device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&RenderCommandQueue))))
 		{
 			V_LOG_FATAL("Command queue creation failed!");
 			ReleaseInternalVariables();
 			return;
 		}
 
-		SetDXDebugName<ID3D12CommandQueue>(CommandQueue, "VR Command Queue");
+		SetDXDebugName<ID3D12CommandQueue>(RenderCommandQueue, "VR Command Queue");
 
-		if (FAILED(Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&CommandAllocator))))
+		for (UINT i = 0; i < VDXConstants::BACK_BUFFER_COUNT; i++)
 		{
-			V_LOG_FATAL("Command allocator creation failed!");
-			ReleaseInternalVariables();
-			return;
+			WindowCommandAllocators.push_back(nullptr);
+
+			if (FAILED(Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&WindowCommandAllocators[i]))))
+			{
+				V_LOG_FATAL("Command allocator creation failed!");
+				ReleaseInternalVariables();
+				return;
+			}
+
+			SetDXDebugName<ID3D12CommandAllocator>(WindowCommandAllocators[i], "VR Command Allocator " + i);
 		}
 
-		SetDXDebugName<ID3D12CommandAllocator>(CommandAllocator, "VR Command Allocator");
-
-		if (FAILED(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, CommandAllocator.Get(), NULL, IID_PPV_ARGS(&CommandList))))
+		if (FAILED(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, WindowCommandAllocators[0].Get(), NULL, IID_PPV_ARGS(&CommandList))))
 		{
 			V_LOG_FATAL("Command list creation failed!");
 			ReleaseInternalVariables();
@@ -300,6 +258,9 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 		SetDXDebugName<ID3D12CommandList>(CommandList, "VR Command List");
 
 		CommandList->Close();
+
+		UploadCommandHandler = new VDXGPUCommand(Device.Get(), D3D12_COMMAND_LIST_TYPE_COPY, "UploadCommandHandler");
+		ComputeCommandHandler = new VDXGPUCommand(Device.Get(), D3D12_COMMAND_LIST_TYPE_COMPUTE, "ComputeCommandHandler");
 
 		InitRendererDescriptorHeap();
 		InitializeGlobalRootSignature();
@@ -316,7 +277,6 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 		SetDXDebugName<ID3D12Fence>(Fence, "Volume Raytracer Fence");
 
 		FenceEvent = CreateEventEx(NULL, FALSE, FALSE, EVENT_ALL_ACCESS);
-		FenceValue = 1;
 
 		IsInitialized = true;
 
@@ -330,7 +290,6 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::DestroyRenderer()
 	{
 		V_LOG("Shutting down DirectX 12 renderer");
 
-		ReleaseAllRenderTargets();
 		ReleaseInternalVariables();
 
 		IsInitialized = false;
@@ -353,7 +312,6 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupDebugLayer()
 	debugController->QueryInterface(IID_PPV_ARGS(&debugControllerExtended));
 
 	debugControllerExtended->EnableDebugLayer();
-	//debugControllerExtended->SetEnableGPUBasedValidation(true);
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupDebugQueue()
@@ -452,162 +410,6 @@ VolumeRaytracer::Renderer::DX::CPtr<IDXGIAdapter3> VolumeRaytracer::Renderer::DX
 	return adapter3;
 }
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::CreateSwapChain(HWND hwnd, unsigned int width, unsigned int height, CPtr<IDXGISwapChain3>& outSwapChain)
-{
-	DXGI_SWAP_CHAIN_DESC1 swapChainDesc;
-	ZeroMemory(&swapChainDesc, sizeof(swapChainDesc));
-
-	CPtr<IDXGISwapChain1> swapChain = NULL;
-
-	swapChainDesc.BufferCount = 2;
-	swapChainDesc.Width = width;
-	swapChainDesc.Height = height;
-	swapChainDesc.Format = VDXConstants::BACK_BUFFER_FORMAT;
-	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapChainDesc.SampleDesc.Count = 1;
-	swapChainDesc.SampleDesc.Quality = 0;
-	swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
-	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
-	swapChainDesc.Flags = 0;
-
-	DXGI_SWAP_CHAIN_FULLSCREEN_DESC fullScreenDesc = {};
-	fullScreenDesc.Windowed = true;
-
-	if (FAILED(DXGIFactory->CreateSwapChainForHwnd(CommandQueue.Get(), hwnd, &swapChainDesc, &fullScreenDesc, nullptr, &swapChain)))
-	{
-		V_LOG_ERROR("Swap chain creation failed!");
-		return;
-	}
-
-	swapChain.As(&outSwapChain);
-
-	SetDXDebugName<IDXGISwapChain3>(outSwapChain, "Volume Raytracer Swapchain");
-}
-
-void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeRenderTargetBuffers(VDXRenderTarget* renderTarget, const uint32_t& bufferCount)
-{
-	uint32_t renderTargetViewDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	D3D12_CPU_DESCRIPTOR_HANDLE renderTargetViewHandle = renderTarget->RenderTargetViewHeap->GetCPUDescriptorHandleForHeapStart();;
-
-	for (unsigned int i = 0; i < bufferCount; i++)
-	{
-		renderTarget->BufferArr.push_back(nullptr);
-
-		if (FAILED(renderTarget->SwapChain->GetBuffer(i, IID_PPV_ARGS(&renderTarget->BufferArr[i]))))
-		{
-			V_LOG_FATAL("Unable to get swap chain buffer! This should never happen!");
-			return;
-		}
-
-		SetDXDebugName<ID3D12Resource>(renderTarget->BufferArr[i], "Volume Raytracer Buffer");
-
-		Device->CreateRenderTargetView(renderTarget->BufferArr[i].Get(), NULL, renderTargetViewHandle);
-		renderTargetViewHandle.ptr += renderTargetViewDescriptorSize;
-	}
-}
-
-void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeRenderTargetResourceDescHeap(VDXRenderTarget* renderTarget)
-{
-	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
-
-	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	descHeapDesc.NumDescriptors = 1;
-	descHeapDesc.NodeMask = 0;
-
-	Device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&renderTarget->ResourceDescHeap));
-
-	renderTarget->ResourceDescHeapSize = descHeapDesc.NumDescriptors;
-	renderTarget->ResourceDescSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-}
-
-void VolumeRaytracer::Renderer::DX::VDXRenderer::CreateRenderingOutputTexture(VDXRenderTarget* renderTarget)
-{
-	CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(VDXConstants::BACK_BUFFER_FORMAT, renderTarget->GetWidth(), renderTarget->GetHeight(), 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-
-	CD3DX12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-
-	if (FAILED(Device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&renderTarget->OutputTexture))))
-	{
-		V_LOG_ERROR("Failed to create output texture for render target");
-		return;
-	}
-
-	SetDXDebugName(renderTarget->OutputTexture, "Volume Raytracer output texture");
-
-	D3D12_CPU_DESCRIPTOR_HANDLE uavDescHandle;
-	
-	if (!renderTarget->AllocateNewResourceDescriptor(&uavDescHandle, renderTarget->OutputTextureDescIndex))
-	{
-		V_LOG_ERROR("Failed to bind output texture resource");
-
-		renderTarget->OutputTexture.Reset();
-		renderTarget->OutputTexture = nullptr;
-
-		return;
-	}
-
-	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-
-	Device->CreateUnorderedAccessView(renderTarget->OutputTexture.Get(), nullptr, &uavDesc, uavDescHandle);
-	renderTarget->OutputTextureGPUHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(renderTarget->GetResourceDescHeap()->GetGPUDescriptorHandleForHeapStart(), renderTarget->OutputTextureDescIndex, renderTarget->ResourceDescSize);
-}
-
-void VolumeRaytracer::Renderer::DX::VDXRenderer::AddRenderTargetToActiveMap(VDXRenderTarget* renderTarget)
-{
-	DXRegisteredRenderTarget registrationContainer;
-
-	registrationContainer.RenderTarget = renderTarget;
-	registrationContainer.RenderTargetReleaseDelegateHandle = renderTarget->OnRenderTargetReleased_Bind(boost::bind(&VDXRenderer::OnRenderTargetPendingRelease, this, boost::placeholders::_1));
-
-	ActiveRenderTargets[renderTarget] = registrationContainer;
-}
-
-void VolumeRaytracer::Renderer::DX::VDXRenderer::RemoveRenderTargetFromActiveMap(VDXRenderTarget* renderTarget)
-{
-	if (ActiveRenderTargets.find(renderTarget) != ActiveRenderTargets.end())
-	{
-		DXRegisteredRenderTarget reg = ActiveRenderTargets[renderTarget];
-
-		reg.RenderTargetReleaseDelegateHandle.disconnect();
-
-		ActiveRenderTargets.erase(renderTarget);
-	}
-}
-
-void VolumeRaytracer::Renderer::DX::VDXRenderer::OnRenderTargetPendingRelease(VRenderTarget* renderTarget)
-{
-	VDXRenderTarget* dxRenderTarget = dynamic_cast<VDXRenderTarget*>(renderTarget);
-	ReleaseRenderTarget(dxRenderTarget);
-}
-
-void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseRenderTarget(VDXRenderTarget* renderTarget)
-{
-	if (renderTarget != nullptr)
-	{
-		V_LOG("Trying to realse render target");
-
-		if (ActiveRenderTargets.find(renderTarget) != ActiveRenderTargets.end())
-		{
-			V_LOG("Waiting for GPU to free Render Target");
-			WaitForGPU();
-			V_LOG("GPU finished. Now releasing Render Target");
-
-			RemoveRenderTargetFromActiveMap(renderTarget);
-
-			renderTarget->ReleaseInternalVariables();
-
-			V_LOG("Render Target released!");
-		}
-		else
-		{
-			V_LOG_WARNING("Render target cannot be released by this renderer because it was created by another one!");
-		}
-	}
-}
-
 uint64_t VolumeRaytracer::Renderer::DX::VDXRenderer::SignalFence(CPtr<ID3D12CommandQueue> commandQueue, CPtr<ID3D12Fence> fence, uint64_t& fenceValue)
 {
 	uint64_t fenceValueForSignal = ++fenceValue;
@@ -629,41 +431,41 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::WaitForFenceValue(CPtr<ID3D12Fe
 	}
 }
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseAllRenderTargets()
+void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseWindowResources()
 {
-	V_LOG("Releasing all render targets!");
-
-	std::vector<VDXRenderTarget*> renderTargets;
-
-	for (auto elem : ActiveRenderTargets)
+	if (WindowRenderTarget != nullptr)
 	{
-		renderTargets.push_back(elem.first);
+		WindowRenderTarget = nullptr;
+		delete WindowRenderTarget;
 	}
-
-	for (auto renderTarget : renderTargets)
-	{
-		ReleaseRenderTarget(renderTarget);
-	}
-
-	ActiveRenderTargets.clear();
-
-	V_LOG("All render targets released!");
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseInternalVariables()
 {
-	DeleteScene();
-
-	if (RendererSamplerDescriptorHeap != nullptr)
+	if (UploadCommandHandler != nullptr)
 	{
-		delete RendererSamplerDescriptorHeap;
-		RendererSamplerDescriptorHeap = nullptr;
+		delete UploadCommandHandler;
+		UploadCommandHandler = nullptr;
 	}
 
-	if (RendererDescriptorHeap != nullptr)
+	if (ComputeCommandHandler != nullptr)
 	{
-		delete RendererDescriptorHeap;
-		RendererDescriptorHeap = nullptr;
+		delete ComputeCommandHandler;
+		ComputeCommandHandler = nullptr;
+	}
+
+	DeleteScene();
+
+	if (RendererSamplerDescriptorHeaps != nullptr)
+	{
+		delete[] RendererSamplerDescriptorHeaps;
+		RendererSamplerDescriptorHeaps = nullptr;
+	}
+
+	if (RendererDescriptorHeaps != nullptr)
+	{
+		delete[] RendererDescriptorHeaps;
+		RendererDescriptorHeaps = nullptr;
 	}
 
 	if (ShaderTableRayGen != nullptr)
@@ -692,7 +494,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseInternalVariables()
 		Fence = nullptr;
 	}
 
-	FenceValue = 0;
+	ReleaseWindowResources();
 
 	if (PipelineState != nullptr)
 	{
@@ -706,16 +508,18 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseInternalVariables()
 		CommandList = nullptr;
 	}
 
-	if (CommandAllocator != nullptr)
+	for (auto& commandAllocator : WindowCommandAllocators)
 	{
-		CommandAllocator.Reset();
-		CommandAllocator = nullptr;
+		commandAllocator.Reset();
+		commandAllocator = nullptr;
 	}
 
-	if (CommandQueue != nullptr)
+	WindowCommandAllocators.empty();
+
+	if (RenderCommandQueue != nullptr)
 	{
-		CommandQueue.Reset();
-		CommandQueue = nullptr;
+		RenderCommandQueue.Reset();
+		RenderCommandQueue = nullptr;
 	}
 
 	if (GlobalRootSignature != nullptr)
@@ -746,61 +550,21 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseInternalVariables()
 	}
 }
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::ClearAllRenderTargets()
-{
-	/*unsigned int renderTargetViewDescriptorSize = 0;
-	renderTargetViewDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-	for (auto elem : ActiveRenderTargets)
-	{
-		VDXRenderTarget* renderTarget = elem.first;
-
-		CPtr<ID3D12Resource> buffer = renderTarget->GetBuffers()[renderTarget->GetBufferIndex()];
-
-		CommandAllocator->Reset();
-		CommandList->Reset(CommandAllocator.Get(), nullptr);
-
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(buffer.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-		CommandList->ResourceBarrier(1, &barrier);
-
-		float color[] = { 0.4f, 0.6f, 0.9f, 1.0f };
-
-		CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle(renderTarget->GetViewHeapDesc()->GetCPUDescriptorHandleForHeapStart(), renderTarget->GetBufferIndex(), renderTargetViewDescriptorSize);
-
-		CommandList->ClearRenderTargetView(cpuHandle, color, 0, nullptr);
-
-		barrier = CD3DX12_RESOURCE_BARRIER::Transition(buffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-
-		CommandList->ResourceBarrier(1, &barrier);
-		CommandList->Close();
-
-		ID3D12CommandList* commandLists[] = {
-				CommandList.Get()
-		};
-
-		CommandQueue->ExecuteCommandLists(1, commandLists);
-
-		renderTarget->FenceValue = SignalFence(CommandQueue, renderTarget->Fence, renderTarget->FenceValue);
-
-		WaitForFenceValue(renderTarget->Fence, renderTarget->FenceValue, renderTarget->FenceEvent);
-
-		unsigned int nextBufferIndex = renderTarget->GetBufferIndex() == 0u ? 1u : 0u;
-
-		renderTarget->SetBufferIndex(nextBufferIndex);
-		renderTarget->GetSwapChain()->Present(0, 0);
-	}*/
-}
-
 void VolumeRaytracer::Renderer::DX::VDXRenderer::InitRendererDescriptorHeap()
 {
-	if (RendererDescriptorHeap == nullptr)
+	if (RendererDescriptorHeaps == nullptr)
 	{
-		RendererDescriptorHeap = new VDXDescriptorHeap(GetDXDevice(), 3);
-		RendererDescriptorHeap->SetDebugName("Renderer Descriptor Heap");
+		RendererDescriptorHeaps = new VDXDescriptorHeap[VDXConstants::BACK_BUFFER_COUNT];
+		RendererSamplerDescriptorHeaps = new VDXDescriptorHeap[VDXConstants::BACK_BUFFER_COUNT];
 
-		RendererSamplerDescriptorHeap = new VDXDescriptorHeap(GetDXDevice(), 1, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
-		RendererSamplerDescriptorHeap->SetDebugName("Renderer Sampler Descriptor Heap");
+		for (UINT i = 0; i < VDXConstants::BACK_BUFFER_COUNT; i++)
+		{
+			RendererDescriptorHeaps[i] = VDXDescriptorHeap(GetDXDevice(), 3);
+			RendererDescriptorHeaps[i].SetDebugName("Renderer Descriptor Heap " + i);
+
+			RendererSamplerDescriptorHeaps[i] = VDXDescriptorHeap(GetDXDevice(), 1, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+			RendererSamplerDescriptorHeaps[i].SetDebugName("Renderer Sampler Descriptor Heap " + i);
+		}
 	}
 }
 
@@ -909,35 +673,40 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::CreateShaderTables()
 	ShaderTableHitGroups = CreateShaderTable(std::vector<void*>{rayHitGroupID, rayHitGroupShadowID}, StrideShaderTableHitGroups);
 }
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::PrepareForRendering(VDXRenderTarget* renderTarget)
+void VolumeRaytracer::Renderer::DX::VDXRenderer::PrepareForRendering()
 {
-	CommandAllocator->Reset();
-	CommandList->Reset(CommandAllocator.Get(), nullptr);
+	UINT backBufferIndex = WindowRenderTarget->GetCurrentBufferIndex();
 
-	FillDescriptorHeap(renderTarget);
+	WindowCommandAllocators[backBufferIndex]->Reset();
+	CommandList->Reset(WindowCommandAllocators[backBufferIndex].Get(), nullptr);
 
-	D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget->GetCurrentBuffer().Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	FillDescriptorHeap();
+
+	D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(WindowRenderTarget->GetCurrentRenderTarget().Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	CommandList->ResourceBarrier(1, &barrier);
 
-	SceneToRender->BuildVoxelVolume(CommandList);
+	//SceneToRender->BuildVoxelVolume(CommandList);
 }
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::DoRendering(VDXRenderTarget* renderTarget)
+void VolumeRaytracer::Renderer::DX::VDXRenderer::DoRendering()
 {
 	CommandList->SetComputeRootSignature(GlobalRootSignature.Get());
 
+	VDXDescriptorHeap* rendererDescHeap = &RendererDescriptorHeaps[WindowRenderTarget->GetCurrentBufferIndex()];
+	VDXDescriptorHeap* rendererSamplerDescHeap = &RendererSamplerDescriptorHeaps[WindowRenderTarget->GetCurrentBufferIndex()];
+
 	ID3D12DescriptorHeap* descHeaps[2];
 
-	descHeaps[0] = RendererDescriptorHeap->GetDescriptorHeap().Get();
-	descHeaps[1] = RendererSamplerDescriptorHeap->GetDescriptorHeap().Get();
+	descHeaps[0] = rendererDescHeap->GetDescriptorHeap().Get();
+	descHeaps[1] = rendererSamplerDescHeap->GetDescriptorHeap().Get();
 
 	CommandList->SetDescriptorHeaps(2, &descHeaps[0]);
-	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::OutputView, RendererDescriptorHeap->GetDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
-	CommandList->SetComputeRootConstantBufferView(EGlobalRootSignature::SceneConstant, SceneToRender->CopySceneConstantBufferToGPU());
+	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::OutputView, rendererDescHeap->GetDescriptorHeap()->GetGPUDescriptorHandleForHeapStart());
+	CommandList->SetComputeRootConstantBufferView(EGlobalRootSignature::SceneConstant, SceneToRender->CopySceneConstantBufferToGPU(WindowRenderTarget->GetCurrentBufferIndex()));
 
 	CommandList->SetComputeRootShaderResourceView(EGlobalRootSignature::AccelerationStructure, SceneToRender->GetAccelerationStructureTL()->GetGPUVirtualAddress());
-	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::SceneTextures, RendererDescriptorHeap->GetGPUHandle(1));
-	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::SceneSamplers, RendererSamplerDescriptorHeap->GetGPUHandle(0));
+	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::SceneTextures, rendererDescHeap->GetGPUHandle(1));
+	CommandList->SetComputeRootDescriptorTable(EGlobalRootSignature::SceneSamplers, rendererSamplerDescHeap->GetGPUHandle(0));
 
 	D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
 	dispatchDesc.HitGroupTable.StartAddress = ShaderTableHitGroups->GetGPUVirtualAddress();
@@ -948,26 +717,26 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::DoRendering(VDXRenderTarget* re
 	dispatchDesc.MissShaderTable.StrideInBytes = StrideShaderTableMiss;
 	dispatchDesc.RayGenerationShaderRecord.StartAddress = ShaderTableRayGen->GetGPUVirtualAddress();
 	dispatchDesc.RayGenerationShaderRecord.SizeInBytes = ShaderTableRayGen->GetDesc().Width;
-	dispatchDesc.Width = renderTarget->Width;
-	dispatchDesc.Height = renderTarget->Height;
+	dispatchDesc.Width = WindowRenderTarget->GetWidth();
+	dispatchDesc.Height = WindowRenderTarget->GetHeight();
 	dispatchDesc.Depth = 1;
 	
 	CommandList->SetPipelineState1(DXRStateObject.Get());
 	CommandList->DispatchRays(&dispatchDesc);
 }
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::CopyRaytracingOutputToBackbuffer(VDXRenderTarget* renderTarget)
+void VolumeRaytracer::Renderer::DX::VDXRenderer::CopyRaytracingOutputToBackbuffer()
 {
 	D3D12_RESOURCE_BARRIER preCopyBarriers[2];
-	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget->GetCurrentBuffer().Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
-	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget->OutputTexture.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(WindowRenderTarget->GetCurrentRenderTarget().Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
+	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(WindowRenderTarget->GetCurrentOutputTexture().Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
 	CommandList->ResourceBarrier(2, preCopyBarriers);
-	CommandList->CopyResource(renderTarget->GetCurrentBuffer().Get(), renderTarget->OutputTexture.Get());
+	CommandList->CopyResource(WindowRenderTarget->GetCurrentRenderTarget().Get(), WindowRenderTarget->GetCurrentOutputTexture().Get());
 
 	D3D12_RESOURCE_BARRIER postCopyBarriers[2];
-	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget->GetCurrentBuffer().Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
-	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget->OutputTexture.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(WindowRenderTarget->GetCurrentRenderTarget().Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(WindowRenderTarget->GetCurrentOutputTexture().Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	CommandList->ResourceBarrier(2, postCopyBarriers);
 }
@@ -975,6 +744,10 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::CopyRaytracingOutputToBackbuffe
 void VolumeRaytracer::Renderer::DX::VDXRenderer::UploadPendingTexturesToGPU()
 {
 	bool hasTexturesToUpload = false;
+
+	ID3D12GraphicsCommandList5* commandList = nullptr;
+
+	std::vector<D3D12_RESOURCE_BARRIER> barriers;
 
 	for (auto& textureUpload : TexturesToUpload)
 	{
@@ -984,25 +757,37 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::UploadPendingTexturesToGPU()
 			{
 				hasTexturesToUpload = true;
 
-				CommandAllocator->Reset();
-				CommandList->Reset(CommandAllocator.Get(), nullptr);
+				commandList = UploadCommandHandler->StartCommandRecording();
 			}
 
 			VDXTextureUploadPayload& uploadPayload = textureUpload.second.UploadPayload;
 
-			for (UINT64 subResourceIndex = 0; subResourceIndex < uploadPayload.SubResourceCount; subResourceIndex++)
-			{
-				CommandList->CopyTextureRegion(&CD3DX12_TEXTURE_COPY_LOCATION(uploadPayload.GPUBuffer.Get(), subResourceIndex), 0, 0, 0, 
-					&CD3DX12_TEXTURE_COPY_LOCATION(uploadPayload.UploadBuffer.Get(), uploadPayload.SubResourceFootprints[subResourceIndex]), nullptr);
-			}
+			barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(uploadPayload.GPUBuffer.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
 		}
 	}
 
 	if (hasTexturesToUpload)
 	{
-		ExecuteCommandList();
-		WaitForGPU();
+		//commandList->ResourceBarrier(barriers.size(), barriers.data());
+
+		for (auto& textureUpload : TexturesToUpload)
+		{
+			if (!textureUpload.second.Texture.expired())
+			{
+				VDXTextureUploadPayload& uploadPayload = textureUpload.second.UploadPayload;
+
+				for (UINT64 subResourceIndex = 0; subResourceIndex < uploadPayload.SubResourceCount; subResourceIndex++)
+				{
+					commandList->CopyTextureRegion(&CD3DX12_TEXTURE_COPY_LOCATION(uploadPayload.GPUBuffer.Get(), subResourceIndex), 0, 0, 0,
+						&CD3DX12_TEXTURE_COPY_LOCATION(uploadPayload.UploadBuffer.Get(), uploadPayload.SubResourceFootprints[subResourceIndex]), nullptr);
+				}
+			}
+		}
+
+		UploadCommandHandler->ExecuteCommandQueue();
 	}
+
+	UploadCommandHandler->WaitForGPU();
 
 	for (auto& textureUpload : TexturesToUpload)
 	{
@@ -1027,16 +812,37 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ExecuteCommandList()
 				CommandList.Get()
 	};
 
-	CommandQueue->ExecuteCommandLists(1, commandLists);
+	RenderCommandQueue->ExecuteCommandLists(1, commandLists);
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::WaitForGPU()
 {
-	if (CommandQueue && Fence)
+	if (RenderCommandQueue && Fence && WindowRenderTarget != nullptr)
 	{
-		uint64_t fenceValueForSignal = SignalFence(CommandQueue, Fence, FenceValue);
-		WaitForFenceValue(Fence, fenceValueForSignal, FenceEvent);
+		UINT64 fenceValue = WindowRenderTarget->GetCurrentFenceValue();
+
+		RenderCommandQueue->Signal(Fence.Get(), fenceValue);
+		WaitForFenceValue(Fence, fenceValue, FenceEvent);
+
+		WindowRenderTarget->SetCurrentFenceValue(fenceValue + 1);
 	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::MoveToNextFrame()
+{
+	UINT64 currentFenceValue = WindowRenderTarget->GetCurrentFenceValue();
+	RenderCommandQueue->Signal(Fence.Get(), currentFenceValue);
+	
+	WindowRenderTarget->SyncBackBufferIndexWithSwapChain();
+
+	UINT64 nextBufferFenceValue = WindowRenderTarget->GetCurrentFenceValue();
+
+	if (Fence->GetCompletedValue() < nextBufferFenceValue)
+	{
+		WaitForFenceValue(Fence, nextBufferFenceValue, FenceEvent);
+	}
+
+	WindowRenderTarget->SetCurrentFenceValue(currentFenceValue + 1);
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::DeleteScene()
@@ -1050,19 +856,14 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::DeleteScene()
 	}
 }
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::FillDescriptorHeap(VDXRenderTarget* renderTarget)
+void VolumeRaytracer::Renderer::DX::VDXRenderer::FillDescriptorHeap()
 {
-	//D3D12_CPU_DESCRIPTOR_HANDLE destDescriptors[]{ RendererDescriptorHeap->GetCPUHandle(0)/*, RendererDescriptorHeap->GetCPUHandle(0)*/ };
-	//UINT destDescriptorSizes[]{/*RendererDescriptorHeap->GetDescriptorSize(),*/ RendererDescriptorHeap->GetDescriptorSize()};
+	VDXDescriptorHeap* rendererDescHeap = &RendererDescriptorHeaps[WindowRenderTarget->GetCurrentBufferIndex()];
+	VDXDescriptorHeap* rendererSamplerDescHeap = &RendererSamplerDescriptorHeaps[WindowRenderTarget->GetCurrentBufferIndex()];
 
-	//D3D12_CPU_DESCRIPTOR_HANDLE srcDescriptors[]{ renderTarget->ResourceDescHeap->GetCPUDescriptorHandleForHeapStart()/*, SceneToRender->GetSceneDescriptorHeap()->GetCPUHandle(0)*/ };
-	//UINT srcDescriptorSizes[]{/*renderTarget->ResourceDescSize,*/ SceneToRender->GetSceneDescriptorHeap()->GetDescriptorSize()};
-
-	//Device->CopyDescriptors(1, &destDescriptors[0], &destDescriptorSizes[0], 1, &srcDescriptors[0], &srcDescriptorSizes[0], D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-	Device->CopyDescriptorsSimple(1, RendererDescriptorHeap->GetCPUHandle(0), renderTarget->ResourceDescHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	Device->CopyDescriptorsSimple(2, RendererDescriptorHeap->GetCPUHandle(1), SceneToRender->GetSceneDescriptorHeap()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	Device->CopyDescriptorsSimple(1, RendererSamplerDescriptorHeap->GetCPUHandle(0), SceneToRender->GetSceneDescriptorHeapSamplers()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+	Device->CopyDescriptorsSimple(1, rendererDescHeap->GetCPUHandle(0), WindowRenderTarget->GetOutputTextureCPUHandle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	Device->CopyDescriptorsSimple(2, rendererDescHeap->GetCPUHandle(1), SceneToRender->GetSceneDescriptorHeap()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	Device->CopyDescriptorsSimple(1, rendererSamplerDescHeap->GetCPUHandle(0), SceneToRender->GetSceneDescriptorHeapSamplers()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 }
 
 VolumeRaytracer::Renderer::DX::CPtr<ID3D12Resource> VolumeRaytracer::Renderer::DX::VDXRenderer::CreateShaderTable(std::vector<void*> shaderIdentifiers, UINT& outShaderTableSize, void* rootArguments /*= nullptr*/, const size_t& rootArgumentsSize /*= 0*/)
@@ -1104,4 +905,359 @@ VolumeRaytracer::Renderer::DX::CPtr<ID3D12Resource> VolumeRaytracer::Renderer::D
 VolumeRaytracer::Renderer::DX::VDXRenderer::~VDXRenderer()
 {
 	DestroyRenderer();
+}
+
+VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::VDXWindowRenderTargetHandler(IDXGIFactory4* dxgiFactory, ID3D12Device5* dxDevice, ID3D12CommandQueue* commandQueue, HWND hwnd, const unsigned int& width, const unsigned int& height)
+{
+	CreateRenderTargets(dxgiFactory, dxDevice, commandQueue, hwnd, width, height);
+}
+
+VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::~VDXWindowRenderTargetHandler()
+{
+	if (RTVDescriptorHeap != nullptr)
+	{
+		delete RTVDescriptorHeap;
+		RTVDescriptorHeap = nullptr;
+	}
+
+	if (ResourceHeap != nullptr)
+	{
+		delete ResourceHeap;
+		ResourceHeap = nullptr;
+	}
+
+	for (auto& renderTarget : BackBufferArr)
+	{
+		if (renderTarget != nullptr)
+		{
+			renderTarget.Reset();
+			renderTarget = nullptr;
+		}
+	}
+
+	for (auto& texture : OutputTextureArr)
+	{
+		if (texture != nullptr)
+		{
+			texture.Reset();
+			texture = nullptr;
+		}
+	}
+
+	BackBufferArr.empty();
+	OutputTextureArr.empty();
+
+	if (SwapChain != nullptr)
+	{
+		SwapChain.Reset();
+		SwapChain = nullptr;
+	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::Resize(ID3D12Device5* dxDevice, const unsigned int& width, const unsigned int& height)
+{
+	if (SwapChain)
+	{
+		for (auto& renderTarget : BackBufferArr)
+		{
+			if (renderTarget != nullptr)
+			{
+				renderTarget.Reset();
+				renderTarget = nullptr;
+			}
+		}
+
+		SwapChain->ResizeBuffers(VDXConstants::BACK_BUFFER_COUNT, width, height, VDXConstants::BACK_BUFFER_FORMAT, DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
+
+		OutputHeight = height;
+		OutputWidth = width;
+
+		CreateBackBuffers(dxDevice);
+	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::Present(const UINT& syncLevel, const UINT& flags)
+{
+	SwapChain->Present(syncLevel, flags);
+}
+
+void VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::SetCurrentBufferIndex(const unsigned int& bufferIndex)
+{
+	if(bufferIndex >= 0 && bufferIndex < VDXConstants::BACK_BUFFER_COUNT)
+		CurrentBufferIndex = bufferIndex;
+}
+
+unsigned int VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::GetCurrentBufferIndex() const
+{
+	return CurrentBufferIndex;
+}
+
+unsigned int VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::GetWidth() const
+{
+	return OutputWidth;
+}
+
+unsigned int VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::GetHeight() const
+{
+	return OutputHeight;
+}
+
+VolumeRaytracer::Renderer::DX::CPtr<ID3D12Resource> VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::GetCurrentRenderTarget() const
+{
+	return BackBufferArr[GetCurrentBufferIndex()];
+}
+
+VolumeRaytracer::Renderer::DX::CPtr<ID3D12Resource> VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::GetCurrentOutputTexture() const
+{
+	return OutputTextureArr[GetCurrentBufferIndex()];
+}
+
+UINT64 VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::GetCurrentFenceValue() const
+{
+	return FenceValues[GetCurrentBufferIndex()];
+}
+
+void VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::SetCurrentFenceValue(const UINT64& fenceValue)
+{
+	FenceValues[GetCurrentBufferIndex()] = fenceValue;
+}
+
+void VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::SyncBackBufferIndexWithSwapChain()
+{
+	SetCurrentBufferIndex(SwapChain->GetCurrentBackBufferIndex());
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::GetOutputTextureCPUHandle() const
+{
+	return ResourceHeap->GetCPUHandle(GetCurrentBufferIndex());
+}
+
+void VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::CreateRenderTargets(IDXGIFactory4* dxgiFactory, ID3D12Device5* dxDevice, ID3D12CommandQueue* commandQueue, HWND hwnd, const unsigned int& width, const unsigned int& height)
+{
+	RTVDescriptorHeap = new VDXDescriptorHeap(dxDevice, VDXConstants::BACK_BUFFER_COUNT, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+	ResourceHeap = new VDXDescriptorHeap(dxDevice, VDXConstants::BACK_BUFFER_COUNT, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+	swapChainDesc.Width = width;
+	swapChainDesc.Height = height;
+	swapChainDesc.Format = VDXConstants::BACK_BUFFER_FORMAT;
+	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	swapChainDesc.BufferCount = VDXConstants::BACK_BUFFER_COUNT;
+	swapChainDesc.SampleDesc.Count = 1;
+	swapChainDesc.SampleDesc.Quality = 0;
+	swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+	swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+
+	DXGI_SWAP_CHAIN_FULLSCREEN_DESC fsSwapChainDesc = {};
+	fsSwapChainDesc.Windowed = true;
+
+	CPtr<IDXGISwapChain1> swapChain;
+
+	if (FAILED(dxgiFactory->CreateSwapChainForHwnd(commandQueue, hwnd, &swapChainDesc, &fsSwapChainDesc, nullptr, &swapChain)))
+	{
+		V_LOG_ERROR("Swap chain creation failed!");
+		return;
+	}
+
+	swapChain.As(&SwapChain);
+	dxgiFactory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+
+	OutputWidth = width;
+	OutputHeight = height;
+
+	FenceValues.empty();
+	BackBufferArr.empty();
+	OutputTextureArr.empty();
+	
+	for (UINT i = 0; i < VDXConstants::BACK_BUFFER_COUNT; i++)
+	{
+		FenceValues.push_back(0);
+		BackBufferArr.push_back(nullptr);
+		OutputTextureArr.push_back(nullptr);
+	}
+
+	CurrentBufferIndex = SwapChain->GetCurrentBackBufferIndex();
+	SetCurrentFenceValue(1);
+
+	CreateBackBuffers(dxDevice);
+}
+
+void VolumeRaytracer::Renderer::DX::VDXWindowRenderTargetHandler::CreateBackBuffers(ID3D12Device5* dxDevice)
+{
+	RTVDescriptorHeap->ResetAllocations();
+	ResourceHeap->ResetAllocations();
+
+	SyncBackBufferIndexWithSwapChain();
+
+	for (UINT i = 0; i < VDXConstants::BACK_BUFFER_COUNT; i++)
+	{
+		FenceValues[i] = GetCurrentFenceValue();
+
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
+
+		rtvDesc.Format = VDXConstants::BACK_BUFFER_FORMAT;
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+
+		if (BackBufferArr[i] != nullptr)
+		{
+			BackBufferArr[i].Reset();
+		}
+
+		SwapChain->GetBuffer(i, IID_PPV_ARGS(&BackBufferArr[i]));
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE cpuHandle;
+		CD3DX12_GPU_DESCRIPTOR_HANDLE gpuHandle;
+		UINT descIndex = 0;
+
+		if(RTVDescriptorHeap->AllocateDescriptor(&cpuHandle, &gpuHandle, descIndex))
+		{
+			dxDevice->CreateRenderTargetView(BackBufferArr[i].Get(), &rtvDesc, cpuHandle);
+		}
+
+		if (OutputTextureArr[i] != nullptr)
+		{
+			OutputTextureArr[i].Reset();
+			OutputTextureArr[i] = nullptr;
+		}
+
+		CD3DX12_RESOURCE_DESC outputTextDesc = CD3DX12_RESOURCE_DESC::Tex2D(VDXConstants::BACK_BUFFER_FORMAT, OutputWidth, OutputHeight, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+		dxDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), D3D12_HEAP_FLAG_NONE, &outputTextDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&OutputTextureArr[i]));
+
+		if (ResourceHeap->AllocateDescriptor(&cpuHandle, &gpuHandle, descIndex))
+		{
+			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+			dxDevice->CreateUnorderedAccessView(OutputTextureArr[i].Get(), nullptr, &uavDesc, cpuHandle);
+		}
+	}
+}
+
+VolumeRaytracer::Renderer::DX::VDXGPUCommand::VDXGPUCommand(ID3D12Device5* device, const D3D12_COMMAND_LIST_TYPE& type, const std::string& debugName)
+{
+	InitializeCommandList(device, type, debugName);
+}
+
+VolumeRaytracer::Renderer::DX::VDXGPUCommand::~VDXGPUCommand()
+{
+	WaitForGPU();
+	ReleaseInternalVariables();
+}
+
+ID3D12GraphicsCommandList5* VolumeRaytracer::Renderer::DX::VDXGPUCommand::StartCommandRecording()
+{
+	WaitForGPU();
+
+	CommandAllocator->Reset();
+	CommandList->Reset(CommandAllocator.Get(), nullptr);
+
+	return CommandList.Get();
+}
+
+void VolumeRaytracer::Renderer::DX::VDXGPUCommand::ExecuteCommandQueue()
+{
+	CommandList->Close();
+
+	ID3D12CommandList* commandLists[] = {
+				CommandList.Get()
+	};
+
+	CommandQueue->ExecuteCommandLists(1, commandLists);
+
+	FenceValue++;
+	CommandQueue->Signal(Fence.Get(), FenceValue);
+}
+
+void VolumeRaytracer::Renderer::DX::VDXGPUCommand::WaitForGPU()
+{
+	if (CommandQueue && Fence)
+	{
+		if (FenceValue != Fence->GetCompletedValue())
+		{
+			Fence->SetEventOnCompletion(FenceValue, FenceEvent);
+			WaitForSingleObject(FenceEvent, INFINITE);
+		}
+	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXGPUCommand::InitializeCommandList(ID3D12Device5* device, const D3D12_COMMAND_LIST_TYPE& type, const std::string& debugName)
+{
+	D3D12_COMMAND_QUEUE_DESC commandQueueDesc = {};
+
+	commandQueueDesc.Type = type;
+	commandQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+	commandQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+	commandQueueDesc.NodeMask = 0;
+
+	if (FAILED(device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&CommandQueue))))
+	{
+		V_LOG_FATAL("Command queue creation failed!");
+		return;
+	}
+
+	SetDXDebugName<ID3D12CommandQueue>(CommandQueue, debugName + "_QUEUE");
+
+	if (FAILED(device->CreateCommandAllocator(type, IID_PPV_ARGS(&CommandAllocator))))
+	{
+		V_LOG_FATAL("Command allocator creation failed!");
+
+		ReleaseInternalVariables();
+		return;
+	}
+
+	SetDXDebugName<ID3D12CommandAllocator>(CommandAllocator, debugName + "_ALLOCATOR");
+
+	if (FAILED(device->CreateCommandList(0, type, CommandAllocator.Get(), NULL, IID_PPV_ARGS(&CommandList))))
+	{
+		V_LOG_FATAL("Command list creation failed!");
+		ReleaseInternalVariables();
+		return;
+	}
+
+	SetDXDebugName<ID3D12CommandList>(CommandList, debugName + "_LIST");
+
+	CommandList->Close();
+
+	if (FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&Fence))))
+	{
+		V_LOG_FATAL("DX Fence creation failed!");
+		ReleaseInternalVariables();
+		return;
+	}
+
+	SetDXDebugName<ID3D12Fence>(Fence, debugName + "_FENCE");
+
+	FenceEvent = CreateEventEx(NULL, FALSE, FALSE, EVENT_ALL_ACCESS);
+}
+
+void VolumeRaytracer::Renderer::DX::VDXGPUCommand::ReleaseInternalVariables()
+{
+	if (Fence != nullptr)
+	{
+		CloseHandle(FenceEvent);
+
+		Fence.Reset();
+		Fence = nullptr;
+	}
+
+	if (CommandList != nullptr)
+	{
+		CommandList.Reset();
+		CommandList = nullptr;
+	}
+
+	if (CommandAllocator != nullptr)
+	{
+		CommandAllocator.Reset();
+		CommandAllocator = nullptr;
+	}
+
+	if (CommandQueue != nullptr)
+	{
+		CommandQueue.Reset();
+		CommandQueue = nullptr;
+	}
 }

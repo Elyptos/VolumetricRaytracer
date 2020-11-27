@@ -16,6 +16,7 @@
 
 #include "RScene.h"
 #include "DXHelper.h"
+#include <vector>
 #include <DirectXMath.h>
 
 struct D3D12_GPU_DESCRIPTOR_HANDLE;
@@ -41,7 +42,7 @@ namespace VolumeRaytracer
 
 				void BuildStaticResources(VDXRenderer* renderer);
 
-				D3D12_GPU_VIRTUAL_ADDRESS CopySceneConstantBufferToGPU();
+				D3D12_GPU_VIRTUAL_ADDRESS CopySceneConstantBufferToGPU(const UINT& backBufferIndex);
 
 				void SyncWithScene(Voxel::VVoxelScene* scene) override;
 
@@ -77,9 +78,8 @@ namespace VolumeRaytracer
 				CPtr<ID3D12Resource> BottomLevelAS = nullptr;
 				CPtr<ID3D12Resource> TopLevelAS = nullptr;
 
-				CPtr<ID3D12Resource> SceneConstantBuffer;
-				uint8_t* SceneConstantBufferDataPtr;
-				D3D12_GPU_DESCRIPTOR_HANDLE SceneConstantBufferGPUHandle;
+				std::vector<CPtr<ID3D12Resource>> SceneConstantBuffers;
+				std::vector<uint8_t*> SceneConstantBufferDataPtrs;
 
 				CPtr<ID3D12Resource> SceneVolume;
 				CPtr<ID3D12Resource> SceneVolumeUploadBuffer;

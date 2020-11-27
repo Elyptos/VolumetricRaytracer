@@ -30,6 +30,7 @@ namespace VolumeRaytracer
 			class VDXDescriptorHeap
 			{
 			public:
+				VDXDescriptorHeap() = default;
 				VDXDescriptorHeap(CPtr<ID3D12Device5> dxDevice, const UINT& maxDescriptors, const D3D12_DESCRIPTOR_HEAP_TYPE& heapType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, const D3D12_DESCRIPTOR_HEAP_FLAGS& heapFlags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 				~VDXDescriptorHeap();
 
@@ -43,13 +44,14 @@ namespace VolumeRaytracer
 				D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle(const UINT& index);
 				D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(const UINT& index);
 
+				void ResetAllocations();
+
 			private:
 				void Reset();
 				void Init(CPtr<ID3D12Device5> dxDevice, const UINT& maxDescriptors, const D3D12_DESCRIPTOR_HEAP_TYPE& heapType, const D3D12_DESCRIPTOR_HEAP_FLAGS& heapFlags);
 
 			private:
 				CPtr<ID3D12DescriptorHeap> DescHeap = nullptr;
-				D3D12_CPU_DESCRIPTOR_HANDLE* AllocatedDescriptors = nullptr;
 
 				UINT ResourceDescSize = 0;
 				UINT MaxNumberOfDescriptors = 0;

@@ -16,38 +16,58 @@
 
 #ifdef _WIN32
 #include "DXRenderer.h"
-#include "DXRenderTarget.h"
 #include "Win32Window.h"
 #include "Logger.h"
 
-VolumeRaytracer::VObjectPtr<VolumeRaytracer::Renderer::VRenderTarget> VolumeRaytracer::UI::VWindowRenderTargetFactory::CreateRenderTarget(std::weak_ptr<Renderer::VRenderer> renderer, std::weak_ptr<VWindow> window)
+bool VolumeRaytracer::UI::VWindowRenderTargetFactory::AttachWindowToRenderer(std::weak_ptr<VWindow> window, std::weak_ptr<Renderer::VRenderer> renderer)
 {
 	std::shared_ptr<Win32::VWin32Window> win32Window = std::dynamic_pointer_cast<Win32::VWin32Window>(window.lock());
 
 	if (win32Window == nullptr)
 	{
-		V_LOG_ERROR("Unable to create render target for window! DirectX render targets are currently only supported by Win32 windows.");
-		return nullptr;
+		V_LOG_ERROR("Unable to attach window to renderer! DirectX renderer only supports Win32 windows!");
+		return false;
 	}
 
 	std::shared_ptr<Renderer::DX::VDXRenderer> dxRenderer = std::dynamic_pointer_cast<Renderer::DX::VDXRenderer>(renderer.lock());
 
 	if (dxRenderer == nullptr)
 	{
-		V_LOG_ERROR("Unable to create render target for window! Provided renderer does not support DirectX render targets.");
-		return nullptr;
+		V_LOG_ERROR("Unable to attach window to renderer! Provided renderer is no DirectX renderer!");
+		return false;
 	}
 
-	VObjectPtr<VolumeRaytracer::Renderer::VRenderTarget> renderTarget = nullptr;
-	renderTarget = dxRenderer->CreateViewportRenderTarget(win32Window->GetHWND(), win32Window->GetWidth(), win32Window->GetHeight());
+	dxRenderer->SetWindowHandle(win32Window->GetHWND(), win32Window->GetWidth(), win32Window->GetHeight());
 
-	if (renderTarget == nullptr)
+	return true;
+}
+
+bool VolumeRaytracer::UI::VWindowRenderTargetFactory::DetachWindowFromRenderer(std::weak_ptr<VWindow> window, std::weak_ptr<Renderer::VRenderer> renderer)
+{
+	std::shared_ptr<VWindow> winPtr = window.lock();
+	std::shared_ptr<Renderer::DX::VDXRenderer> dxRendererPtr = std::dynamic_pointer_cast<Renderer::DX::VDXRenderer>(renderer.lock());
+
+	if (winPtr == nullptr)
 	{
-		V_LOG_ERROR("Unable to create render target for window!");
-		return nullptr;
+		V_LOG_ERROR("Unable to detach window from renderer! Window is not valid!");
+		return false;
 	}
 
-	return renderTarget;
+	if (dxRendererPtr == nullptr)
+	{
+		V_LOG_ERROR("Unable to detach window from renderer! Renderer is not valid!");
+		return false;
+	}
+
+	if (winPtr->GetAttachedRenderer().lock() != dxRendererPtr)
+	{
+		V_LOG_ERROR("Unable to detach window from renderer! Window is not attached to the provided renderer!");
+		return false;
+	}
+
+	dxRendererPtr->ClearWindowHandle();
+
+	return true;
 }
 
 #endif

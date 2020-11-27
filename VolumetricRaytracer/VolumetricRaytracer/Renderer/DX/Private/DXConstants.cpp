@@ -18,7 +18,9 @@ const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::HIT_GROUP(L"HitG
 
 const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADOW_HIT_GROUP(L"HitGroup_ShadowRay");
 
-DXGI_FORMAT VolumeRaytracer::Renderer::DX::VDXConstants::BACK_BUFFER_FORMAT = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM;
+const DXGI_FORMAT VolumeRaytracer::Renderer::DX::VDXConstants::BACK_BUFFER_FORMAT = DXGI_FORMAT::DXGI_FORMAT_B8G8R8A8_UNORM;
+
+const unsigned int VolumeRaytracer::Renderer::DX::VDXConstants::BACK_BUFFER_COUNT = 3;
 
 const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_RAYGEN(L"VRRaygen");
 

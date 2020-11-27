@@ -28,7 +28,8 @@ namespace VolumeRaytracer
 				static const std::wstring HIT_GROUP;
 				static const std::wstring SHADOW_HIT_GROUP;
 
-				static DXGI_FORMAT BACK_BUFFER_FORMAT;
+				static const DXGI_FORMAT BACK_BUFFER_FORMAT;
+				static const unsigned int BACK_BUFFER_COUNT;
 
 				static const std::wstring SHADER_NAME_RAYGEN;
 				static const std::wstring SHADER_NAME_CLOSEST_HIT;

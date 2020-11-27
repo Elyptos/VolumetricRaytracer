@@ -19,6 +19,7 @@
 #include "DXDescriptorHeap.h"
 #include <DirectXMath.h>
 #include "DXTextureCube.h"
+#include "DXConstants.h"
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::InitFromScene(Voxel::VVoxelScene* scene)
 {
@@ -53,16 +54,9 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::BuildStaticResources(VDXRenderer*
 	InitEnvironmentMap(renderer);
 }
 
-D3D12_GPU_VIRTUAL_ADDRESS VolumeRaytracer::Renderer::DX::VRDXScene::CopySceneConstantBufferToGPU()
+D3D12_GPU_VIRTUAL_ADDRESS VolumeRaytracer::Renderer::DX::VRDXScene::CopySceneConstantBufferToGPU(const UINT& backBufferIndex)
 {
 	VSceneConstantBuffer constantBufferData = VSceneConstantBuffer();
-
-	/*XMVECTOR Eye = XMVectorSet(1.5f, 1.5f, 1.5f, 0.0f);
-	XMVECTOR At = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
-	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-	XMMATRIX lookAt = XMMatrixLookAtRH(Eye, At, Up);
-	XMMATRIX perspective = XMMatrixPerspectiveFovRH(XMConvertToRadians(45.f), 1.7777777f, 0.01f, 125.0f);*/
 
 	constantBufferData.cameraPosition = CameraPosition;
 	constantBufferData.voxelAxisCount = VoxelCountAlongAxis;
@@ -72,9 +66,9 @@ D3D12_GPU_VIRTUAL_ADDRESS VolumeRaytracer::Renderer::DX::VRDXScene::CopySceneCon
 	constantBufferData.viewMatrixInverted = XMMatrixInverse(&det, ViewMatrix);
 	constantBufferData.projectionMatrixInverted = XMMatrixInverse(&det, ProjectionMatrix);
 
-	memcpy(SceneConstantBufferDataPtr, &constantBufferData, sizeof(VSceneConstantBuffer));
+	memcpy(SceneConstantBufferDataPtrs[backBufferIndex], &constantBufferData, sizeof(VSceneConstantBuffer));
 
-	return SceneConstantBuffer->GetGPUVirtualAddress();
+	return SceneConstantBuffers[backBufferIndex]->GetGPUVirtualAddress();
 }
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::SyncWithScene(Voxel::VVoxelScene* scene)
@@ -153,15 +147,25 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::AllocSceneConstantBuffer(VDXRende
 
 	UINT cBufferSize = (sizeof(VSceneConstantBuffer) + 255) & ~255;
 
-	CD3DX12_RESOURCE_DESC constantBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(cBufferSize, D3D12_RESOURCE_FLAG_NONE);
-	CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	for (UINT i = 0; i < VDXConstants::BACK_BUFFER_COUNT; i++)
+	{
+		SceneConstantBuffers.push_back(nullptr);
+		SceneConstantBufferDataPtrs.push_back(nullptr);
 
-	dxDevice->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &constantBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&SceneConstantBuffer));
+		CD3DX12_RESOURCE_DESC constantBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(cBufferSize, D3D12_RESOURCE_FLAG_NONE);
+		CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 
-	SetDXDebugName<ID3D12Resource>(SceneConstantBuffer, "Voxel Scene Constant Buffer");
+		dxDevice->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &constantBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&SceneConstantBuffers[i]));
 
-	CD3DX12_RANGE mapRange(0, 0);
-	SceneConstantBuffer->Map(0, &mapRange, reinterpret_cast<void**>(&SceneConstantBufferDataPtr));
+		SetDXDebugName<ID3D12Resource>(SceneConstantBuffers[i], "Voxel Scene Constant Buffer");
+
+		uint8_t* dataPtr = nullptr;
+
+		CD3DX12_RANGE mapRange(0, 0);
+		SceneConstantBuffers[i]->Map(0, &mapRange, reinterpret_cast<void**>(&dataPtr));
+
+		SceneConstantBufferDataPtrs[i] = dataPtr;
+	}
 }
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::AllocSceneVolumeBuffer(VDXRenderer* renderer)
@@ -269,12 +273,18 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::CleanupStaticResources()
 		DXDescriptorHeap = nullptr;
 	}
 
-	if (SceneConstantBuffer != nullptr)
+	for (auto& constantBuffer : SceneConstantBuffers)
 	{
-		SceneConstantBuffer->Unmap(0, nullptr);
-		SceneConstantBuffer.Reset();
-		SceneConstantBuffer = nullptr;
+		if (constantBuffer != nullptr)
+		{
+			constantBuffer->Unmap(0, nullptr);
+			constantBuffer.Reset();
+			constantBuffer = nullptr;
+		}
 	}
+
+	SceneConstantBuffers.empty();
+	SceneConstantBufferDataPtrs.empty();
 
 	if (TopLevelAS != nullptr)
 	{
