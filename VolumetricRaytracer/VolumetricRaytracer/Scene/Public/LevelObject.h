@@ -13,23 +13,19 @@
 */
 
 #pragma once
-#include "LevelObject.h"
+#include "Object.h"
+#include "Vector.h"
+#include "Quat.h"
 
 namespace VolumeRaytracer
 {
 	namespace Scene
 	{
-		class VCamera : public VLevelObject
+		class VLevelObject : public VObject
 		{
-		protected:
-			void Initialize() override;
-			void BeginDestroy() override;
-
 		public:
-			float FOVAngle = 60.f;
-			float NearClipPlane = 0.01f;
-			float FarClipPlane = 125.f;
-			float AspectRatio = 1.7777f;
+			VVector Position = VVector::ZERO;
+			VQuat Rotation = VQuat::IDENTITY;
 		};
 	}
 }

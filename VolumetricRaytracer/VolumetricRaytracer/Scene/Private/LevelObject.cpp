@@ -12,24 +12,4 @@
 	copies or substantial portions of the Software.
 */
 
-#pragma once
 #include "LevelObject.h"
-
-namespace VolumeRaytracer
-{
-	namespace Scene
-	{
-		class VCamera : public VLevelObject
-		{
-		protected:
-			void Initialize() override;
-			void BeginDestroy() override;
-
-		public:
-			float FOVAngle = 60.f;
-			float NearClipPlane = 0.01f;
-			float FarClipPlane = 125.f;
-			float AspectRatio = 1.7777f;
-		};
-	}
-}
