@@ -16,6 +16,7 @@
 
 #include "IEngineInstance.h"
 #include "Object.h"
+#include "Vector.h"
 #include <boost/signals2/connection.hpp>
 #include <boost/bind.hpp>
 
@@ -24,6 +25,8 @@ namespace VolumeRaytracer
 	namespace UI
 	{
 		class VWindow;
+		enum class EVKeyType;
+		enum class EVAxisType;
 	}
 
 	namespace Voxel
@@ -44,6 +47,8 @@ namespace VolumeRaytracer
 			void CreateRendererWindow();
 
 			void OnWindowClosed();
+			void OnKeyDown(const VolumeRaytracer::UI::EVKeyType& key);
+			void OnAxisInput(const VolumeRaytracer::UI::EVAxisType& axis, const float& delta);
 
 			void InitScene();
 
@@ -53,6 +58,10 @@ namespace VolumeRaytracer
 			VObjectPtr<Voxel::VVoxelScene> Scene = nullptr;
 
 			boost::signals2::connection OnWindowClosedHandle;
+			boost::signals2::connection OnKeyDownHandle;
+			boost::signals2::connection OnAxisInpuHandle;
+
+			VVector TargetCameraLocation = VVector::ZERO;
 		};
 	}
 }

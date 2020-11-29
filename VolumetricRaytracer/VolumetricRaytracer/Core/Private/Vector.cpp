@@ -15,6 +15,15 @@
 #include "Vector.h"
 #include <cmath>
 
+VolumeRaytracer::VVector VolumeRaytracer::VVector::Lerp(const VVector& a, const VVector& b, const float& t)
+{
+	return VVector(
+		a.X + (b.X - a.X) * t,
+		a.Y + (b.Y - a.Y) * t,
+		a.Z + (b.Z - a.Z) * t
+	);
+}
+
 const VolumeRaytracer::VVector VolumeRaytracer::VVector::ZERO = VolumeRaytracer::VVector(0.f, 0.f, 0.f);
 
 const VolumeRaytracer::VVector VolumeRaytracer::VVector::ONE = VolumeRaytracer::VVector(1.f, 1.f, 1.f);

@@ -88,6 +88,16 @@ boost::signals2::connection VolumeRaytracer::UI::VWindow::OnWindowClosed_Bind(co
 	return OnWindowClosed.connect(del);
 }
 
+boost::signals2::connection VolumeRaytracer::UI::VWindow::OnKeyDown_Bind(const KeyInputDelegate::slot_type& del)
+{
+	return OnKeyPressedEvent.connect(del);
+}
+
+boost::signals2::connection VolumeRaytracer::UI::VWindow::OnAxisInput_Bind(const AxisDelegate::slot_type& del)
+{
+	return OnAxisInputEvent.connect(del);
+}
+
 void VolumeRaytracer::UI::VWindow::InitializeWindow()
 {
 	WindowOpen = true;
@@ -102,6 +112,16 @@ void VolumeRaytracer::UI::VWindow::CloseWindow()
 	RemoveRenderer();
 
 	OnWindowClosed();
+}
+
+void VolumeRaytracer::UI::VWindow::OnKeyPressed(const EVKeyType& key)
+{
+	OnKeyPressedEvent(key);
+}
+
+void VolumeRaytracer::UI::VWindow::OnAxisInput(const EVAxisType& axis, const float& delta)
+{
+	OnAxisInputEvent(axis, delta);
 }
 
 void VolumeRaytracer::UI::VWindow::Initialize()

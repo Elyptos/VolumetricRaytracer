@@ -42,6 +42,8 @@ namespace VolumeRaytracer
 
 		operator Eigen::Vector3f() const {return Eigen::Vector3f(X, Y, Z);}
 
+		static VVector Lerp(const VVector& a, const VVector& b, const float& t);
+
 	public:
 		static const VVector ZERO;
 		static const VVector ONE;

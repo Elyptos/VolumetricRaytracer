@@ -41,6 +41,12 @@ namespace VolumeRaytracer
 				HINSTANCE GetHInstance() const;
 				LRESULT CALLBACK MessageHandler(HWND hwnd, UINT msg, WPARAM p1, LPARAM p2);
 
+
+				void LockMouseCursor() override;
+
+
+				void FreeMouseCursor() override;
+
 			protected:
 				void InitializeWindow() override;
 				void CloseWindow() override;
@@ -55,11 +61,24 @@ namespace VolumeRaytracer
 				bool DetachFromRenderer(Renderer::VRenderer* renderer) override;
 
 			private:
+				void ProcessKeyDown(WPARAM key);
+				void ProcessAxisEvents();
+
+				void RecenterMouseInWindow();
+
+				POINT GetCenterOfWindow() const;
+
+			private:
 				uint32_t Width;
 				uint32_t Height;
 
 				HINSTANCE HInstance;
 				HWND WindowHandle;
+
+				float MouseXDelta = 0.f;
+				float MouseYDelta = 0.f;
+
+				bool IsMouseLocked = false;
 			};
 		}
 	}

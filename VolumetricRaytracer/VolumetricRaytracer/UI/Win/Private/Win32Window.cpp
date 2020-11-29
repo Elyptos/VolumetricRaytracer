@@ -41,6 +41,15 @@ namespace VolumeRaytracer
 			};
 
 			VWin32MessageDistributor WinMessageDistributor;
+
+
+			enum EVWin32KeyCode
+			{
+				A = 0x41,
+				D = 0x44,
+				S = 0x53,
+				W = 0x57,
+			};
 		}
 	}
 }
@@ -107,10 +116,6 @@ LRESULT CALLBACK VolumeRaytracer::UI::Win32::VWin32Window::MessageHandler(HWND h
 		Close();
 		return 0;
 	}
-	case WM_SYSCHAR:
-	{
-		
-	}
 	break;
 	case WM_SIZE:
 	{
@@ -125,12 +130,73 @@ LRESULT CALLBACK VolumeRaytracer::UI::Win32::VWin32Window::MessageHandler(HWND h
 	{
 		return 0;
 	}
-	case WM_DISPLAYCHANGE:
+	case WM_LBUTTONDOWN:
 	{
+		LockMouseCursor();
 
+		return 0;
+	}
+	case WM_KEYDOWN:
+	{
+		ProcessKeyDown(p1);
+		
+		return 0;
+	}
+	case WM_MOUSEMOVE:
+	{
+		if (IsMouseLocked)
+		{
+			POINT centerOfWindow = GetCenterOfWindow();
+			POINT mousePos;
+
+			if (GetCursorPos(&mousePos))
+			{
+				MouseXDelta = mousePos.x - centerOfWindow.x;
+				MouseYDelta = mousePos.y - centerOfWindow.y;
+			}
+
+			RecenterMouseInWindow();
+		}
+
+		return 0;
+	}
+	case WM_KILLFOCUS:
+	{
+		FreeMouseCursor();
+		return 0;
 	}
 	}
 	return DefWindowProcW(hwnd, msg, p1, p2);
+}
+
+void VolumeRaytracer::UI::Win32::VWin32Window::LockMouseCursor()
+{
+	RECT windowRect;
+	RECT cursorCaptureRect;
+
+	if (GetWindowRect(WindowHandle, &windowRect))
+	{
+		//float xPos = windowRect.left + (windowRect.right - windowRect.left) * 0.5f;
+		//float yPos = windowRect.top + (windowRect.bottom - windowRect.top) * 0.5f;
+
+		//cursorCaptureRect.top = yPos;
+		//cursorCaptureRect.bottom = yPos;
+		//cursorCaptureRect.left = xPos;
+		//cursorCaptureRect.right = xPos;
+
+		ShowCursor(false);
+		SetCapture(WindowHandle);
+		ClipCursor(&windowRect);
+		IsMouseLocked = true;
+	}
+}
+
+void VolumeRaytracer::UI::Win32::VWin32Window::FreeMouseCursor()
+{
+	ClipCursor(nullptr);
+	IsMouseLocked = false;
+	ReleaseCapture();
+	ShowCursor(true);
 }
 
 void VolumeRaytracer::UI::Win32::VWin32Window::InitializeWindow()
@@ -191,6 +257,8 @@ void VolumeRaytracer::UI::Win32::VWin32Window::CloseWindow()
 {
 	WinMessageDistributor.UnregisterWindow(this);
 
+	FreeMouseCursor();
+
 	DestroyWindow(WindowHandle);
 	WindowHandle = nullptr;
 
@@ -203,6 +271,8 @@ void VolumeRaytracer::UI::Win32::VWin32Window::CloseWindow()
 void VolumeRaytracer::UI::Win32::VWin32Window::Tick(const float& deltaSeconds)
 {
 	VWindow::Tick(deltaSeconds);
+
+	ProcessAxisEvents();
 
 	MSG message;
 
@@ -243,5 +313,67 @@ bool VolumeRaytracer::UI::Win32::VWin32Window::DetachFromRenderer(Renderer::VRen
 	dxRendererPtr->ClearWindowHandle();
 
 	return true;
+}
+
+void VolumeRaytracer::UI::Win32::VWin32Window::ProcessKeyDown(WPARAM key)
+{
+	switch (key)
+	{
+		case VK_ESCAPE:
+		{
+			CloseWindow();
+		}
+		break;
+		case EVWin32KeyCode::W:
+		{
+			OnKeyPressed(EVKeyType::W);
+		}
+		break;
+		case EVWin32KeyCode::A:
+		{
+			OnKeyPressed(EVKeyType::A);
+		}
+		break;
+		case EVWin32KeyCode::S:
+		{
+			OnKeyPressed(EVKeyType::S);
+		}
+		break;
+		case EVWin32KeyCode::D:
+		{
+			OnKeyPressed(EVKeyType::D);
+		}
+		break;
+	}
+}
+
+void VolumeRaytracer::UI::Win32::VWin32Window::ProcessAxisEvents()
+{
+	OnAxisInput(EVAxisType::MouseX, MouseXDelta * 0.04f);
+	OnAxisInput(EVAxisType::MouseY, MouseYDelta * 0.04f);
+
+	MouseXDelta = 0.f;
+	MouseYDelta = 0.f;
+}
+
+void VolumeRaytracer::UI::Win32::VWin32Window::RecenterMouseInWindow()
+{
+	POINT center = GetCenterOfWindow();
+
+	SetCursorPos(center.x, center.y);
+}
+
+POINT VolumeRaytracer::UI::Win32::VWin32Window::GetCenterOfWindow() const
+{
+	POINT res;
+	RECT windowRect;
+
+	if (GetWindowRect(WindowHandle, &windowRect))
+	{
+		res.x = windowRect.left + (windowRect.right - windowRect.left) * 0.5f;
+		res.y = windowRect.top + (windowRect.bottom - windowRect.top) * 0.5f;
+	}
+
+	return res;
 }
 

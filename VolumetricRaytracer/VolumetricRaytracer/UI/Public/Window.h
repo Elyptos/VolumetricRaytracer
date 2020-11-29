@@ -17,6 +17,7 @@
 #include <string>
 #include <boost/signals2.hpp>
 #include "Object.h"
+#include "Input/InputTypes.h"
 
 namespace VolumeRaytracer
 {
@@ -30,6 +31,8 @@ namespace VolumeRaytracer
 		class VWindow : public VObject
 		{
 			typedef boost::signals2::signal<void()> WindowDelegate;
+			typedef boost::signals2::signal<void(const EVKeyType&)> KeyInputDelegate;
+			typedef boost::signals2::signal<void(const EVAxisType&, const float&)> AxisDelegate;
 
 		public:
 			VWindow();
@@ -37,6 +40,9 @@ namespace VolumeRaytracer
 
 			virtual void SetTitle(const std::wstring& title) = 0;
 			virtual void SetSize(const unsigned int& width, const unsigned int& height) = 0;
+
+			virtual void LockMouseCursor() = 0;
+			virtual void FreeMouseCursor() = 0;
 
 			virtual unsigned int GetWidth() const = 0;
 			virtual unsigned int GetHeight() const = 0;
@@ -55,9 +61,15 @@ namespace VolumeRaytracer
 			boost::signals2::connection OnWindowOpened_Bind(const WindowDelegate::slot_type& del);
 			boost::signals2::connection OnWindowClosed_Bind(const WindowDelegate::slot_type& del);
 
+			boost::signals2::connection OnKeyDown_Bind(const KeyInputDelegate::slot_type& del);
+			boost::signals2::connection OnAxisInput_Bind(const AxisDelegate::slot_type& del);
+
 		protected:
 			virtual void InitializeWindow();
 			virtual void CloseWindow();
+
+			virtual void OnKeyPressed(const EVKeyType& key);
+			virtual void OnAxisInput(const EVAxisType& axis, const float& delta);
 
 			virtual bool AttachToRenderer(Renderer::VRenderer* renderer) = 0;
 			virtual bool DetachFromRenderer(Renderer::VRenderer* renderer) = 0;
@@ -77,6 +89,9 @@ namespace VolumeRaytracer
 
 			WindowDelegate OnWindowOpened;
 			WindowDelegate OnWindowClosed;
+
+			KeyInputDelegate OnKeyPressedEvent;
+			AxisDelegate OnAxisInputEvent;
 		};
 	}
 }
