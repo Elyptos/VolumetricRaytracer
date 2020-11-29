@@ -32,7 +32,6 @@ namespace VolumeRaytracer
 			float VolumeExtends = 0.f;
 			unsigned int VoxelCountAlongAxis;
 			VAABB Bounds;
-			std::wstring EnvironmentMapPath;
 		};
 	}
 }

@@ -12,24 +12,19 @@
 	copies or substantial portions of the Software.
 */
 
-#pragma once
+#include "Textures/Texture3D.h"
 
-#include "Object.h"
-#include <string>
-
-namespace VolumeRaytracer
+size_t VolumeRaytracer::VTexture3D::GetWidth() const
 {
-	class VTexture : public VObject
-	{
-	public:
-		virtual ~VTexture() = default;
-		size_t GetMipCount() const;
+	return Width;
+}
 
-		virtual void GetPixels(const size_t& mipLevel, uint8_t*& outPixelArray, size_t* outArraySize) = 0;
-		virtual void Commit() = 0;
+size_t VolumeRaytracer::VTexture3D::GetHeight() const
+{
+	return Height;
+}
 
-	protected:
-		std::wstring AssetPath;
-		size_t MipCount;
-	};
+size_t VolumeRaytracer::VTexture3D::GetDepth() const
+{
+	return Depth;
 }

@@ -85,6 +85,18 @@ bool VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::AllocateDescriptor(D3D12_
 	NumAllocatedDescriptors++;
 }
 
+bool VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::AllocateDescriptorRange(const UINT& descriptorCount, UINT& outDescriptorIndexStart)
+{
+	if (MaxNumberOfDescriptors <= (NumAllocatedDescriptors + descriptorCount))
+	{
+		V_LOG_WARNING("Resource descriptor heap is full!");
+		return false;
+	}
+
+	outDescriptorIndexStart = NumAllocatedDescriptors;
+	NumAllocatedDescriptors += descriptorCount;
+}
+
 D3D12_CPU_DESCRIPTOR_HANDLE VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::GetCPUHandle(const UINT& index)
 {
 	if (index < 0 || index >= MaxNumberOfDescriptors)
@@ -112,4 +124,42 @@ D3D12_GPU_DESCRIPTOR_HANDLE VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::Ge
 void VolumeRaytracer::Renderer::DX::VDXDescriptorHeap::ResetAllocations()
 {
 	NumAllocatedDescriptors = 0;
+}
+
+VolumeRaytracer::Renderer::DX::VDXDescriptorHeapRingBuffer::VDXDescriptorHeapRingBuffer(CPtr<ID3D12Device5> dxDevice, const UINT& maxDescriptors, const D3D12_DESCRIPTOR_HEAP_TYPE& heapType /*= D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV*/, const D3D12_DESCRIPTOR_HEAP_FLAGS& heapFlags /*= D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE*/)
+	: VDXDescriptorHeap(dxDevice, maxDescriptors, heapType, heapFlags)
+{
+
+}
+
+bool VolumeRaytracer::Renderer::DX::VDXDescriptorHeapRingBuffer::AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* outHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle, UINT& outDescriptorIndex)
+{
+	if (MaxNumberOfDescriptors <= NumAllocatedDescriptors)
+	{
+		NumAllocatedDescriptors = 0;
+	}
+
+	D3D12_CPU_DESCRIPTOR_HANDLE heapStart = DescHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_GPU_DESCRIPTOR_HANDLE gpuHeapStart = DescHeap->GetGPUDescriptorHandleForHeapStart();
+
+	*outHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(heapStart, NumAllocatedDescriptors, ResourceDescSize);
+	*outGpuHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(gpuHeapStart, NumAllocatedDescriptors, ResourceDescSize);
+
+	outDescriptorIndex = NumAllocatedDescriptors;
+	NumAllocatedDescriptors++;
+
+	return true;
+}
+
+bool VolumeRaytracer::Renderer::DX::VDXDescriptorHeapRingBuffer::AllocateDescriptorRange(const UINT& descriptorCount, UINT& outDescriptorIndexStart)
+{
+	if (MaxNumberOfDescriptors <= (NumAllocatedDescriptors + descriptorCount))
+	{
+		NumAllocatedDescriptors = 0;
+	}
+
+	outDescriptorIndexStart = NumAllocatedDescriptors;
+	NumAllocatedDescriptors += descriptorCount;
+
+	return true;
 }

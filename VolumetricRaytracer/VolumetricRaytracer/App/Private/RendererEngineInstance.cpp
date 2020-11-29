@@ -14,6 +14,7 @@
 
 #include "../Public/RendererEngineInstance.h"
 #include "WindowFactory.h"
+#include "TextureFactory.h"
 #include "WindowRenderTargetFactory.h"
 #include "Window.h"
 #include "Engine.h"
@@ -92,7 +93,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 	Scene->GetSceneCamera()->Position = VolumeRaytracer::VVector(300.f, 0.f, 100.f);
 	//Scene->GetSceneCamera()->Rotation = VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 180.f * (M_PI / 180.f));
 
-	Scene->SetPathToEnvironmentMap(L"Resources/Skybox/Skybox.dds");
+	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
 
 	Voxel::VVoxel voxelToUse;
 	voxelToUse.Material = 1;

@@ -22,6 +22,8 @@
 
 namespace VolumeRaytracer
 {
+	class VTextureCube;
+
 	namespace Scene
 	{
 		class VCamera;
@@ -72,8 +74,8 @@ namespace VolumeRaytracer
 			VVoxel GetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
 			bool IsValidVoxelIndex(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
 
-			void SetPathToEnvironmentMap(const std::wstring& path);
-			std::wstring GetEnvironmentMapPath() const;
+			void SetEnvironmentTexture(VObjectPtr<VTextureCube> texture);
+			VObjectPtr<VTextureCube> GetEnvironmentTexture() const;
 
 			VVoxelSceneIterator begin();
 			VVoxelSceneIterator end();
@@ -89,7 +91,7 @@ namespace VolumeRaytracer
 
 			VObjectPtr<Scene::VCamera> Camera;
 
-			std::wstring EnvironmentMapPath;
+			VObjectPtr<VTextureCube> EnvironmentTexture;
 		};
 	}
 }

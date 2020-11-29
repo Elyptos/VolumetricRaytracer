@@ -24,7 +24,6 @@ void VolumeRaytracer::Renderer::VRScene::InitFromScene(Voxel::VVoxelScene* scene
 	Bounds = scene->GetSceneBounds();
 	VolumeExtends = scene->GetVolumeExtends();
 	VoxelCountAlongAxis = scene->GetSize();
-	EnvironmentMapPath = scene->GetEnvironmentMapPath();
 }
 
 void VolumeRaytracer::Renderer::VRScene::SyncWithScene(Voxel::VVoxelScene* scene)

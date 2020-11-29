@@ -14,17 +14,17 @@
 
 #include "Textures/TextureCube.h"
 
-size_t VolumeRaytracer::Renderer::VTextureCube::GetWidth() const
+size_t VolumeRaytracer::VTextureCube::GetWidth() const
 {
 	return Width;
 }
 
-size_t VolumeRaytracer::Renderer::VTextureCube::GetHeight() const
+size_t VolumeRaytracer::VTextureCube::GetHeight() const
 {
 	return Height;
 }
 
-size_t VolumeRaytracer::Renderer::VTextureCube::GetArraySize() const
+size_t VolumeRaytracer::VTextureCube::GetArraySize() const
 {
 	return ArraySize;
 }

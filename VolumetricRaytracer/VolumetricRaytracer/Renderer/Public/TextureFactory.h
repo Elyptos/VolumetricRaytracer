@@ -19,17 +19,20 @@
 
 namespace VolumeRaytracer
 {
-	class VTexture : public VObject
+	class VTexture;
+	class VTexture3D;
+	class VTextureCube;
+
+	namespace Renderer
 	{
-	public:
-		virtual ~VTexture() = default;
-		size_t GetMipCount() const;
-
-		virtual void GetPixels(const size_t& mipLevel, uint8_t*& outPixelArray, size_t* outArraySize) = 0;
-		virtual void Commit() = 0;
-
-	protected:
-		std::wstring AssetPath;
-		size_t MipCount;
-	};
+		class VRenderer;
+		
+		class VTextureFactory
+		{
+		public:
+			static VObjectPtr<VTextureCube> LoadTextureCubeFromFile(std::weak_ptr<VRenderer> renderer, const std::wstring& path);
+			
+			static VObjectPtr<VTexture3D> CreateTexture3D(std::weak_ptr<VRenderer> renderer, const size_t& width, const size_t& height, const size_t& depth);
+		};
+	}
 }

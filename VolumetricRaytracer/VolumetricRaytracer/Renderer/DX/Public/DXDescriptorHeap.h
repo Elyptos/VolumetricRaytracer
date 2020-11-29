@@ -32,12 +32,13 @@ namespace VolumeRaytracer
 			public:
 				VDXDescriptorHeap() = default;
 				VDXDescriptorHeap(CPtr<ID3D12Device5> dxDevice, const UINT& maxDescriptors, const D3D12_DESCRIPTOR_HEAP_TYPE& heapType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, const D3D12_DESCRIPTOR_HEAP_FLAGS& heapFlags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
-				~VDXDescriptorHeap();
+				virtual ~VDXDescriptorHeap();
 
 				void SetDebugName(const std::string& name);
 				UINT GetDescriptorSize() const;
 
-				bool AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* outHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle, UINT& outDescriptorIndex);
+				virtual bool AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* outHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle, UINT& outDescriptorIndex);
+				virtual bool AllocateDescriptorRange(const UINT& descriptorCount, UINT& outDescriptorIndexStart);
 
 				CPtr<ID3D12DescriptorHeap> GetDescriptorHeap() const { return DescHeap;}
 
@@ -50,13 +51,27 @@ namespace VolumeRaytracer
 				void Reset();
 				void Init(CPtr<ID3D12Device5> dxDevice, const UINT& maxDescriptors, const D3D12_DESCRIPTOR_HEAP_TYPE& heapType, const D3D12_DESCRIPTOR_HEAP_FLAGS& heapFlags);
 
-			private:
+			protected:
 				CPtr<ID3D12DescriptorHeap> DescHeap = nullptr;
 
 				UINT ResourceDescSize = 0;
 				UINT MaxNumberOfDescriptors = 0;
 				UINT NumAllocatedDescriptors = 0;
 				
+			};
+
+			class VDXDescriptorHeapRingBuffer : public VDXDescriptorHeap
+			{
+			public:
+				VDXDescriptorHeapRingBuffer(CPtr<ID3D12Device5> dxDevice, const UINT& maxDescriptors, const D3D12_DESCRIPTOR_HEAP_TYPE& heapType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, const D3D12_DESCRIPTOR_HEAP_FLAGS& heapFlags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+
+
+
+				bool AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* outHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle, UINT& outDescriptorIndex) override;
+
+
+				bool AllocateDescriptorRange(const UINT& descriptorCount, UINT& outDescriptorIndexStart) override;
+
 			};
 		}
 	}

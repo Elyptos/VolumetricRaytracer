@@ -14,7 +14,7 @@
 
 #include "Textures/Texture.h"
 
-size_t VolumeRaytracer::Renderer::VTexture::GetMipCount() const
+size_t VolumeRaytracer::VTexture::GetMipCount() const
 {
 	return MipCount;
 }

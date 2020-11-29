@@ -40,6 +40,13 @@ namespace VolumeRaytracer
 			class VDXRenderTarget;
 			class VRDXScene;
 			class VDXDescriptorHeap;
+			class VDXDescriptorHeapRingBuffer;
+
+			struct VDXResourceBindingPayload
+			{
+			public:
+				D3D12_GPU_DESCRIPTOR_HANDLE BindingGPUHandle;
+			};
 
 			class VDXWindowRenderTargetHandler
 			{
@@ -92,6 +99,7 @@ namespace VolumeRaytracer
 
 				ID3D12GraphicsCommandList5* StartCommandRecording();
 				void ExecuteCommandQueue();
+				bool IsBusy() const;
 				void WaitForGPU();
 
 			private:
@@ -155,12 +163,11 @@ namespace VolumeRaytracer
 				void SetSceneToRender(VObjectPtr<Voxel::VVoxelScene> scene) override;
 
 
-				void InitializeTexture(VObjectPtr<VTextureCube> cubeTexture, bool uploadToGPU) override;
+				void InitializeTexture(VObjectPtr<VTexture> texture) override;
 
+				void CreateSRVDescriptor(VObjectPtr<VTexture> texture, const D3D12_CPU_DESCRIPTOR_HANDLE& descHandle);
 
 				void UploadToGPU(VObjectPtr<VTexture> texture) override;
-
-				void MakeShaderResourceView(VObjectPtr<VTextureCube> texture);
 
 				bool HasValidWindow() const;
 
@@ -201,7 +208,8 @@ namespace VolumeRaytracer
 
 				void DeleteScene();
 
-				void FillDescriptorHeap();
+
+				void FillDescriptorHeap(boost::unordered_map<UINT, VDXResourceBindingPayload>& outResourceBindings);
 
 				CPtr<ID3D12Resource> CreateShaderTable(std::vector<void*> shaderIdentifiers, UINT& outShaderTableSize, void* rootArguments = nullptr, const size_t& rootArgumentsSize = 0);
 
@@ -232,8 +240,8 @@ namespace VolumeRaytracer
 				CPtr<ID3D12Resource> ShaderTableMiss;
 				UINT StrideShaderTableMiss;
 
-				VDXDescriptorHeap* RendererDescriptorHeaps = nullptr;
-				VDXDescriptorHeap* RendererSamplerDescriptorHeaps = nullptr;
+				VDXDescriptorHeapRingBuffer* RendererDescriptorHeap = nullptr;
+				VDXDescriptorHeapRingBuffer* RendererSamplerDescriptorHeap = nullptr;
 
 				CPtr<ID3D12RootSignature> GlobalRootSignature;
 				boost::unordered_map<EShaderType, CPtr<ID3D12RootSignature>> LocalRootSignatures;

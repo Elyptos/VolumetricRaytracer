@@ -31,6 +31,9 @@ namespace VolumeRaytracer
 				static const DXGI_FORMAT BACK_BUFFER_FORMAT;
 				static const unsigned int BACK_BUFFER_COUNT;
 
+				static const size_t SRV_CV_UAV_HEAP_SIZE_PER_FRAME;
+				static const size_t SAMPLER_HEAP_SIZE_PER_FRAME;
+
 				static const std::wstring SHADER_NAME_RAYGEN;
 				static const std::wstring SHADER_NAME_CLOSEST_HIT;
 				static const std::wstring SHADER_NAME_INTERSECTION;

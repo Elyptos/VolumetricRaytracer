@@ -18,21 +18,18 @@
 
 namespace VolumeRaytracer
 {
-	namespace Renderer
+	class VTextureCube : public VTexture
 	{
-		class VTextureCube : public VTexture
-		{
-		public:
-			virtual ~VTextureCube() = default;
-			
-			size_t GetWidth() const;
-			size_t GetHeight() const;
-			size_t GetArraySize() const;
+	public:
+		virtual ~VTextureCube() = default;
 
-		protected:
-			size_t Width;
-			size_t Height;
-			size_t ArraySize;
-		};
-	}
+		size_t GetWidth() const;
+		size_t GetHeight() const;
+		size_t GetArraySize() const;
+
+	protected:
+		size_t Width;
+		size_t Height;
+		size_t ArraySize;
+	};
 }

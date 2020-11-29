@@ -14,22 +14,22 @@
 
 #pragma once
 
-#include "Object.h"
-#include <string>
+#include "Texture.h"
 
 namespace VolumeRaytracer
 {
-	class VTexture : public VObject
+	class VTexture3D : public VTexture
 	{
 	public:
-		virtual ~VTexture() = default;
-		size_t GetMipCount() const;
+		virtual ~VTexture3D() = default;
 
-		virtual void GetPixels(const size_t& mipLevel, uint8_t*& outPixelArray, size_t* outArraySize) = 0;
-		virtual void Commit() = 0;
+		size_t GetWidth() const;
+		size_t GetHeight() const;
+		size_t GetDepth() const;
 
 	protected:
-		std::wstring AssetPath;
-		size_t MipCount;
+		size_t Width;
+		size_t Height;
+		size_t Depth;
 	};
 }

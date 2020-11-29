@@ -77,14 +77,14 @@ bool VolumeRaytracer::Voxel::VVoxelScene::IsValidVoxelIndex(const unsigned int& 
 	return xPos < Size && yPos < Size && zPos < Size;
 }
 
-void VolumeRaytracer::Voxel::VVoxelScene::SetPathToEnvironmentMap(const std::wstring& path)
+void VolumeRaytracer::Voxel::VVoxelScene::SetEnvironmentTexture(VObjectPtr<VTextureCube> texture)
 {
-	EnvironmentMapPath = path;
+	EnvironmentTexture = texture;
 }
 
-std::wstring VolumeRaytracer::Voxel::VVoxelScene::GetEnvironmentMapPath() const
+VolumeRaytracer::VObjectPtr<VolumeRaytracer::VTextureCube> VolumeRaytracer::Voxel::VVoxelScene::GetEnvironmentTexture() const
 {
-	return EnvironmentMapPath;
+	return EnvironmentTexture;
 }
 
 VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator VolumeRaytracer::Voxel::VVoxelScene::begin()

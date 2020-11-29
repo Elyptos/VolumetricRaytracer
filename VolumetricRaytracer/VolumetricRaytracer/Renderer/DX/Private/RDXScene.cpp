@@ -24,6 +24,8 @@
 void VolumeRaytracer::Renderer::DX::VRDXScene::InitFromScene(Voxel::VVoxelScene* scene)
 {
 	VRScene::InitFromScene(scene);
+
+	EnvironmentMap = std::static_pointer_cast<VDXTextureCube>(scene->GetEnvironmentTexture());
 }
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::Cleanup()
@@ -108,23 +110,17 @@ VolumeRaytracer::Renderer::DX::VDXDescriptorHeap* VolumeRaytracer::Renderer::DX:
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::InitEnvironmentMap(VDXRenderer* renderer)
 {
-	EnvironmentMap = VDXTextureCube::LoadFromFile(EnvironmentMapPath);
-
 	if (EnvironmentMap != nullptr)
 	{
-		std::shared_ptr<IDXRenderableTexture> renderableTexture = std::static_pointer_cast<IDXRenderableTexture>(EnvironmentMap);
-		renderer->InitializeTexture(EnvironmentMap, false);
-		
 		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle;
 		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
 		UINT descIndex = 0;
 
 		DXDescriptorHeap->AllocateDescriptor(&cpuHandle, &gpuHandle, descIndex);
-		renderableTexture->SetDescriptorHandles(cpuHandle, gpuHandle);
 
-		renderer->MakeShaderResourceView(EnvironmentMap);
+		renderer->CreateSRVDescriptor(EnvironmentMap, cpuHandle);
+
 		renderer->UploadToGPU(EnvironmentMap);
-
 		
 		DXDescriptorHeapSamplers->AllocateDescriptor(&cpuHandle, &gpuHandle, descIndex);
 

@@ -270,11 +270,6 @@ void VRIntersection()
 void VRMiss(inout VolumeRaytracer::VRayPayload rayPayload)
 {
 	float3 rayDirection = WorldRayDirection();
-	/*float3 worldX = float3(1,0,0);
-	float yawCos = dot(rayDirection, worldX);
-
-	rayPayload.color = float4(abs(yawCos), 0, 0, 1);*/
-
 	rayPayload.color = g_envMap.SampleLevel(g_envMapSampler, rayDirection.xzy, 0);
 }
 

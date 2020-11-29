@@ -19,55 +19,9 @@
 #include <comdef.h>
 #include <cmath>
 
-VolumeRaytracer::VObjectPtr<VolumeRaytracer::Renderer::DX::VDXTextureCube> VolumeRaytracer::Renderer::DX::VDXTextureCube::LoadFromFile(const std::wstring& path)
-{
-	DirectX::ScratchImage* imageData = new DirectX::ScratchImage();
-
-	HRESULT loadingRes = DirectX::LoadFromDDSFile(path.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, *imageData);
-
-	if (FAILED(loadingRes))
-	{
-		std::string errorMessage = _com_error(loadingRes).ErrorMessage();
-
-		V_LOG_ERROR("Texture loading failed! " + errorMessage);
-		delete imageData;
-
-		return nullptr;
-	}
-
-	const DirectX::TexMetadata& metadata = imageData->GetMetadata();
-
-	if (metadata.IsCubemap())
-	{
-		VObjectPtr<VDXTextureCube> res = VObject::CreateObject<VDXTextureCube>();
-
-		res->AssetPath = path;
-		res->Width = metadata.width;
-		res->Height = metadata.height;
-		res->ArraySize = metadata.arraySize;
-		res->DXTextureFormat = metadata.format;
-		res->MipCount = metadata.mipLevels;
-		res->RawImage = imageData;
-
-		return res;
-	}
-	else
-	{
-		V_LOG_ERROR("Loaded texture is not a cubemap!");
-		delete imageData;
-
-		return nullptr;
-	}
-}
-
 DXGI_FORMAT VolumeRaytracer::Renderer::DX::VDXTextureCube::GetDXGIFormat() const
 {
 	return DXTextureFormat;
-}
-
-DirectX::ScratchImage* VolumeRaytracer::Renderer::DX::VDXTextureCube::GetRawData() const
-{
-	return RawImage;
 }
 
 VolumeRaytracer::Renderer::DX::CPtr<ID3D12Resource> VolumeRaytracer::Renderer::DX::VDXTextureCube::GetDXUploadResource() const 
@@ -80,20 +34,38 @@ VolumeRaytracer::Renderer::DX::CPtr<ID3D12Resource> VolumeRaytracer::Renderer::D
 	return GpuResource;
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE VolumeRaytracer::Renderer::DX::VDXTextureCube::GetCPUHandle() const
+void VolumeRaytracer::Renderer::DX::VDXTextureCube::GetPixels(const size_t& mipLevel, uint8_t*& outPixelArray, size_t* outArraySize)
 {
-	return CPUDescHandle;
+	if (RawImage != nullptr && mipLevel >= 0 && mipLevel < GetMipCount())
+	{
+		const DirectX::Image* image = RawImage->GetImage(mipLevel, 0, 0);
+
+		if (image != nullptr)
+		{
+			outPixelArray = image->pixels;
+			*outArraySize = image->width * image->height;
+
+			return;
+		}
+	}
+
+	outPixelArray = nullptr;
+	outArraySize = 0;
 }
 
-D3D12_GPU_DESCRIPTOR_HANDLE VolumeRaytracer::Renderer::DX::VDXTextureCube::GetGPUHandle() const
+void VolumeRaytracer::Renderer::DX::VDXTextureCube::Commit()
 {
-	return GPUDescHandle;
+	
 }
 
-void VolumeRaytracer::Renderer::DX::VDXTextureCube::SetDescriptorHandles(const D3D12_CPU_DESCRIPTOR_HANDLE& cpuHandle, const D3D12_GPU_DESCRIPTOR_HANDLE& gpuHandle)
+std::weak_ptr<VolumeRaytracer::Renderer::DX::VDXRenderer> VolumeRaytracer::Renderer::DX::VDXTextureCube::GetOwnerRenderer()
 {
-	CPUDescHandle = cpuHandle;
-	GPUDescHandle = gpuHandle;
+	return OwnerRenderer;
+}
+
+D3D12_SRV_DIMENSION VolumeRaytracer::Renderer::DX::VDXTextureCube::GetSRVDimension()
+{
+	return D3D12_SRV_DIMENSION_TEXTURECUBE;
 }
 
 void VolumeRaytracer::Renderer::DX::VDXTextureCube::Initialize()
@@ -108,98 +80,120 @@ void VolumeRaytracer::Renderer::DX::VDXTextureCube::BeginDestroy()
 		delete RawImage;
 		RawImage = nullptr;
 	}
-}
-
-void VolumeRaytracer::Renderer::DX::VDXTextureCube::SetDXUploadResource(CPtr<ID3D12Resource> resource)
-{
-	UploadResource = resource;
-}
-
-void VolumeRaytracer::Renderer::DX::VDXTextureCube::SetDXGPUResource(CPtr<ID3D12Resource> resource)
-{
-	GpuResource = resource;
-}
-
-VolumeRaytracer::Renderer::DX::VDXTextureUploadPayload VolumeRaytracer::Renderer::DX::VDXTextureCube::BeginGPUUpload(VDXRenderer* renderer)
-{
-	CPtr<ID3D12Device5> dxDevice = renderer->GetDXDevice();
-
-	UINT64 numSubresources = GetMipCount() * GetArraySize();
-	UINT64 uploadBufferSize = GetRequiredIntermediateSize(GpuResource.Get(), 0, numSubresources);
-
-	CD3DX12_RESOURCE_DESC uploadBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize, D3D12_RESOURCE_FLAG_NONE);
-
-	CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-
-	dxDevice->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &uploadBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&UploadResource));
-
-	SetDXDebugName<ID3D12Resource>(UploadResource, "Cubemap upload buffer");
-
-	VDXTextureUploadPayload uploadPayload;
-	uploadPayload.SubResourceFootprints.resize(numSubresources);
-	
-	UINT* rows = new UINT[numSubresources];
-	UINT64* rowSizes = new UINT64[numSubresources];
-
-	UINT64 totalSize = 0;
-
-	dxDevice->GetCopyableFootprints(&GpuResource->GetDesc(), 0, GetMipCount() * GetArraySize(), 0, uploadPayload.SubResourceFootprints.data(), rows, rowSizes, &totalSize);
 
 	if (UploadResource != nullptr)
 	{
-		uint8_t* uploadMemory;
-		CD3DX12_RANGE mapRange(0, 0);
-		UploadResource->Map(0, &mapRange, reinterpret_cast<void**>(&uploadMemory));
+		UploadResource.Reset();
+		UploadResource = nullptr;
+	}
 
-		for (UINT64 arrayIndex = 0; arrayIndex < ArraySize; arrayIndex++)
+	if (GpuResource != nullptr)
+	{
+		GpuResource.Reset();
+		GpuResource = nullptr;
+	}
+}
+
+VolumeRaytracer::Renderer::DX::VDXTextureUploadPayload VolumeRaytracer::Renderer::DX::VDXTextureCube::BeginGPUUpload()
+{
+	if (!OwnerRenderer.expired())
+	{
+		CPtr<ID3D12Device5> dxDevice = OwnerRenderer.lock()->GetDXDevice();
+
+		UINT64 numSubresources = GetMipCount() * GetArraySize();
+		UINT64 uploadBufferSize = GetRequiredIntermediateSize(GpuResource.Get(), 0, numSubresources);
+
+		CD3DX12_RESOURCE_DESC uploadBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize, D3D12_RESOURCE_FLAG_NONE);
+
+		CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+
+		dxDevice->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &uploadBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&UploadResource));
+
+		SetDXDebugName<ID3D12Resource>(UploadResource, "Cubemap upload buffer");
+
+		VDXTextureUploadPayload uploadPayload;
+		uploadPayload.SubResourceFootprints.resize(numSubresources);
+
+		UINT* rows = new UINT[numSubresources];
+		UINT64* rowSizes = new UINT64[numSubresources];
+
+		UINT64 totalSize = 0;
+
+		dxDevice->GetCopyableFootprints(&GpuResource->GetDesc(), 0, GetMipCount() * GetArraySize(), 0, uploadPayload.SubResourceFootprints.data(), rows, rowSizes, &totalSize);
+
+		if (UploadResource != nullptr)
 		{
-			for (UINT64 mipIndex = 0; mipIndex < MipCount; mipIndex++)
+			uint8_t* uploadMemory;
+			CD3DX12_RANGE mapRange(0, 0);
+			UploadResource->Map(0, &mapRange, reinterpret_cast<void**>(&uploadMemory));
+
+			for (UINT64 arrayIndex = 0; arrayIndex < ArraySize; arrayIndex++)
 			{
-				UINT64 subResourceIndex = mipIndex + (arrayIndex * MipCount);
-
-				D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = uploadPayload.SubResourceFootprints[subResourceIndex];
-
-				UINT64 subResourceHeight = rows[subResourceIndex];
-				UINT64 subResourcePitch = VDXHelper::Align(layout.Footprint.RowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-				UINT64 subResourceDepth = layout.Footprint.Depth;
-				uint8_t* destSubResourceMemory = uploadMemory + layout.Offset;
-
-				for (UINT64 sliceIndex = 0; sliceIndex < subResourceDepth; sliceIndex++)
+				for (UINT64 mipIndex = 0; mipIndex < MipCount; mipIndex++)
 				{
-					const DirectX::Image* rawSubImage = RawImage->GetImage(mipIndex, arrayIndex, sliceIndex);
-					uint8_t* subResourceMemory = rawSubImage->pixels;
+					UINT64 subResourceIndex = mipIndex + (arrayIndex * MipCount);
 
-					for (UINT64 height = 0; height < subResourceHeight; height++)
+					D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = uploadPayload.SubResourceFootprints[subResourceIndex];
+
+					UINT64 subResourceHeight = rows[subResourceIndex];
+					UINT64 subResourcePitch = VDXHelper::Align(layout.Footprint.RowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+					UINT64 subResourceDepth = layout.Footprint.Depth;
+					uint8_t* destSubResourceMemory = uploadMemory + layout.Offset;
+
+					for (UINT64 sliceIndex = 0; sliceIndex < subResourceDepth; sliceIndex++)
 					{
-						memcpy(destSubResourceMemory, subResourceMemory, (subResourcePitch < rawSubImage->rowPitch) ? subResourcePitch : rawSubImage->rowPitch);
+						const DirectX::Image* rawSubImage = RawImage->GetImage(mipIndex, arrayIndex, sliceIndex);
+						uint8_t* subResourceMemory = rawSubImage->pixels;
 
-						destSubResourceMemory += subResourcePitch;
-						subResourceMemory += rawSubImage->rowPitch;
+						for (UINT64 height = 0; height < subResourceHeight; height++)
+						{
+							memcpy(destSubResourceMemory, subResourceMemory, (subResourcePitch < rawSubImage->rowPitch) ? subResourcePitch : rawSubImage->rowPitch);
+
+							destSubResourceMemory += subResourcePitch;
+							subResourceMemory += rawSubImage->rowPitch;
+						}
 					}
 				}
 			}
+
+			delete[] rowSizes;
+			delete[] rows;
+
+			UploadResource->Unmap(0, nullptr);
+
+			uploadPayload.GPUBuffer = GpuResource;
+			uploadPayload.UploadBuffer = UploadResource;
+			uploadPayload.SubResourceCount = numSubresources;
+
+			return uploadPayload;
 		}
-
-		delete[] rowSizes;
-		delete[] rows;
-
-		UploadResource->Unmap(0, nullptr);
-
-		uploadPayload.GPUBuffer = GpuResource;
-		uploadPayload.UploadBuffer = UploadResource;
-		uploadPayload.SubResourceCount = numSubresources;
-		
-		return uploadPayload;
 	}
-
+		
 	return VDXTextureUploadPayload();
 }
 
-void VolumeRaytracer::Renderer::DX::VDXTextureCube::EndGPUUpload(VDXRenderer* renderer)
+void VolumeRaytracer::Renderer::DX::VDXTextureCube::EndGPUUpload()
 {
 	if (UploadResource != nullptr)
 	{
 		UploadResource.Reset();
 		UploadResource = nullptr;
 	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXTextureCube::InitGPUResource(VDXRenderer* renderer)
+{
+	CD3DX12_RESOURCE_DESC textureDesc = CD3DX12_RESOURCE_DESC::Tex2D(GetDXGIFormat(), GetWidth(),
+		GetHeight(), GetArraySize(), GetMipCount());
+
+	CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+	renderer->GetDXDevice()->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &textureDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&GpuResource));
+
+	SetDXDebugName<ID3D12Resource>(GpuResource, "Cubemap");
+}
+
+void VolumeRaytracer::Renderer::DX::VDXTextureCube::SetOwnerRenderer(std::weak_ptr<VDXRenderer> renderer)
+{
+	OwnerRenderer = renderer;
 }

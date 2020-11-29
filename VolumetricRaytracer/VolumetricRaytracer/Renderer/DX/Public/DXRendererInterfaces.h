@@ -46,21 +46,20 @@ namespace VolumeRaytracer
 			public:
 				virtual ~IDXRenderableTexture() = default;
 
-				virtual DirectX::ScratchImage* GetRawData() const = 0;
 				virtual DXGI_FORMAT GetDXGIFormat() const = 0;
 				virtual CPtr<ID3D12Resource> GetDXUploadResource() const = 0;
 				virtual CPtr<ID3D12Resource> GetDXGPUResource() const = 0;
-				virtual D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle() const = 0;
-				virtual D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle() const = 0;
 
-				virtual void SetDescriptorHandles(const D3D12_CPU_DESCRIPTOR_HANDLE& cpuHandle, const D3D12_GPU_DESCRIPTOR_HANDLE& gpuHandle) = 0;
+				virtual std::weak_ptr<VDXRenderer> GetOwnerRenderer() = 0;
+
+				virtual D3D12_SRV_DIMENSION GetSRVDimension() = 0;
 
 			protected:
-				virtual void SetDXUploadResource(CPtr<ID3D12Resource> resource) = 0;
-				virtual void SetDXGPUResource(CPtr<ID3D12Resource> resource) = 0;
+				virtual void SetOwnerRenderer(std::weak_ptr<VDXRenderer> renderer) = 0; 
+				virtual void InitGPUResource(VDXRenderer* renderer) = 0;
 
-				virtual VDXTextureUploadPayload BeginGPUUpload(VDXRenderer* renderer) = 0;
-				virtual void EndGPUUpload(VDXRenderer* renderer) = 0;
+				virtual VDXTextureUploadPayload BeginGPUUpload() = 0;
+				virtual void EndGPUUpload() = 0;
 			};
 		}
 	}

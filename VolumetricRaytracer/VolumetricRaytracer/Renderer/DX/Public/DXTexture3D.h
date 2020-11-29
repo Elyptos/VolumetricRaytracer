@@ -13,11 +13,8 @@
 */
 
 #pragma once
-
-#include "Textures/TextureCube.h"
+#include "Textures/Texture3D.h"
 #include "DXRendererInterfaces.h"
-
-
 
 namespace VolumeRaytracer
 {
@@ -25,20 +22,24 @@ namespace VolumeRaytracer
 	{
 		namespace DX
 		{
-			class VDXTextureCube : public VolumeRaytracer::VTextureCube, public IDXRenderableTexture
+			class VDXTexture3D : public VTexture3D, public IDXRenderableTexture
 			{
 				friend class VTextureFactory;
 
 			public:
-				DXGI_FORMAT GetDXGIFormat() const override;
-				CPtr<ID3D12Resource> GetDXUploadResource() const override;
-				CPtr<ID3D12Resource> GetDXGPUResource() const override;
-
 				void GetPixels(const size_t& mipLevel, uint8_t*& outPixelArray, size_t* outArraySize) override;
 
 
 				void Commit() override;
 
+
+				DXGI_FORMAT GetDXGIFormat() const override;
+
+
+				CPtr<ID3D12Resource> GetDXUploadResource() const override;
+
+
+				CPtr<ID3D12Resource> GetDXGPUResource() const override;
 
 				std::weak_ptr<VDXRenderer> GetOwnerRenderer() override;
 
@@ -48,21 +49,22 @@ namespace VolumeRaytracer
 			protected:
 				void Initialize() override;
 
+
 				void BeginDestroy() override;
 
-				VDXTextureUploadPayload BeginGPUUpload() override;
 
-				void EndGPUUpload() override;
+				void SetOwnerRenderer(std::weak_ptr<VDXRenderer> renderer) override;
 
 
 				void InitGPUResource(VDXRenderer* renderer) override;
 
 
-				void SetOwnerRenderer(std::weak_ptr<VDXRenderer> renderer) override;
+				VDXTextureUploadPayload BeginGPUUpload() override;
+
+
+				void EndGPUUpload() override;
 
 			private:
-				DXGI_FORMAT DXTextureFormat;
-				DirectX::ScratchImage* RawImage = nullptr;
 				CPtr<ID3D12Resource> UploadResource = nullptr;
 				CPtr<ID3D12Resource> GpuResource = nullptr;
 
