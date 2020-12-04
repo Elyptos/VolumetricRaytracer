@@ -32,7 +32,7 @@ namespace VolumeRaytracer
 		public:
 			static VObjectPtr<VTextureCube> LoadTextureCubeFromFile(std::weak_ptr<VRenderer> renderer, const std::wstring& path);
 			
-			static VObjectPtr<VTexture3D> CreateTexture3D(std::weak_ptr<VRenderer> renderer, const size_t& width, const size_t& height, const size_t& depth);
+			static VObjectPtr<VTexture3D> CreateTexture3D(std::weak_ptr<VRenderer> renderer, const size_t& width, const size_t& height, const size_t& depth, const size_t& mipLevels);
 		};
 	}
 }

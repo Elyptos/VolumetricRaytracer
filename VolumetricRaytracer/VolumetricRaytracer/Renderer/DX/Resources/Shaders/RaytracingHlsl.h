@@ -53,6 +53,7 @@ namespace VolumeRaytracer
 		XMVECTOR cameraPosition;
 		UINT voxelAxisCount;
 		float volumeExtend;
+		float distanceBtwVoxels;
 	};
 
 	static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);

@@ -66,9 +66,13 @@ VolumeRaytracer::VObjectPtr<VolumeRaytracer::VTextureCube> VolumeRaytracer::Rend
 	}
 }
 
-VolumeRaytracer::VObjectPtr<VolumeRaytracer::VTexture3D> VolumeRaytracer::Renderer::VTextureFactory::CreateTexture3D(std::weak_ptr<VRenderer> renderer, const size_t& width, const size_t& height, const size_t& depth)
+VolumeRaytracer::VObjectPtr<VolumeRaytracer::VTexture3D> VolumeRaytracer::Renderer::VTextureFactory::CreateTexture3D(std::weak_ptr<VRenderer> renderer, const size_t& width, const size_t& height, const size_t& depth, const size_t& mipLevels)
 {
-	return VObject::CreateObject<DX::VDXTexture3D>();
+	VObjectPtr<VolumeRaytracer::VTexture3D> res = VObject::CreateObject<DX::VDXTexture3D>(width, height, depth, mipLevels);
+
+	renderer.lock()->InitializeTexture(res);
+
+	return res;
 }
 
 #endif

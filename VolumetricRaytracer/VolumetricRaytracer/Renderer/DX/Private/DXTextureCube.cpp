@@ -68,6 +68,16 @@ D3D12_SRV_DIMENSION VolumeRaytracer::Renderer::DX::VDXTextureCube::GetSRVDimensi
 	return D3D12_SRV_DIMENSION_TEXTURECUBE;
 }
 
+size_t VolumeRaytracer::Renderer::DX::VDXTextureCube::GetPixelCount()
+{
+	if (RawImage != nullptr)
+	{
+		return RawImage->GetMetadata().width * RawImage->GetMetadata().height;
+	}
+
+	return 0;
+}
+
 void VolumeRaytracer::Renderer::DX::VDXTextureCube::Initialize()
 {
 	

@@ -17,9 +17,9 @@
 #include "RaytracingHlsl.h"
 
 RaytracingAccelerationStructure g_scene : register(t0, space0);
-Texture3D<float> g_voxelVolume : register(t1, space0);
+Texture3D<float4> g_voxelVolume : register(t2, space0);
 
-TextureCube g_envMap : register(t2, space0);
+TextureCube g_envMap : register(t1, space0);
 SamplerState g_envMapSampler : register(s0);
 
 RWTexture2D<float4> g_renderTarget : register(u0);
@@ -99,70 +99,73 @@ bool DetermineRayAABBIntersection(in Ray ray, in float3 aabb[2], out float tEnte
 	return tExit > tEnter && tExit >= RayTMin() && tEnter <= RayTCurrent();
 }
 
-uint3 WorldSpaceToVoxelSpace(in float3 worldLocation)
+int3 WorldSpaceToVoxelSpace(in float3 worldLocation)
 {
-	float3 relativeVolumePos = worldLocation - g_sceneCB.volumeExtend;
-	float distanceBetweenVoxel = (g_sceneCB.volumeExtend * 2) / g_sceneCB.voxelAxisCount;
+	float3 volumeOrigin = -g_sceneCB.volumeExtend;
+	float3 relativeVolumePos = worldLocation - volumeOrigin;
+	float distanceBetweenVoxel = g_sceneCB.distanceBtwVoxels;
 
-	return uint3(relativeVolumePos.x / distanceBetweenVoxel, relativeVolumePos.y / distanceBetweenVoxel, relativeVolumePos.z / distanceBetweenVoxel);
+	return int3(floor(relativeVolumePos.x / distanceBetweenVoxel), floor(relativeVolumePos.y / distanceBetweenVoxel), floor(relativeVolumePos.z / distanceBetweenVoxel));
 }
 
-float3 VoxelIndexToWorldSpace(in uint3 voxelIndex)
+float3 VoxelIndexToWorldSpace(in int3 voxelIndex)
 {
-	float distanceBetweenVoxel = (g_sceneCB.volumeExtend * 2) / g_sceneCB.voxelAxisCount;
+	float distanceBetweenVoxel = g_sceneCB.distanceBtwVoxels;
 	float3 voxelIndexF = voxelIndex;
+	float3 volumeOrigin = -g_sceneCB.volumeExtend;
 
-	return voxelIndexF * distanceBetweenVoxel + distanceBetweenVoxel * 0.5f - g_sceneCB.volumeExtend;
+	return voxelIndexF * distanceBetweenVoxel + distanceBetweenVoxel * 0.5f + volumeOrigin;
 }
 
-uint3 GoToNextVoxel(in Ray ray, in float currentT, in uint3 voxelIndex, in int3 direction, out float newT, out float3 voxelFaceNormal)
+int3 GoToNextVoxel(in Ray ray, in uint3 voxelIndex, in int3 direction, out float newT, out float3 voxelFaceNormal)
 {
-	float maxX, maxY, maxZ = 100000;
-	float3 voxelMax = VoxelIndexToWorldSpace(voxelIndex) + ((g_sceneCB.volumeExtend * 2) / g_sceneCB.voxelAxisCount) * 0.5f;
-	uint3 res = voxelIndex;
+	float3 tMax = float3(100000, 100000, 100000);
+	int3 res = voxelIndex;
+	const float FLT_INFINITY = 1.#INF;
+	float3 invRayDirection = ray.direction != 0 ? 1 / ray.direction : (ray.direction > 0) ? FLT_INFINITY : -FLT_INFINITY;
 
-	if (ray.direction.x != 0)
-	{
-		maxX = (voxelMax.x - ray.origin.x) / ray.direction.x;
-	}
+	int3 sign = ray.direction > 0;
 
-	if (ray.direction.y != 0)
-	{
-		maxY = (voxelMax.y - ray.origin.y) / ray.direction.y;
-	}
+	float3 voxelPos = VoxelIndexToWorldSpace(voxelIndex);
+	float3 voxelExtends = g_sceneCB.distanceBtwVoxels * 0.5;
+	float3 aabb[2] = { voxelPos - voxelExtends, voxelPos + voxelExtends };
 
-	if (ray.direction.z != 0)
-	{
-		maxZ = (voxelMax.z - ray.origin.z) / ray.direction.z;
-	}
+	if(ray.direction.x != 0)
+		tMax.x = (aabb[sign.x].x - ray.origin.x) * invRayDirection.x;
+	
+	if(ray.direction.y != 0)
+		tMax.y = (aabb[sign.y].y - ray.origin.y) * invRayDirection.y;
+	
+	if(ray.direction.z != 0)
+		tMax.z = (aabb[sign.z].z - ray.origin.z) * invRayDirection.z;
 
-	if (maxX < maxY)
+	if (tMax.x < tMax.y)
 	{
-		if (maxX < maxZ)
+		if (tMax.x < tMax.z)
 		{
 			res.x += direction.x;
-			newT = maxX;
+			newT = tMax.x;
 			voxelFaceNormal = VolumeRaytracer::CubeNormals[0] * -direction.x;
 		}
 		else
 		{
 			res.z += direction.z;
-			newT = maxZ;
+			newT = tMax.z;
 			voxelFaceNormal = VolumeRaytracer::CubeNormals[4] * -direction.z;
 		}
 	}
 	else
 	{
-		if (maxY < maxZ)
+		if (tMax.y < tMax.z)
 		{
 			res.y += direction.y;
-			newT = maxY;
+			newT = tMax.y;
 			voxelFaceNormal = VolumeRaytracer::CubeNormals[2] * -direction.y;
 		}
 		else
 		{
 			res.z += direction.z;
-			newT = maxZ;
+			newT = tMax.z;
 			voxelFaceNormal = VolumeRaytracer::CubeNormals[4] * -direction.z;
 		}
 	}
@@ -177,12 +180,12 @@ float3 GetPositionAlongRay(in Ray ray, in float t)
 	return ray.origin + ray.direction * t;
 }
 
-bool IsValidVoxelIndex(in uint3 index)
+bool IsValidVoxelIndex(in int3 index)
 {
-	return index.x < g_sceneCB.voxelAxisCount && index.y < g_sceneCB.voxelAxisCount && index.z < g_sceneCB.voxelAxisCount;
+	return index.x >= 0 && index.x < g_sceneCB.voxelAxisCount && index.y >= 0 && index.y < g_sceneCB.voxelAxisCount && index.z >= 0 && index.z < g_sceneCB.voxelAxisCount;
 }
 
-bool IsSolid(in uint3 index)
+bool IsSolid(in int3 index)
 {
 	return g_voxelVolume[index].r > 0;
 }
@@ -201,7 +204,8 @@ void VRRaygen()
 [shader("closesthit")]
 void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytracer::VPrimitiveAttributes attr)
 {
-	rayPayload.color = float4(abs((attr.normal + 1) * 0.5), 1);
+	rayPayload.color = float4(attr.normal, 1);
+	//rayPayload.color = float4(abs((attr.normal + 1) * 0.5), 1);
 }
 
 [shader("intersection")]
@@ -216,11 +220,15 @@ void VRIntersection()
 	float3 volumeAABB[2] = {float3(-g_sceneCB.volumeExtend, -g_sceneCB.volumeExtend, -g_sceneCB.volumeExtend), float3(g_sceneCB.volumeExtend, g_sceneCB.volumeExtend, g_sceneCB.volumeExtend)};
 	float tEnter, tExit;
 
+	float tMax = RayTCurrent();
+
 	if (DetermineRayAABBIntersection(ray, volumeAABB, tEnter, tExit))
 	{
-		/*int3 voxelDir = sign(ray.direction);
-		uint3 voxelPos;
+		int3 voxelDir = sign(ray.direction);
+		int3 voxelPos;
 		float3 hitNormal = -ray.direction;
+
+		tEnter += 0.0001;
 
 		if (tEnter >= 0)
 		{
@@ -233,10 +241,15 @@ void VRIntersection()
 
 		tExit = tEnter;
 
-		while (IsValidVoxelIndex(voxelPos) && !IsSolid(voxelPos))
+		while (tEnter <= tMax)
 		{
-			tEnter = tExit;
-			voxelPos = GoToNextVoxel(ray, tEnter, voxelPos, voxelDir, tExit, hitNormal);
+			if (IsValidVoxelIndex(voxelPos) && IsSolid(voxelPos))
+			{
+				break;
+			}
+
+			tEnter = tExit + g_sceneCB.distanceBtwVoxels * 0.5;
+			voxelPos = GoToNextVoxel(ray, voxelPos, voxelDir, tExit, hitNormal);
 		}
 
 		if (IsValidVoxelIndex(voxelPos) && IsSolid(voxelPos))
@@ -245,12 +258,12 @@ void VRIntersection()
 			attr.normal = hitNormal;
 
 			ReportHit(tEnter, 0, attr);
-		}*/
 
-		VolumeRaytracer::VPrimitiveAttributes attr;
-		attr.normal = float3(0, 1, 0);
+			/*VolumeRaytracer::VPrimitiveAttributes attr;
+			attr.normal = g_voxelVolume[voxelPos].rgb;
 
-		ReportHit(tEnter, 0, attr);
+			ReportHit(tEnter, 0, attr);*/
+		}
 	}
 	//else
 	//{

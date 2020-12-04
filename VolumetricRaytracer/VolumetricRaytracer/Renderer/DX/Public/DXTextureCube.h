@@ -45,6 +45,9 @@ namespace VolumeRaytracer
 
 				D3D12_SRV_DIMENSION GetSRVDimension() override;
 
+
+				size_t GetPixelCount() override;
+
 			protected:
 				void Initialize() override;
 

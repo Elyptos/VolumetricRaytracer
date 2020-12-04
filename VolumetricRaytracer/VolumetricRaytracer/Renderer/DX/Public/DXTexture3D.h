@@ -15,6 +15,7 @@
 #pragma once
 #include "Textures/Texture3D.h"
 #include "DXRendererInterfaces.h"
+#include "Color.h"
 
 namespace VolumeRaytracer
 {
@@ -27,8 +28,13 @@ namespace VolumeRaytracer
 				friend class VTextureFactory;
 
 			public:
+				VDXTexture3D() = default;
+				VDXTexture3D(const size_t& width, const size_t& height, const size_t& depth, const size_t& mipLevels);
+
 				void GetPixels(const size_t& mipLevel, uint8_t*& outPixelArray, size_t* outArraySize) override;
 
+				VColor GetPixel(const size_t& x, const size_t& y, const size_t& z, const size_t& mipLevel) const;
+				void SetPixel(const size_t& x, const size_t& y, const size_t& z, const size_t& mipLevel, const VColor& pixelColor);
 
 				void Commit() override;
 
@@ -45,6 +51,9 @@ namespace VolumeRaytracer
 
 
 				D3D12_SRV_DIMENSION GetSRVDimension() override;
+
+
+				size_t GetPixelCount() override;
 
 			protected:
 				void Initialize() override;
@@ -67,6 +76,10 @@ namespace VolumeRaytracer
 			private:
 				CPtr<ID3D12Resource> UploadResource = nullptr;
 				CPtr<ID3D12Resource> GpuResource = nullptr;
+
+				uint8_t** Pixels = nullptr;
+
+				size_t PixelCount = 0;
 
 				std::weak_ptr<VDXRenderer> OwnerRenderer;
 			};

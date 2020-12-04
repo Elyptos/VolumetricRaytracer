@@ -25,6 +25,8 @@
 #include <sstream>
 #include <vector>
 
+//#undef _DEBUG
+
 void VolumeRaytracer::Renderer::DX::VDXRenderer::Render()
 {
 	if (IsActive())
@@ -104,11 +106,14 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetSceneToRender(VObjectPtr<Vox
 {
 	VRenderer::SetSceneToRender(scene);
 
+	std::weak_ptr<VDXRenderer> weakThis = std::static_pointer_cast<VDXRenderer>(shared_from_this());
+
 	DeleteScene();
 
 	SceneToRender = new VRDXScene();
 	SceneToRender->InitFromScene(scene.get());
 	SceneToRender->BuildStaticResources(this);
+	SceneToRender->BuildVoxelVolume(scene.get(), weakThis);
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeTexture(VObjectPtr<VTexture> texture)

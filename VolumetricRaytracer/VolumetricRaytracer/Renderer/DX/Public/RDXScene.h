@@ -33,6 +33,7 @@ namespace VolumeRaytracer
 			class VDXRenderer;
 			class VDXDescriptorHeap;
 			class VDXTextureCube;
+			class VDXTexture3D;
 
 			class VRDXScene : public VRScene
 			{
@@ -52,17 +53,18 @@ namespace VolumeRaytracer
 
 				CPtr<ID3D12Resource> GetSceneVolume() const;
 
-				void BuildVoxelVolume(CPtr<ID3D12GraphicsCommandList5> commandList);
+				//void BuildVoxelVolume(CPtr<ID3D12GraphicsCommandList5> commandList);
+				void BuildVoxelVolume(Voxel::VVoxelScene* scene, std::weak_ptr<VDXRenderer> renderer);
 
 			private:
 				void InitEnvironmentMap(VDXRenderer* renderer);
 				void AllocSceneConstantBuffer(VDXRenderer* renderer);
-				void AllocSceneVolumeBuffer(VDXRenderer* renderer);
+				//void AllocSceneVolumeBuffer(VDXRenderer* renderer);
 				void BuildGeometryAABB(VDXRenderer* renderer);
 				void BuildAccelerationStructure(VDXRenderer* renderer);
 				void CleanupStaticResources();
 
-				void PrepareVoxelVolume(Voxel::VVoxelScene* scene);
+				//void PrepareVoxelVolume(Voxel::VVoxelScene* scene);
 
 				VDXAccelerationStructureBuffers BuildBottomLevelAccelerationStructures(VDXRenderer* renderer, D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc);
 				VDXAccelerationStructureBuffers BuildTopLevelAccelerationStructures(VDXRenderer* renderer, const VDXAccelerationStructureBuffers& bottomLevelAS);
@@ -81,11 +83,10 @@ namespace VolumeRaytracer
 				std::vector<CPtr<ID3D12Resource>> SceneConstantBuffers;
 				std::vector<uint8_t*> SceneConstantBufferDataPtrs;
 
-				CPtr<ID3D12Resource> SceneVolume;
-				CPtr<ID3D12Resource> SceneVolumeUploadBuffer;
+				VObjectPtr<VDXTexture3D> SceneVolume = nullptr;
 				
-				D3D12_PLACED_SUBRESOURCE_FOOTPRINT UploadBufferFootprint;
-				D3D12_GPU_DESCRIPTOR_HANDLE SceneVolumeTextureGPUHandle;
+				//D3D12_PLACED_SUBRESOURCE_FOOTPRINT UploadBufferFootprint;
+				//D3D12_GPU_DESCRIPTOR_HANDLE SceneVolumeTextureGPUHandle;
 
 				DirectX::XMMATRIX ViewMatrix;
 				DirectX::XMMATRIX ProjectionMatrix;
