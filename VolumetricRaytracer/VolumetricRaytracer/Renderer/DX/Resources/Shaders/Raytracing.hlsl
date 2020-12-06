@@ -65,7 +65,7 @@ float4 TraceRadianceRay(in Ray ray, in uint currentRayRecursionDepth)
 	rayDesc.Direction = ray.direction;
 
 	rayDesc.TMin = 0;
-	rayDesc.TMax = 10000;
+	rayDesc.TMax = 1000;
 
 	VolumeRaytracer::VRayPayload rayPayload = { float4(0,0,0,0), currentRayRecursionDepth + 1 };
 
@@ -114,7 +114,25 @@ float3 VoxelIndexToWorldSpace(in int3 voxelIndex)
 	float3 voxelIndexF = voxelIndex;
 	float3 volumeOrigin = -g_sceneCB.volumeExtend;
 
-	return voxelIndexF * distanceBetweenVoxel + distanceBetweenVoxel * 0.5f + volumeOrigin;
+	return voxelIndexF * distanceBetweenVoxel + volumeOrigin;
+}
+
+inline float3 WorldSpaceToCellSpace(in int3 cellOriginPos, in float3 worldLocation)
+{
+	float3 voxelOriginPos = VoxelIndexToWorldSpace(cellOriginPos);
+	float3 rel = worldLocation - voxelOriginPos;
+
+	return rel / g_sceneCB.distanceBtwVoxels;
+}
+
+bool IsValidCell(in int3 originVoxelPos)
+{
+	return  originVoxelPos.x >= 0 &&
+			originVoxelPos.y >= 0 &&
+			originVoxelPos.z >= 0 &&
+			(originVoxelPos.x + 1) < g_sceneCB.voxelAxisCount &&
+			(originVoxelPos.y + 1) < g_sceneCB.voxelAxisCount &&
+			(originVoxelPos.z + 1) < g_sceneCB.voxelAxisCount;
 }
 
 int3 GoToNextVoxel(in Ray ray, in uint3 voxelIndex, in int3 direction, out float newT, out float3 voxelFaceNormal)
@@ -128,7 +146,7 @@ int3 GoToNextVoxel(in Ray ray, in uint3 voxelIndex, in int3 direction, out float
 
 	float3 voxelPos = VoxelIndexToWorldSpace(voxelIndex);
 	float3 voxelExtends = g_sceneCB.distanceBtwVoxels * 0.5;
-	float3 aabb[2] = { voxelPos - voxelExtends, voxelPos + voxelExtends };
+	float3 aabb[2] = { voxelPos, voxelPos + g_sceneCB.distanceBtwVoxels };
 
 	if(ray.direction.x != 0)
 		tMax.x = (aabb[sign.x].x - ray.origin.x) * invRayDirection.x;
@@ -190,6 +208,128 @@ bool IsSolid(in int3 index)
 	return g_voxelVolume[index].r > 0;
 }
 
+inline float4 GetCellVoxel1(in int3 cellOriginIndex)
+{
+	return g_voxelVolume[cellOriginIndex];
+}
+
+inline float4 GetCellVoxel2(in int3 cellOriginIndex)
+{
+	return	g_voxelVolume[int3(cellOriginIndex.x + 1, cellOriginIndex.y, cellOriginIndex.z)];
+}
+
+inline float4 GetCellVoxel3(in int3 cellOriginIndex)
+{
+	return	g_voxelVolume[int3(cellOriginIndex.x + 1, cellOriginIndex.y + 1, cellOriginIndex.z)];
+}
+
+inline float4 GetCellVoxel4(in int3 cellOriginIndex)
+{
+	return	g_voxelVolume[int3(cellOriginIndex.x, cellOriginIndex.y + 1, cellOriginIndex.z)];
+}
+
+inline float4 GetCellVoxel5(in int3 cellOriginIndex)
+{
+	return g_voxelVolume[int3(cellOriginIndex.x, cellOriginIndex.y, cellOriginIndex.z + 1)];
+}
+
+inline float4 GetCellVoxel6(in int3 cellOriginIndex)
+{
+	return	g_voxelVolume[int3(cellOriginIndex.x + 1, cellOriginIndex.y, cellOriginIndex.z + 1)];
+}
+
+inline float4 GetCellVoxel7(in int3 cellOriginIndex)
+{
+	return	g_voxelVolume[int3(cellOriginIndex.x + 1, cellOriginIndex.y + 1, cellOriginIndex.z + 1)];
+}
+
+inline float4 GetCellVoxel8(in int3 cellOriginIndex)
+{
+	return	g_voxelVolume[int3(cellOriginIndex.x, cellOriginIndex.y + 1, cellOriginIndex.z + 1)];
+}
+
+bool HasIsoSurfaceInsideCell(in int3 cellOriginIndex)
+{
+	float4 v1 = GetCellVoxel1(cellOriginIndex);
+	float4 v2 = GetCellVoxel2(cellOriginIndex);
+	float4 v3 = GetCellVoxel3(cellOriginIndex);
+	float4 v4 = GetCellVoxel4(cellOriginIndex);
+	float4 v5 = GetCellVoxel5(cellOriginIndex);
+	float4 v6 = GetCellVoxel6(cellOriginIndex);
+	float4 v7 = GetCellVoxel7(cellOriginIndex);
+	float4 v8 = GetCellVoxel8(cellOriginIndex);
+
+	//return (sign(v1.g) & sign(v2.g) & sign(v3.g) & sign(v4.g) & sign(v5.g) & sign(v6.g) & sign(v7.g) & sign(v8.g)) != sign(v1.g);
+
+	return  v1.g != v2.g ||
+			v1.g != v3.g ||
+			v1.g != v4.g ||
+			v1.g != v5.g ||
+			v1.g != v6.g ||
+			v1.g != v7.g ||
+			v1.g != v8.g;
+}
+
+float GetDensity(in int3 cellOriginIndex, in float3 normPosInsideCell)
+{
+	float4 v1 = GetCellVoxel1(cellOriginIndex);
+	float4 v2 = GetCellVoxel2(cellOriginIndex);
+	float4 v3 = GetCellVoxel3(cellOriginIndex);
+	float4 v4 = GetCellVoxel4(cellOriginIndex);
+	float4 v5 = GetCellVoxel5(cellOriginIndex);
+	float4 v6 = GetCellVoxel6(cellOriginIndex);
+	float4 v7 = GetCellVoxel7(cellOriginIndex);
+	float4 v8 = GetCellVoxel8(cellOriginIndex);
+
+	float vx1 = lerp(v1.g, v2.g, normPosInsideCell.x); 
+	float vx2 = lerp(v4.g, v3.g, normPosInsideCell.x); 
+	float vx3 = lerp(v5.g, v6.g, normPosInsideCell.x); 
+	float vx4 = lerp(v8.g, v7.g, normPosInsideCell.x);
+	
+	float vy1 = lerp(vx1, vx2, normPosInsideCell.y);
+	float vy2 = lerp(vx3, vx4, normPosInsideCell.y);
+
+	float vz = lerp(vy1, vy2, normPosInsideCell.z);
+
+	return vz;
+}
+
+float3 GetVoxelNormal(in int3 cellIndex, in float3 normVoxelPos)
+{
+	const float accuracy = 0.1;
+
+	float nX = GetDensity(cellIndex, normVoxelPos + float3(accuracy, 0, 0)) - GetDensity(cellIndex, normVoxelPos - float3(accuracy, 0, 0));
+	float nY = GetDensity(cellIndex, normVoxelPos + float3(0, accuracy, 0)) - GetDensity(cellIndex, normVoxelPos - float3(0, accuracy, 0));
+	float nZ = GetDensity(cellIndex, normVoxelPos + float3(0, 0, accuracy)) - GetDensity(cellIndex, normVoxelPos - float3(0, 0, accuracy));
+
+	//return normalize(float3(nX, nY, nZ));
+	return float3(nX, nY, nZ);
+}
+
+float3 GetNormal(in int3 cellIndex, in float3 normPosInsideCell)
+{
+	float3 n1 = GetVoxelNormal(cellIndex, float3(0,0,0));
+	float3 n2 = GetVoxelNormal(cellIndex, float3(1,0,0));
+	float3 n3 = GetVoxelNormal(cellIndex, float3(1,1,0));
+	float3 n4 = GetVoxelNormal(cellIndex, float3(0,1,0));
+	float3 n5 = GetVoxelNormal(cellIndex, float3(0,0,1));
+	float3 n6 = GetVoxelNormal(cellIndex, float3(1,0,1));
+	float3 n7 = GetVoxelNormal(cellIndex, float3(1,1,1));
+	float3 n8 = GetVoxelNormal(cellIndex, float3(0,1,1));
+
+	float3 nx1 = lerp(n1, n2, normPosInsideCell.x);
+	float3 nx2 = lerp(n4, n3, normPosInsideCell.x);
+	float3 nx3 = lerp(n5, n6, normPosInsideCell.x);
+	float3 nx4 = lerp(n8, n7, normPosInsideCell.x);
+
+	float3 ny1 = lerp(nx1, nx2, normPosInsideCell.y);
+	float3 ny2 = lerp(nx3, nx4, normPosInsideCell.y);
+
+	float3 nz = lerp(ny1, ny2, normPosInsideCell.z);
+
+	return n1;
+}
+
 [shader("raygeneration")]
 void VRRaygen()
 {
@@ -226,7 +366,11 @@ void VRIntersection()
 	{
 		int3 voxelDir = sign(ray.direction);
 		int3 voxelPos;
+		int3 nextVoxelPos;
 		float3 hitNormal = -ray.direction;
+		float cellExit;
+		float cellEnter;
+		float tHit;
 
 		tEnter += 0.0001;
 
@@ -239,44 +383,85 @@ void VRIntersection()
 			voxelPos = WorldSpaceToVoxelSpace(ray.origin);
 		}
 
-		tExit = tEnter;
+		cellExit = tEnter;
 
-		while (tEnter <= tMax)
+		int maxIterations = 3000;
+
+		while (cellExit <= tMax && maxIterations > 0)
 		{
-			if (IsValidVoxelIndex(voxelPos) && IsSolid(voxelPos))
+			maxIterations--;
+
+			cellEnter = cellExit;
+
+			nextVoxelPos = GoToNextVoxel(ray, voxelPos, voxelDir, cellExit, hitNormal);
+
+			if (IsValidCell(voxelPos))
 			{
-				break;
+				//if (GetDensity(int3(0, 0, 0), float3(1, 1, 1)) < 0)
+				//{
+				//	VolumeRaytracer::VPrimitiveAttributes attr;
+				//	attr.normal = voxelPos;
+
+				//	ReportHit(cellEnter, 0, attr);
+				//}
+
+				if (HasIsoSurfaceInsideCell(voxelPos))
+				{
+					float3 enterCellSpace = WorldSpaceToCellSpace(voxelPos, GetPositionAlongRay(ray, cellEnter));
+					float3 exitCellSpace = WorldSpaceToCellSpace(voxelPos, GetPositionAlongRay(ray, cellExit));
+
+					float densityEnter = GetDensity(voxelPos, enterCellSpace);
+
+					if (densityEnter < 0)
+					{
+						VolumeRaytracer::VPrimitiveAttributes attr;
+						attr.normal = GetNormal(voxelPos, WorldSpaceToCellSpace(voxelPos, GetPositionAlongRay(ray, cellEnter)));;
+
+						ReportHit(cellEnter, 0, attr);
+
+						break;
+					}
+
+					float densityExit = GetDensity(voxelPos, exitCellSpace);
+
+					//if (densityExit > 0)
+					//{
+					//	VolumeRaytracer::VPrimitiveAttributes attr;
+					//	attr.normal = float3(1, 0, 0);
+
+					//	ReportHit(tEnter, 0, attr);
+
+					//	break;
+					//}
+
+					if (sign(densityEnter) != sign(densityExit))
+					{
+						float k = densityExit - densityEnter;
+						float interpA = -densityExit / k;
+
+						tHit = lerp(cellEnter, cellExit, (-densityExit / k));
+
+						VolumeRaytracer::VPrimitiveAttributes attr;
+						attr.normal = GetNormal(voxelPos, WorldSpaceToCellSpace(voxelPos, GetPositionAlongRay(ray, tHit)));
+
+						ReportHit(tHit, 0, attr);
+
+						break;
+					}
+				}
 			}
-
-			tEnter = tExit + g_sceneCB.distanceBtwVoxels * 0.5;
-			voxelPos = GoToNextVoxel(ray, voxelPos, voxelDir, tExit, hitNormal);
+			
+			voxelPos = nextVoxelPos;
 		}
 
-		if (IsValidVoxelIndex(voxelPos) && IsSolid(voxelPos))
-		{
-			VolumeRaytracer::VPrimitiveAttributes attr;
-			attr.normal = hitNormal;
+		//if (maxIterations <= 0)
+		//{
+		//	VolumeRaytracer::VPrimitiveAttributes attr;
+		//	attr.normal = float3(1, 0, 0);
 
-			ReportHit(tEnter, 0, attr);
-
-			/*VolumeRaytracer::VPrimitiveAttributes attr;
-			attr.normal = g_voxelVolume[voxelPos].rgb;
-
-			ReportHit(tEnter, 0, attr);*/
-		}
+		//	ReportHit(tEnter, 0, attr);
+		//}
 	}
-	//else
-	//{
-	//	VolumeRaytracer::VPrimitiveAttributes attr;
-	//	attr.normal = float3(1, 0, 0);
-
-	//	ReportHit(RayTCurrent(), 0, attr);
-	//}
-
-	//VolumeRaytracer::VPrimitiveAttributes attr;
-	//attr.normal = float3(1, 0, 0);
-
-	//ReportHit(RayTCurrent(), 0, attr);
 }
 
 [shader("miss")]
