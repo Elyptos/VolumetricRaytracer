@@ -30,11 +30,18 @@ if (WIN32)
 		message("HLSL shader compiler found at path " ${hlslCompiler})
 		message("Compiling shaders")
 
-		execute_process(
+		add_custom_command(
+			OUTPUT "DX/Resources/Shaders/Compiled/Raytracing.hlsl.h"
 			COMMAND ${hlslCompiler} -Zi -Od -Vn "g_pRaytracing" -Fo "./DX/Resources/Shaders/Compiled/Raytracing.cso" -T "lib_6_3"  -Fh "./DX/Resources/Shaders/Compiled/Raytracing.hlsl.h" "./DX/Resources/Shaders/Raytracing.hlsl"
 			WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-			RESULT_VARIABLE hlslCompilerResult
+			DEPENDS "DX/Resources/Shaders/RaytracingHlsl.h" "DX/Resources/Shaders/Raytracing.hlsl"
 		)
+
+		#execute_process(
+		#	COMMAND ${hlslCompiler} -Zi -Od -Vn "g_pRaytracing" -Fo "./DX/Resources/Shaders/Compiled/Raytracing.cso" -T "lib_6_3"  -Fh "./DX/Resources/Shaders/Compiled/Raytracing.hlsl.h" "./DX/Resources/Shaders/Raytracing.hlsl"
+		#	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		#	RESULT_VARIABLE hlslCompilerResult
+		#)
 	else()
 		message(WARNING "HLSL shader compiler not found")
 	endif()
