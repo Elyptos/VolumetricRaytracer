@@ -149,7 +149,7 @@ void VolumeRaytracer::App::RendererEngineInstance::OnAxisInput(const VolumeRaytr
 
 void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
-	Scene = VObject::CreateObject<Voxel::VVoxelScene>(100, 3000.f);
+	Scene = VObject::CreateObject<Voxel::VVoxelScene>(2, 100.f);
 	Scene->GetSceneCamera()->Position = VolumeRaytracer::VVector(300.f, 0.f, 100.f);
 	TargetCameraLocation = Scene->GetSceneCamera()->Position;
 	Scene->GetSceneCamera()->Rotation = VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f));
@@ -158,13 +158,14 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 
 	Voxel::VVoxel voxelToUse;
 	voxelToUse.Material = 1;
+	voxelToUse.Density = -10;
 
-	Scene->SetVoxel(50, 50, 50, voxelToUse);
-	Scene->SetVoxel(51, 50, 50, voxelToUse);
-	Scene->SetVoxel(49, 50, 50, voxelToUse);
-	Scene->SetVoxel(50, 51, 50, voxelToUse);
-	Scene->SetVoxel(50, 49, 50, voxelToUse);
-	Scene->SetVoxel(50, 50, 51, voxelToUse);
-	Scene->SetVoxel(50, 50, 49, voxelToUse);
+	Scene->SetVoxel(1, 1, 1, voxelToUse);
+	//Scene->SetVoxel(6, 5, 5, voxelToUse);
+	//Scene->SetVoxel(4, 5, 5, voxelToUse);
+	//Scene->SetVoxel(5, 6, 5, voxelToUse);
+	//Scene->SetVoxel(5, 4, 5, voxelToUse);
+	//Scene->SetVoxel(5, 5, 6, voxelToUse);
+	//Scene->SetVoxel(5, 5, 4, voxelToUse);
 }
 

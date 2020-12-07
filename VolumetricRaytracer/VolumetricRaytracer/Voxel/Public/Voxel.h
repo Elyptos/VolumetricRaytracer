@@ -23,6 +23,7 @@ namespace VolumeRaytracer
 		{
 		public:
 			uint8_t Material = 0;
+			int8_t Density = 0;
 		};
 	}
 }

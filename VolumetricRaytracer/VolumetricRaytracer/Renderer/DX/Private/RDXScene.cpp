@@ -67,7 +67,7 @@ D3D12_GPU_VIRTUAL_ADDRESS VolumeRaytracer::Renderer::DX::VRDXScene::CopySceneCon
 	constantBufferData.cameraPosition = CameraPosition;
 	constantBufferData.voxelAxisCount = VoxelCountAlongAxis;
 	constantBufferData.volumeExtend = VolumeExtends;
-	constantBufferData.distanceBtwVoxels = (VolumeExtends * 2) / VoxelCountAlongAxis;
+	constantBufferData.distanceBtwVoxels = (VolumeExtends * 2) / (VoxelCountAlongAxis - 1);
 
 	XMVECTOR det;
 	constantBufferData.viewMatrixInverted = XMMatrixInverse(&det, ViewMatrix);
@@ -127,8 +127,8 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::BuildVoxelVolume(Voxel::VVoxelSce
 	for (const Voxel::VVoxelIteratorElement& voxel : *scene)
 	{
 		UINT rIndex = voxel.Index * 4;
-		pixels[rIndex] = voxel.Voxel.Material > 0 ? 255 : 0;
-		pixels[rIndex + 1] = 0;
+		pixels[rIndex] = voxel.Voxel.Material > 0 ? 50 : 0;
+		pixels[rIndex + 1] = (uint8_t)voxel.Voxel.Density;
 		pixels[rIndex + 2] = 0;
 		pixels[rIndex + 3] = 0;
 	}

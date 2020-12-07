@@ -104,6 +104,12 @@ void VolumeRaytracer::Voxel::VVoxelScene::Initialize()
 	if (GetSize() > 0)
 	{
 		VoxelArr = new VVoxel[GetVoxelCount()];
+
+		for (unsigned int i = 0; i < GetVoxelCount(); i++)
+		{
+			VoxelArr[i].Material = 0u;
+			VoxelArr[i].Density = 1;
+		}
 	}
 	else
 	{

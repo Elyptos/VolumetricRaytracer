@@ -78,7 +78,7 @@ void VolumeRaytracer::Renderer::DX::VDXTexture3D::Commit()
 
 DXGI_FORMAT VolumeRaytracer::Renderer::DX::VDXTexture3D::GetDXGIFormat() const
 {
-	return DXGI_FORMAT_R8G8B8A8_UNORM;
+	return DXGI_FORMAT_R8G8B8A8_SNORM;
 }
 
 VolumeRaytracer::Renderer::DX::CPtr<ID3D12Resource> VolumeRaytracer::Renderer::DX::VDXTexture3D::GetDXUploadResource() const
