@@ -62,6 +62,7 @@ namespace VolumeRaytracer
 
 			private:
 				void ProcessKeyDown(WPARAM key);
+				void ProcessKeyUp(WPARAM key);
 				void ProcessAxisEvents();
 
 				void RecenterMouseInWindow();

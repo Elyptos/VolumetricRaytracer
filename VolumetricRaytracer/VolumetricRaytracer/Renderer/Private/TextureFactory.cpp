@@ -19,6 +19,7 @@
 
 #include "DXTextureCube.h"
 #include "DXTexture3D.h"
+#include "DXTexture3DFloat.h"
 #include "DirectXTex.h"
 #include "DXRenderer.h"
 #include <comdef.h>
@@ -69,6 +70,15 @@ VolumeRaytracer::VObjectPtr<VolumeRaytracer::VTextureCube> VolumeRaytracer::Rend
 VolumeRaytracer::VObjectPtr<VolumeRaytracer::VTexture3D> VolumeRaytracer::Renderer::VTextureFactory::CreateTexture3D(std::weak_ptr<VRenderer> renderer, const size_t& width, const size_t& height, const size_t& depth, const size_t& mipLevels)
 {
 	VObjectPtr<VolumeRaytracer::VTexture3D> res = VObject::CreateObject<DX::VDXTexture3D>(width, height, depth, mipLevels);
+
+	renderer.lock()->InitializeTexture(res);
+
+	return res;
+}
+
+VolumeRaytracer::VObjectPtr<VolumeRaytracer::VTexture3DFloat> VolumeRaytracer::Renderer::VTextureFactory::CreateTexture3DFloat(std::weak_ptr<VRenderer> renderer, const size_t& width, const size_t& height, const size_t& depth, const size_t& mipLevels)
+{
+	VObjectPtr<VolumeRaytracer::VTexture3DFloat> res = VObject::CreateObject<DX::VDXTexture3DFloat>(width, height, depth, mipLevels);
 
 	renderer.lock()->InitializeTexture(res);
 

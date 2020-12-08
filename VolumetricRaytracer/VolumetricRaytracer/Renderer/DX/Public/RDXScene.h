@@ -33,7 +33,7 @@ namespace VolumeRaytracer
 			class VDXRenderer;
 			class VDXDescriptorHeap;
 			class VDXTextureCube;
-			class VDXTexture3D;
+			class VDXTexture3DFloat;
 
 			class VRDXScene : public VRScene
 			{
@@ -83,7 +83,7 @@ namespace VolumeRaytracer
 				std::vector<CPtr<ID3D12Resource>> SceneConstantBuffers;
 				std::vector<uint8_t*> SceneConstantBufferDataPtrs;
 
-				VObjectPtr<VDXTexture3D> SceneVolume = nullptr;
+				VObjectPtr<VDXTexture3DFloat> SceneVolume = nullptr;
 				
 				//D3D12_PLACED_SUBRESOURCE_FOOTPRINT UploadBufferFootprint;
 				//D3D12_GPU_DESCRIPTOR_HANDLE SceneVolumeTextureGPUHandle;

@@ -29,6 +29,8 @@ namespace VolumeRaytracer
 			VRenderTarget() = default;
 			virtual ~VRenderTarget();
 
+			virtual void GetPixels(const size_t& mipLevel, uint8_t*& outPixelArray, size_t* outArraySize) = 0;
+
 			virtual void Release();
 			virtual void Resize(unsigned int width, unsigned int height) const = 0;
 

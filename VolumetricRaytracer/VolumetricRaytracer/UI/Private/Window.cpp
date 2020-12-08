@@ -70,7 +70,10 @@ void VolumeRaytracer::UI::VWindow::Close()
 
 void VolumeRaytracer::UI::VWindow::Tick(const float& deltaSeconds)
 {
-	
+	if (IsWindowOpen())
+	{
+		ProcessKeyboardStates();
+	}
 }
 
 bool VolumeRaytracer::UI::VWindow::IsWindowOpen() const
@@ -116,7 +119,12 @@ void VolumeRaytracer::UI::VWindow::CloseWindow()
 
 void VolumeRaytracer::UI::VWindow::OnKeyPressed(const EVKeyType& key)
 {
-	OnKeyPressedEvent(key);
+	PressedKeys.insert(key);
+}
+
+void VolumeRaytracer::UI::VWindow::OnKeyReleased(const EVKeyType& key)
+{
+	PressedKeys.erase(key);
 }
 
 void VolumeRaytracer::UI::VWindow::OnAxisInput(const EVAxisType& axis, const float& delta)
@@ -147,6 +155,14 @@ void VolumeRaytracer::UI::VWindow::OnSizeChanged(const unsigned int& width, cons
 	if (!Renderer.expired())
 	{
 		Renderer.lock()->ResizeRenderOutput(width, height);
+	}
+}
+
+void VolumeRaytracer::UI::VWindow::ProcessKeyboardStates()
+{
+	for (const auto& keyState : PressedKeys)
+	{
+		OnKeyPressedEvent(keyState);
 	}
 }
 

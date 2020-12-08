@@ -16,6 +16,7 @@
 
 #include <string>
 #include <boost/signals2.hpp>
+#include <boost/unordered_set.hpp>
 #include "Object.h"
 #include "Input/InputTypes.h"
 
@@ -69,6 +70,7 @@ namespace VolumeRaytracer
 			virtual void CloseWindow();
 
 			virtual void OnKeyPressed(const EVKeyType& key);
+			virtual void OnKeyReleased(const EVKeyType& key);
 			virtual void OnAxisInput(const EVAxisType& axis, const float& delta);
 
 			virtual bool AttachToRenderer(Renderer::VRenderer* renderer) = 0;
@@ -82,6 +84,8 @@ namespace VolumeRaytracer
 
 			virtual void OnSizeChanged(const unsigned int& width, const unsigned int& height);
 
+			void ProcessKeyboardStates();
+
 		private:
 			bool WindowOpen = false;
 
@@ -92,6 +96,8 @@ namespace VolumeRaytracer
 
 			KeyInputDelegate OnKeyPressedEvent;
 			AxisDelegate OnAxisInputEvent;
+
+			boost::unordered_set<EVKeyType> PressedKeys;
 		};
 	}
 }

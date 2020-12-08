@@ -65,6 +65,7 @@ namespace VolumeRaytracer
 			unsigned int GetSize() const;
 			unsigned int GetVoxelCount() const;
 			float GetVolumeExtends() const;
+			float GetCellSize() const;
 
 			VAABB GetSceneBounds() const;
 
@@ -77,6 +78,8 @@ namespace VolumeRaytracer
 			void SetEnvironmentTexture(VObjectPtr<VTextureCube> texture);
 			VObjectPtr<VTextureCube> GetEnvironmentTexture() const;
 
+			VVector VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
+
 			VVoxelSceneIterator begin();
 			VVoxelSceneIterator end();
 
@@ -87,6 +90,7 @@ namespace VolumeRaytracer
 		private:
 			unsigned int Size = 0;
 			float VolumeExtends = 0;
+			float CellSize = 0;
 			VVoxel* VoxelArr = nullptr;
 
 			VObjectPtr<Scene::VCamera> Camera;

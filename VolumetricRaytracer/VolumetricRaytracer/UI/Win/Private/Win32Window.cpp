@@ -142,6 +142,11 @@ LRESULT CALLBACK VolumeRaytracer::UI::Win32::VWin32Window::MessageHandler(HWND h
 		
 		return 0;
 	}
+	case WM_KEYUP:
+	{
+		ProcessKeyUp(p1);
+		return 0;
+	}
 	case WM_MOUSEMOVE:
 	{
 		if (IsMouseLocked)
@@ -344,6 +349,34 @@ void VolumeRaytracer::UI::Win32::VWin32Window::ProcessKeyDown(WPARAM key)
 			OnKeyPressed(EVKeyType::D);
 		}
 		break;
+	}
+}
+
+void VolumeRaytracer::UI::Win32::VWin32Window::ProcessKeyUp(WPARAM key)
+{
+	switch (key)
+	{
+	break;
+	case EVWin32KeyCode::W:
+	{
+		OnKeyReleased(EVKeyType::W);
+	}
+	break;
+	case EVWin32KeyCode::A:
+	{
+		OnKeyReleased(EVKeyType::A);
+	}
+	break;
+	case EVWin32KeyCode::S:
+	{
+		OnKeyReleased(EVKeyType::S);
+	}
+	break;
+	case EVWin32KeyCode::D:
+	{
+		OnKeyReleased(EVKeyType::D);
+	}
+	break;
 	}
 }
 

@@ -12,26 +12,19 @@
 	copies or substantial portions of the Software.
 */
 
-#pragma once
+#include "Textures/Texture3DFloat.h"
 
-#include "Texture.h"
-
-namespace VolumeRaytracer
+size_t VolumeRaytracer::VTexture3DFloat::GetWidth() const
 {
-	class VTexture3D : public VTexture
-	{
-	public:
-		virtual ~VTexture3D() = default;
+	return Width;
+}
 
-		virtual void GetPixels(const size_t& mipLevel, uint8_t*& outPixelArray, size_t* outArraySize) = 0;
+size_t VolumeRaytracer::VTexture3DFloat::GetHeight() const
+{
+	return Height;
+}
 
-		size_t GetWidth() const;
-		size_t GetHeight() const;
-		size_t GetDepth() const;
-
-	protected:
-		size_t Width;
-		size_t Height;
-		size_t Depth;
-	};
+size_t VolumeRaytracer::VTexture3DFloat::GetDepth() const
+{
+	return Depth;
 }

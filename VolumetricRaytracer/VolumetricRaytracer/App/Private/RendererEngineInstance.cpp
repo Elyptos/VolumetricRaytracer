@@ -59,10 +59,10 @@ void VolumeRaytracer::App::RendererEngineInstance::OnEngineShutdown()
 
 void VolumeRaytracer::App::RendererEngineInstance::OnEngineUpdate(const float& deltaTime)
 {
-	VVector currentPos = Scene->GetSceneCamera()->Position;
-	currentPos = VVector::Lerp(currentPos, TargetCameraLocation, deltaTime * 10.f);
+	//VVector currentPos = Scene->GetSceneCamera()->Position;
+	//currentPos = VVector::Lerp(currentPos, TargetCameraLocation, deltaTime * 10.f);
 
-	Scene->GetSceneCamera()->Position = currentPos;
+	//Scene->GetSceneCamera()->Position = currentPos;
 
 	std::wstringstream windowTitle;
 
@@ -93,7 +93,7 @@ void VolumeRaytracer::App::RendererEngineInstance::OnKeyDown(const VolumeRaytrac
 	if(Scene == nullptr || Engine == nullptr)
 		return;
 
-	const float movementSpeed = 100000.f;
+	const float movementSpeed = 100.f;
 	VolumeRaytracer::VVector velocity;
 
 	VolumeRaytracer::VVector forward = Scene->GetSceneCamera()->Rotation.GetForwardVector();
@@ -123,7 +123,7 @@ void VolumeRaytracer::App::RendererEngineInstance::OnKeyDown(const VolumeRaytrac
 		break;
 	}
 
-	TargetCameraLocation = Scene->GetSceneCamera()->Position + velocity;
+	Scene->GetSceneCamera()->Position = Scene->GetSceneCamera()->Position + velocity;
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::OnAxisInput(const VolumeRaytracer::UI::EVAxisType& axis, const float& delta)
@@ -149,23 +149,48 @@ void VolumeRaytracer::App::RendererEngineInstance::OnAxisInput(const VolumeRaytr
 
 void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
-	Scene = VObject::CreateObject<Voxel::VVoxelScene>(2, 100.f);
+	Scene = VObject::CreateObject<Voxel::VVoxelScene>(40, 200.f);
 	Scene->GetSceneCamera()->Position = VolumeRaytracer::VVector(300.f, 0.f, 100.f);
 	TargetCameraLocation = Scene->GetSceneCamera()->Position;
 	Scene->GetSceneCamera()->Rotation = VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f));
 
 	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
 
-	Voxel::VVoxel voxelToUse;
+	/*Voxel::VVoxel voxelToUse;
 	voxelToUse.Material = 1;
-	voxelToUse.Density = -10;
+	voxelToUse.Density = -1;
 
-	Scene->SetVoxel(1, 1, 1, voxelToUse);
+	Scene->SetVoxel(1, 1, 1, voxelToUse);*/
 	//Scene->SetVoxel(6, 5, 5, voxelToUse);
 	//Scene->SetVoxel(4, 5, 5, voxelToUse);
 	//Scene->SetVoxel(5, 6, 5, voxelToUse);
 	//Scene->SetVoxel(5, 4, 5, voxelToUse);
 	//Scene->SetVoxel(5, 5, 6, voxelToUse);
 	//Scene->SetVoxel(5, 5, 4, voxelToUse);
+
+	for (unsigned int x = 0; x < Scene->GetSize(); x++)
+	{
+		for (unsigned int y = 0; y < Scene->GetSize(); y++)
+		{
+			for (unsigned int z = 0; z < Scene->GetSize(); z++)
+			{
+				VVector voxelPos = Scene->VoxelIndexToWorldPosition(x, y, z);
+
+				float density = voxelPos.Length() - 80.f;
+
+				if (density <= 0)
+				{
+					int i = 0;
+				}
+
+				Voxel::VVoxel voxel;
+
+				voxel.Material = density <= 0 ? 1 : 0;
+				voxel.Density = density;
+
+				Scene->SetVoxel(x, y, z, voxel);
+			}
+		}
+	}
 }
 

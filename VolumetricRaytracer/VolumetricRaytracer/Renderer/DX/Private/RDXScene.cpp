@@ -21,7 +21,7 @@
 #include "DXTextureCube.h"
 #include "DXConstants.h"
 #include "TextureFactory.h"
-#include "DXTexture3D.h"
+#include "DXTexture3DFloat.h"
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::InitFromScene(Voxel::VVoxelScene* scene)
 {
@@ -115,22 +115,18 @@ VolumeRaytracer::Renderer::DX::VDXDescriptorHeap* VolumeRaytracer::Renderer::DX:
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::BuildVoxelVolume(Voxel::VVoxelScene* scene, std::weak_ptr<VDXRenderer> renderer)
 {
-	SceneVolume = std::static_pointer_cast<VDXTexture3D>(VolumeRaytracer::Renderer::VTextureFactory::CreateTexture3D(renderer, scene->GetSize(), scene->GetSize(), scene->GetSize(), 1));
+	SceneVolume = std::static_pointer_cast<VDXTexture3DFloat>(VolumeRaytracer::Renderer::VTextureFactory::CreateTexture3DFloat(renderer, scene->GetSize(), scene->GetSize(), scene->GetSize(), 1));
 
 	std::shared_ptr<VDXRenderer> rendererPtr = renderer.lock();
 
-	uint8_t* pixels = nullptr;
+	float* pixels = nullptr;
 	size_t arraySize = 0;
 
 	SceneVolume->GetPixels(0, pixels, &arraySize);
 
 	for (const Voxel::VVoxelIteratorElement& voxel : *scene)
 	{
-		UINT rIndex = voxel.Index * 4;
-		pixels[rIndex] = voxel.Voxel.Material > 0 ? 50 : 0;
-		pixels[rIndex + 1] = (uint8_t)voxel.Voxel.Density;
-		pixels[rIndex + 2] = 0;
-		pixels[rIndex + 3] = 0;
+		pixels[voxel.Index] = voxel.Voxel.Density;
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle;

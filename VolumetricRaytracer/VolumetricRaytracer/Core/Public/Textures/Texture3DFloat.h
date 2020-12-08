@@ -18,12 +18,12 @@
 
 namespace VolumeRaytracer
 {
-	class VTexture3D : public VTexture
+	class VTexture3DFloat : public VTexture
 	{
 	public:
-		virtual ~VTexture3D() = default;
+		virtual ~VTexture3DFloat() = default;
 
-		virtual void GetPixels(const size_t& mipLevel, uint8_t*& outPixelArray, size_t* outArraySize) = 0;
+		virtual void GetPixels(const size_t& mipLevel, float*& outPixelArray, size_t* outArraySize) = 0;
 
 		size_t GetWidth() const;
 		size_t GetHeight() const;

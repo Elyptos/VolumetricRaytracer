@@ -21,6 +21,7 @@ namespace VolumeRaytracer
 {
 	class VTexture;
 	class VTexture3D;
+	class VTexture3DFloat;
 	class VTextureCube;
 
 	namespace Renderer
@@ -33,6 +34,7 @@ namespace VolumeRaytracer
 			static VObjectPtr<VTextureCube> LoadTextureCubeFromFile(std::weak_ptr<VRenderer> renderer, const std::wstring& path);
 			
 			static VObjectPtr<VTexture3D> CreateTexture3D(std::weak_ptr<VRenderer> renderer, const size_t& width, const size_t& height, const size_t& depth, const size_t& mipLevels);
+			static VObjectPtr<VTexture3DFloat> CreateTexture3DFloat(std::weak_ptr<VRenderer> renderer, const size_t& width, const size_t& height, const size_t& depth, const size_t& mipLevels);
 		};
 	}
 }

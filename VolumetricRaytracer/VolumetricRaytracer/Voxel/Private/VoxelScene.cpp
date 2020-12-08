@@ -18,7 +18,9 @@
 
 VolumeRaytracer::Voxel::VVoxelScene::VVoxelScene(const unsigned int& size, const float& volumeExtends) :Size(size),
 	VolumeExtends(volumeExtends)
-{}
+{
+	CellSize = (volumeExtends * 2) / ((float)size - 1.f);
+}
 
 unsigned int VolumeRaytracer::Voxel::VVoxelScene::GetSize() const
 {
@@ -33,6 +35,11 @@ unsigned int VolumeRaytracer::Voxel::VVoxelScene::GetVoxelCount() const
 float VolumeRaytracer::Voxel::VVoxelScene::GetVolumeExtends() const
 {
 	return VolumeExtends;
+}
+
+float VolumeRaytracer::Voxel::VVoxelScene::GetCellSize() const
+{
+	return CellSize;
 }
 
 VolumeRaytracer::VAABB VolumeRaytracer::Voxel::VVoxelScene::GetSceneBounds() const
@@ -85,6 +92,13 @@ void VolumeRaytracer::Voxel::VVoxelScene::SetEnvironmentTexture(VObjectPtr<VText
 VolumeRaytracer::VObjectPtr<VolumeRaytracer::VTextureCube> VolumeRaytracer::Voxel::VVoxelScene::GetEnvironmentTexture() const
 {
 	return EnvironmentTexture;
+}
+
+VolumeRaytracer::VVector VolumeRaytracer::Voxel::VVoxelScene::VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const
+{
+	VVector volumeOrigin = VVector::ONE * -VolumeExtends;
+
+	return VVector(xPos, yPos, zPos) * CellSize + volumeOrigin;
 }
 
 VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator VolumeRaytracer::Voxel::VVoxelScene::begin()
