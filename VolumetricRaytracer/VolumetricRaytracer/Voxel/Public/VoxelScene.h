@@ -16,6 +16,7 @@
 
 #include "Voxel.h"
 #include "Object.h"
+#include "Material.h"
 #include "AABB.h"
 #include <string>
 #include <iterator>
@@ -27,6 +28,7 @@ namespace VolumeRaytracer
 	namespace Scene
 	{
 		class VCamera;
+		class VLight;
 	}
 
 	namespace Voxel
@@ -70,6 +72,7 @@ namespace VolumeRaytracer
 			VAABB GetSceneBounds() const;
 
 			VObjectPtr<Scene::VCamera> GetSceneCamera() const;
+			VObjectPtr<Scene::VLight> GetDirectionalLight() const;
 
 			void SetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos, const VVoxel& voxel);
 			VVoxel GetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
@@ -79,6 +82,9 @@ namespace VolumeRaytracer
 			VObjectPtr<VTextureCube> GetEnvironmentTexture() const;
 
 			VVector VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
+
+			void SetMaterial(const VMaterial& material);
+			VMaterial GetMaterial() const;
 
 			VVoxelSceneIterator begin();
 			VVoxelSceneIterator end();
@@ -93,7 +99,10 @@ namespace VolumeRaytracer
 			float CellSize = 0;
 			VVoxel* VoxelArr = nullptr;
 
+			VMaterial GeometryMaterial;
+
 			VObjectPtr<Scene::VCamera> Camera;
+			VObjectPtr<Scene::VLight> DirectionalLight;
 
 			VObjectPtr<VTextureCube> EnvironmentTexture;
 		};

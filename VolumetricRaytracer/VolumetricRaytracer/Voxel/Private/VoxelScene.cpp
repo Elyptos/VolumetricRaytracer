@@ -15,6 +15,7 @@
 #include "VoxelScene.h"
 #include "MathHelpers.h"
 #include "Camera.h"
+#include "Light.h"
 
 VolumeRaytracer::Voxel::VVoxelScene::VVoxelScene(const unsigned int& size, const float& volumeExtends) :Size(size),
 	VolumeExtends(volumeExtends)
@@ -55,6 +56,11 @@ VolumeRaytracer::VAABB VolumeRaytracer::Voxel::VVoxelScene::GetSceneBounds() con
 VolumeRaytracer::VObjectPtr<VolumeRaytracer::Scene::VCamera> VolumeRaytracer::Voxel::VVoxelScene::GetSceneCamera() const
 {
 	return Camera;
+}
+
+VolumeRaytracer::VObjectPtr<VolumeRaytracer::Scene::VLight> VolumeRaytracer::Voxel::VVoxelScene::GetDirectionalLight() const
+{
+	return DirectionalLight;
 }
 
 void VolumeRaytracer::Voxel::VVoxelScene::SetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos, const VVoxel& voxel)
@@ -101,6 +107,16 @@ VolumeRaytracer::VVector VolumeRaytracer::Voxel::VVoxelScene::VoxelIndexToWorldP
 	return VVector(xPos, yPos, zPos) * CellSize + volumeOrigin;
 }
 
+void VolumeRaytracer::Voxel::VVoxelScene::SetMaterial(const VMaterial& material)
+{
+	GeometryMaterial = material;
+}
+
+VolumeRaytracer::VMaterial VolumeRaytracer::Voxel::VVoxelScene::GetMaterial() const
+{
+	return GeometryMaterial;
+}
+
 VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator VolumeRaytracer::Voxel::VVoxelScene::begin()
 {
 	return VVoxelSceneIterator(*this, 0);
@@ -114,6 +130,7 @@ VolumeRaytracer::Voxel::VVoxelScene::VVoxelSceneIterator VolumeRaytracer::Voxel:
 void VolumeRaytracer::Voxel::VVoxelScene::Initialize()
 {
 	Camera = VObject::CreateObject<Scene::VCamera>();
+	DirectionalLight = VObject::CreateObject<Scene::VLight>();
 
 	if (GetSize() > 0)
 	{

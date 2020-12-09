@@ -19,6 +19,8 @@
 
 #include <d3d12.h>
 
+#define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
+
 namespace VolumeRaytracer
 {
 	namespace Renderer
