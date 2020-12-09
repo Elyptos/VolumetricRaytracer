@@ -25,6 +25,8 @@ SamplerState g_envMapSampler : register(s0);
 RWTexture2D<float4> g_renderTarget : register(u0);
 ConstantBuffer<VolumeRaytracer::VSceneConstantBuffer> g_sceneCB : register(b0);
 
+static const float PI = 3.141592f;
+
 struct Ray
 {
 	float3 origin;
@@ -72,6 +74,36 @@ float4 TraceRadianceRay(in Ray ray, in uint currentRayRecursionDepth)
 	TraceRay(g_scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xff, 0, 2, 0, rayDesc, rayPayload);
 
 	return rayPayload.color;
+}
+
+bool TraceShadowRay(in Ray ray, in uint currentRayRecursionDepth)
+{
+	if (currentRayRecursionDepth >= MAX_RAY_RECURSION_DEPTH)
+	{
+		return false;
+	}
+
+	RayDesc rayDesc;
+	rayDesc.Origin = ray.origin;
+	rayDesc.Direction = ray.direction;
+
+	rayDesc.TMin = 0;
+	rayDesc.TMax = 600;
+
+	VolumeRaytracer::VShadowRayPayload rayPayload = { true };
+
+	TraceRay(g_scene,
+		RAY_FLAG_CULL_BACK_FACING_TRIANGLES
+		| RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH
+		| RAY_FLAG_FORCE_OPAQUE             // ~skip any hit shaders
+		| RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, // ~skip closest hit shaders,
+		0xff,
+		1,
+		2,
+		1,
+		rayDesc, rayPayload);
+
+	return rayPayload.hit;
 }
 
 bool DetermineRayAABBIntersection(in Ray ray, in float3 aabb[2], out float tEnter, out float tExit)
@@ -553,7 +585,18 @@ void VRRaygen()
 [shader("closesthit")]
 void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytracer::VPrimitiveAttributes attr)
 {
-	rayPayload.color = float4(attr.normal, 1);
+	float3 hitPosition = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
+
+	//Ray shadowRay = { hitPosition, -g_sceneCB.dirLightDirection };
+
+	//bool shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth);
+
+	float diffuse = (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);
+
+	rayPayload.color.rgb = float3(1.f, 1.f, 1.f) * diffuse;
+	rayPayload.color.a = 1.f;
+
+	//rayPayload.color = float4(1.f, 1.f, 1.f, 1.f) * (shadowRayHit ? 0.35f : 1.f);
 	//rayPayload.color = float4(abs((attr.normal + 1) * 0.5), 1);
 }
 
@@ -616,7 +659,7 @@ void VRIntersection()
 					if (GetSurfaceIntersectionT(ray, voxelPos, cellEnter, cellExit, tHit))
 					{
 						VolumeRaytracer::VPrimitiveAttributes attr;
-						attr.normal = float3(tHit, tHit, tHit) / tMax;
+						attr.normal = GetNormal(voxelPos, WorldSpaceToBottomLevelCellSpace(voxelPos, GetPositionAlongRay(ray, tHit)));
 
 						ReportHit(tHit, 0, attr);
 					}

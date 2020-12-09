@@ -20,6 +20,7 @@
 #include "Engine.h"
 #include "Renderer.h"
 #include "Camera.h"
+#include "Light.h"
 #include "Quat.h"
 #include "VoxelScene.h"
 
@@ -155,18 +156,10 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 	Scene->GetSceneCamera()->Rotation = VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f));
 
 	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
-
-	/*Voxel::VVoxel voxelToUse;
-	voxelToUse.Material = 1;
-	voxelToUse.Density = -1;
-
-	Scene->SetVoxel(1, 1, 1, voxelToUse);*/
-	//Scene->SetVoxel(6, 5, 5, voxelToUse);
-	//Scene->SetVoxel(4, 5, 5, voxelToUse);
-	//Scene->SetVoxel(5, 6, 5, voxelToUse);
-	//Scene->SetVoxel(5, 4, 5, voxelToUse);
-	//Scene->SetVoxel(5, 5, 6, voxelToUse);
-	//Scene->SetVoxel(5, 5, 4, voxelToUse);
+	
+	Scene->GetDirectionalLight()->Rotation = VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
+												* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 135.f * (M_PI / 180.f));
+	Scene->GetDirectionalLight()->IlluminationStrength = 5.f;
 
 	for (unsigned int x = 0; x < Scene->GetSize(); x++)
 	{

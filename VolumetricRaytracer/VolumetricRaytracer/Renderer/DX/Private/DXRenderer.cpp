@@ -919,6 +919,7 @@ VolumeRaytracer::Renderer::DX::CPtr<ID3D12Resource> VolumeRaytracer::Renderer::D
 	}
 
 	shaderTableRes->Unmap(0, nullptr);
+	outShaderTableSize = shaderTableEntrySize;
 
 	return shaderTableRes;
 }
