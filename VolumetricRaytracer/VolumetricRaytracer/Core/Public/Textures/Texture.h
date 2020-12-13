@@ -25,7 +25,6 @@ namespace VolumeRaytracer
 		virtual ~VTexture() = default;
 		size_t GetMipCount() const;
 
-		virtual void GetPixels(const size_t& mipLevel, uint8_t*& outPixelArray, size_t* outArraySize) = 0;
 		virtual size_t GetPixelCount() = 0;
 		virtual void Commit() = 0;
 

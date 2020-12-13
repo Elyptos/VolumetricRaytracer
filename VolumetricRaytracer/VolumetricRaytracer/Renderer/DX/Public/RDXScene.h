@@ -16,6 +16,7 @@
 
 #include "RScene.h"
 #include "DXHelper.h"
+#include "Material.h"
 #include <vector>
 #include <DirectXMath.h>
 
@@ -33,7 +34,7 @@ namespace VolumeRaytracer
 			class VDXRenderer;
 			class VDXDescriptorHeap;
 			class VDXTextureCube;
-			class VDXTexture3D;
+			class VDXTexture3DFloat;
 
 			class VRDXScene : public VRScene
 			{
@@ -44,6 +45,7 @@ namespace VolumeRaytracer
 				void BuildStaticResources(VDXRenderer* renderer);
 
 				D3D12_GPU_VIRTUAL_ADDRESS CopySceneConstantBufferToGPU(const UINT& backBufferIndex);
+				D3D12_GPU_VIRTUAL_ADDRESS CopyGeometryConstantBufferToGPU(const UINT& backBufferIndex);
 
 				void SyncWithScene(Voxel::VVoxelScene* scene) override;
 
@@ -53,18 +55,15 @@ namespace VolumeRaytracer
 
 				CPtr<ID3D12Resource> GetSceneVolume() const;
 
-				//void BuildVoxelVolume(CPtr<ID3D12GraphicsCommandList5> commandList);
 				void BuildVoxelVolume(Voxel::VVoxelScene* scene, std::weak_ptr<VDXRenderer> renderer);
 
 			private:
 				void InitEnvironmentMap(VDXRenderer* renderer);
 				void AllocSceneConstantBuffer(VDXRenderer* renderer);
-				//void AllocSceneVolumeBuffer(VDXRenderer* renderer);
+				void AllocGeometryConstantBuffer(VDXRenderer* renderer);
 				void BuildGeometryAABB(VDXRenderer* renderer);
 				void BuildAccelerationStructure(VDXRenderer* renderer);
 				void CleanupStaticResources();
-
-				//void PrepareVoxelVolume(Voxel::VVoxelScene* scene);
 
 				VDXAccelerationStructureBuffers BuildBottomLevelAccelerationStructures(VDXRenderer* renderer, D3D12_RAYTRACING_GEOMETRY_DESC& geometryDesc);
 				VDXAccelerationStructureBuffers BuildTopLevelAccelerationStructures(VDXRenderer* renderer, const VDXAccelerationStructureBuffers& bottomLevelAS);
@@ -83,14 +82,19 @@ namespace VolumeRaytracer
 				std::vector<CPtr<ID3D12Resource>> SceneConstantBuffers;
 				std::vector<uint8_t*> SceneConstantBufferDataPtrs;
 
-				VObjectPtr<VDXTexture3D> SceneVolume = nullptr;
-				
-				//D3D12_PLACED_SUBRESOURCE_FOOTPRINT UploadBufferFootprint;
-				//D3D12_GPU_DESCRIPTOR_HANDLE SceneVolumeTextureGPUHandle;
+				std::vector<CPtr<ID3D12Resource>> GeometryConstantBuffers;
+				std::vector<uint8_t*> GeometryConstantBufferDataPtrs;
+
+				VObjectPtr<VDXTexture3DFloat> SceneVolume = nullptr;
 
 				DirectX::XMMATRIX ViewMatrix;
 				DirectX::XMMATRIX ProjectionMatrix;
 				DirectX::XMVECTOR CameraPosition;
+
+				float DirectionalLightStrength;
+				DirectX::XMFLOAT3 DirectionalLightDirection;
+
+				VMaterial GeometryMaterial;
 
 				VObjectPtr<VDXTextureCube> EnvironmentMap = nullptr;
 			};

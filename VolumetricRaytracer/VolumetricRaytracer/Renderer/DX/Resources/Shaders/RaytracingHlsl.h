@@ -52,9 +52,16 @@ namespace VolumeRaytracer
 		XMMATRIX viewMatrixInverted;
 		XMMATRIX projectionMatrixInverted;
 		XMVECTOR cameraPosition;
+		XMFLOAT3 dirLightDirection;
+		float dirLightStrength;
 		UINT voxelAxisCount;
 		float volumeExtend;
 		float distanceBtwVoxels;
+	};
+
+	struct VGeometryConstantBuffer
+	{
+		XMFLOAT4 Albedo;
 	};
 
 	static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);

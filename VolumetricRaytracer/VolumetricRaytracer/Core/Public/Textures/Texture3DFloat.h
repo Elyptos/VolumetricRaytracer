@@ -13,33 +13,25 @@
 */
 
 #pragma once
-#include "Vector.h"
-#include <Eigen/Geometry>
+
+#include "Texture.h"
 
 namespace VolumeRaytracer
 {
-	struct VQuat
+	class VTexture3DFloat : public VTexture
 	{
 	public:
-		VQuat();
-		VQuat(const float& x, const float& y, const float& z, const float& w);
-		VQuat(const Eigen::Quaternionf eigenQuat);
+		virtual ~VTexture3DFloat() = default;
 
-		static VQuat FromAxisAngle(const VVector& axis, const float& angle);
+		virtual void GetPixels(const size_t& mipLevel, float*& outPixelArray, size_t* outArraySize) = 0;
 
-		VQuat Inverse() const;
+		size_t GetWidth() const;
+		size_t GetHeight() const;
+		size_t GetDepth() const;
 
-		VVector GetUpVector();
-		VVector GetForwardVector();
-		VVector GetRightVector();
-
-		VVector operator*(const VVector& vec) const;
-		VQuat operator*(const VQuat& other) const;
-
-	public:
-		static const VQuat IDENTITY;
-
-	private:
-		Eigen::Quaternionf EigenQuat;
+	protected:
+		size_t Width;
+		size_t Height;
+		size_t Depth;
 	};
 }

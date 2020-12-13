@@ -23,6 +23,8 @@ namespace VolumeRaytracer
 	public:
 		virtual ~VTextureCube() = default;
 
+		virtual void GetPixels(const size_t& mipLevel, uint8_t*& outPixelArray, size_t* outArraySize) = 0;
+
 		size_t GetWidth() const;
 		size_t GetHeight() const;
 		size_t GetArraySize() const;

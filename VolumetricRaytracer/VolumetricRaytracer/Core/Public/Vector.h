@@ -30,6 +30,10 @@ namespace VolumeRaytracer
 		float Dot(const VVector& other) const;
 		VVector Cross(const VVector& other) const;
 
+		VVector Abs() const;
+		static VVector Max(const VVector& vec, const float& scalar);
+		static VVector Min(const VVector& vec, const float& scalar);
+
 		void Normalize();
 		VVector GetNormalized() const;
 

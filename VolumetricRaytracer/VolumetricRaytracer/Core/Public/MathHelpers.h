@@ -21,5 +21,7 @@ namespace VolumeRaytracer
 	public:
 		static void Index1DTo3D(const unsigned int& index, const unsigned int& yCount, const unsigned int& zCount, unsigned int& outX, unsigned int& outY, unsigned int& outZ);
 		static unsigned int Index3DTo1D(const unsigned int& x, const unsigned int& y, const unsigned int& z, const unsigned int& yCount, const unsigned int& zCount);
+		static float Min(const float& a, const float& b);
+		static float Max(const float& a, const float& b);
 	};
 }

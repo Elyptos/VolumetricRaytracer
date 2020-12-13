@@ -12,34 +12,19 @@
 	copies or substantial portions of the Software.
 */
 
-#pragma once
-#include "Vector.h"
-#include <Eigen/Geometry>
+#include "Textures/Texture3DFloat.h"
 
-namespace VolumeRaytracer
+size_t VolumeRaytracer::VTexture3DFloat::GetWidth() const
 {
-	struct VQuat
-	{
-	public:
-		VQuat();
-		VQuat(const float& x, const float& y, const float& z, const float& w);
-		VQuat(const Eigen::Quaternionf eigenQuat);
+	return Width;
+}
 
-		static VQuat FromAxisAngle(const VVector& axis, const float& angle);
+size_t VolumeRaytracer::VTexture3DFloat::GetHeight() const
+{
+	return Height;
+}
 
-		VQuat Inverse() const;
-
-		VVector GetUpVector();
-		VVector GetForwardVector();
-		VVector GetRightVector();
-
-		VVector operator*(const VVector& vec) const;
-		VQuat operator*(const VQuat& other) const;
-
-	public:
-		static const VQuat IDENTITY;
-
-	private:
-		Eigen::Quaternionf EigenQuat;
-	};
+size_t VolumeRaytracer::VTexture3DFloat::GetDepth() const
+{
+	return Depth;
 }

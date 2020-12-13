@@ -16,6 +16,7 @@
 
 #include "Voxel.h"
 #include "Object.h"
+#include "Material.h"
 #include "AABB.h"
 #include <string>
 #include <iterator>
@@ -27,6 +28,7 @@ namespace VolumeRaytracer
 	namespace Scene
 	{
 		class VCamera;
+		class VLight;
 	}
 
 	namespace Voxel
@@ -65,10 +67,12 @@ namespace VolumeRaytracer
 			unsigned int GetSize() const;
 			unsigned int GetVoxelCount() const;
 			float GetVolumeExtends() const;
+			float GetCellSize() const;
 
 			VAABB GetSceneBounds() const;
 
 			VObjectPtr<Scene::VCamera> GetSceneCamera() const;
+			VObjectPtr<Scene::VLight> GetDirectionalLight() const;
 
 			void SetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos, const VVoxel& voxel);
 			VVoxel GetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
@@ -76,6 +80,11 @@ namespace VolumeRaytracer
 
 			void SetEnvironmentTexture(VObjectPtr<VTextureCube> texture);
 			VObjectPtr<VTextureCube> GetEnvironmentTexture() const;
+
+			VVector VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
+
+			void SetMaterial(const VMaterial& material);
+			VMaterial GetMaterial() const;
 
 			VVoxelSceneIterator begin();
 			VVoxelSceneIterator end();
@@ -87,9 +96,13 @@ namespace VolumeRaytracer
 		private:
 			unsigned int Size = 0;
 			float VolumeExtends = 0;
+			float CellSize = 0;
 			VVoxel* VoxelArr = nullptr;
 
+			VMaterial GeometryMaterial;
+
 			VObjectPtr<Scene::VCamera> Camera;
+			VObjectPtr<Scene::VLight> DirectionalLight;
 
 			VObjectPtr<VTextureCube> EnvironmentTexture;
 		};
