@@ -27,6 +27,8 @@ namespace VolumeRaytracer
 
 		static VQuat FromAxisAngle(const VVector& axis, const float& angle);
 
+		VQuat Inverse() const;
+
 		VVector GetUpVector();
 		VVector GetForwardVector();
 		VVector GetRightVector();

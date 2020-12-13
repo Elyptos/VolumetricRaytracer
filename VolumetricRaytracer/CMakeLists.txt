@@ -52,6 +52,9 @@ set(BOOST_LIBRARYDIR $ENV{BOOST_ROOT}/stage/lib)
 
 find_package(Boost 1.74 REQUIRED COMPONENTS filesystem)
 
+# OpenMP
+find_package(OpenMP)
+
 # Include sub-projects.
 add_subdirectory("Dependencies/DirectXTex")
 add_subdirectory ("VolumetricRaytracer")

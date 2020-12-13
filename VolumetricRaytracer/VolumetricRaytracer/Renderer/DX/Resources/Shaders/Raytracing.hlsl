@@ -408,7 +408,10 @@ void GetDensityPolynomial(in Ray ray, in int3 cellIndex, in float tIn, in float 
 
 float GetDensity(in int3 cellOriginIndex, in float3 cellPos)
 {
-	float v1 = GetCellVoxel1(cellOriginIndex);
+	if(!IsValidCell(cellOriginIndex))
+		return -1.f;
+
+	/*float v1 = GetCellVoxel1(cellOriginIndex);
 	float v2 = GetCellVoxel2(cellOriginIndex);
 	float v3 = GetCellVoxel3(cellOriginIndex);
 	float v4 = GetCellVoxel4(cellOriginIndex);
@@ -426,7 +429,26 @@ float GetDensity(in int3 cellOriginIndex, in float3 cellPos)
 	float g = v1 - v2;
 	float h = v2;
 
-	return a * cellPos.x * cellPos.y * cellPos.z + b * cellPos.y * cellPos.z + c * cellPos.x * cellPos.z + d * cellPos.x * cellPos.y + e * cellPos.y + f * cellPos.z + g * cellPos.x + h;
+	return a * cellPos.x * cellPos.y * cellPos.z + b * cellPos.y * cellPos.z + c * cellPos.x * cellPos.z + d * cellPos.x * cellPos.y + e * cellPos.y + f * cellPos.z + g * cellPos.x + h;*/
+
+	float p = 0.f;
+
+	for (int i = 0; i <= 1; i++)
+	{
+		for (int j = 0; j <= 1; j++)
+		{
+			for (int k = 0; k <= 1; k++)
+			{
+				float u = abs((1 - i) - cellPos.x);
+				float v = abs((1 - j) - cellPos.y);
+				float w = abs((1 - k) - cellPos.z);
+
+				p += (u * v * w * g_voxelVolume[cellOriginIndex + int3(i, j, k)]);
+			}
+		}
+	}
+
+	return p;
 }
 
 inline float GetDensityWithPolynomial(in float t, in float A, in float B, in float C, in float D)
@@ -538,7 +560,23 @@ bool GetSurfaceIntersectionT(in Ray ray, in int3 cellIndex, in float tIn, in flo
 
 float3 GetNormal(in int3 cellIndex, in float3 normPos)
 {
-	float v1 = GetCellVoxel1(cellIndex);
+	float x = (GetDensity(cellIndex + int3(1,0,0), normPos) - GetDensity(cellIndex - int3(1,0,0), normPos)) / (2 * g_sceneCB.distanceBtwVoxels);
+	float y = (GetDensity(cellIndex + int3(0,1,0), normPos) - GetDensity(cellIndex - int3(0,1,0), normPos)) / (2 * g_sceneCB.distanceBtwVoxels);
+	float z = (GetDensity(cellIndex + int3(0,0,1), normPos) - GetDensity(cellIndex - int3(0,0,1), normPos)) / (2 * g_sceneCB.distanceBtwVoxels);
+
+	float3 norm = float3(x,y,z);
+	bool3 nan = isnan(norm);
+
+	if (nan.x || nan.y || nan.z)
+	{
+		return float3(0, 0, 0);
+	}
+	else
+	{
+		return normalize(norm);
+	}
+
+	/*float v1 = GetCellVoxel1(cellIndex);
 	float v2 = GetCellVoxel2(cellIndex);
 	float v3 = GetCellVoxel3(cellIndex);
 	float v4 = GetCellVoxel4(cellIndex);
@@ -546,6 +584,8 @@ float3 GetNormal(in int3 cellIndex, in float3 normPos)
 	float v6 = GetCellVoxel6(cellIndex);
 	float v7 = GetCellVoxel7(cellIndex);
 	float v8 = GetCellVoxel8(cellIndex);
+
+
 
 	float a = v3 + v6 + v1 + v8 - v4 - v7 - v5 - v2;
 	float b = v7 - v6 - v3 + v2;
@@ -568,7 +608,9 @@ float3 GetNormal(in int3 cellIndex, in float3 normPos)
 	else
 	{
 		return norm;
-	}
+	}*/
+
+
 }
 
 [shader("raygeneration")]

@@ -23,6 +23,7 @@
 #include "Light.h"
 #include "Quat.h"
 #include "VoxelScene.h"
+#include "DensityGenerator.h"
 
 #define _USE_MATH_DEFINES
 
@@ -150,7 +151,7 @@ void VolumeRaytracer::App::RendererEngineInstance::OnAxisInput(const VolumeRaytr
 
 void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
-	Scene = VObject::CreateObject<Voxel::VVoxelScene>(40, 200.f);
+	Scene = VObject::CreateObject<Voxel::VVoxelScene>(140, 200.f);
 	Scene->GetSceneCamera()->Position = VolumeRaytracer::VVector(300.f, 0.f, 100.f);
 	TargetCameraLocation = Scene->GetSceneCamera()->Position;
 	Scene->GetSceneCamera()->Rotation = VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f));
@@ -161,20 +162,50 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 												* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 135.f * (M_PI / 180.f));
 	Scene->GetDirectionalLight()->IlluminationStrength = 5.f;
 
-	for (unsigned int x = 0; x < Scene->GetSize(); x++)
+	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
+
+	std::shared_ptr<Scene::VSphere> sphere = std::make_shared<Scene::VSphere>();
+	std::shared_ptr<Scene::VSphere> sphere2 = std::make_shared<Scene::VSphere>();
+	std::shared_ptr<Scene::VSphere> sphere3 = std::make_shared<Scene::VSphere>();
+	std::shared_ptr<Scene::VCylinder> cyliner1 = std::make_shared<Scene::VCylinder>();
+	std::shared_ptr<Scene::VCylinder> cylinder2 = std::make_shared<Scene::VCylinder>();
+
+	sphere->Radius = 70.f;
+	sphere2->Radius = 50.f;
+	sphere2->Position = VVector::FORWARD * 80.f;
+	sphere3->Radius = 35.f;
+	sphere3->Position = VVector::FORWARD * 70.f;
+	cyliner1->Radius = 50.f;
+	cyliner1->Height = 8.f;
+	cyliner1->Position = VVector::FORWARD * 30.f;
+	cyliner1->Rotation = VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 90.f * (M_PI / 180.f));
+	cylinder2->Radius = 25.f;
+	cylinder2->Height = 30.f;
+	cylinder2->Position = VVector::RIGHT * -30.f;
+
+	densityObj->GetRootShape().AddChild(sphere)
+		.AddChild(sphere2)
+		.AddChild(sphere3)
+		.AddChild(cyliner1)
+		.AddChild(cylinder2);
+
+	std::shared_ptr<Scene::VBox> box = std::make_shared<Scene::VBox>();
+	box->Extends = VVector::ONE * 100.f;
+
+	//densityObj->GetRootShape().AddChild(box);
+
+	densityObj->Position = VVector::FORWARD * -150.f;
+
+	#pragma omp parallel for collapse(3)
+	for (int x = 0; x < Scene->GetSize(); x++)
 	{
-		for (unsigned int y = 0; y < Scene->GetSize(); y++)
+		for (int y = 0; y < Scene->GetSize(); y++)
 		{
-			for (unsigned int z = 0; z < Scene->GetSize(); z++)
+			for (int z = 0; z < Scene->GetSize(); z++)
 			{
 				VVector voxelPos = Scene->VoxelIndexToWorldPosition(x, y, z);
 
-				float density = voxelPos.Length() - 80.f;
-
-				if (density <= 0)
-				{
-					int i = 0;
-				}
+				float density = densityObj->Evaluate(voxelPos);
 
 				Voxel::VVoxel voxel;
 

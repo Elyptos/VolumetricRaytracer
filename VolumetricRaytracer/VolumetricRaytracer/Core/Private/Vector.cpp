@@ -57,6 +57,29 @@ VolumeRaytracer::VVector VolumeRaytracer::VVector::Cross(const VVector& other) c
 	return VVector(Y*other.Z - Z*other.Y, Z*other.X - X*other.Z, X*other.Y - Y*other.X);
 }
 
+VolumeRaytracer::VVector VolumeRaytracer::VVector::Abs() const
+{
+	return VVector(abs(X), abs(Y), abs(Z));
+}
+
+VolumeRaytracer::VVector VolumeRaytracer::VVector::Max(const VVector& vec, const float& scalar)
+{
+	float x = vec.X >= scalar ? vec.X : scalar;
+	float y = vec.Y >= scalar ? vec.Y : scalar;
+	float z = vec.Z >= scalar ? vec.Z : scalar;
+
+	return VVector(x, y, z);
+}
+
+VolumeRaytracer::VVector VolumeRaytracer::VVector::Min(const VVector& vec, const float& scalar)
+{
+	float x = vec.X <= scalar ? vec.X : scalar;
+	float y = vec.Y <= scalar ? vec.Y : scalar;
+	float z = vec.Z <= scalar ? vec.Z : scalar;
+
+	return VVector(x, y, z);
+}
+
 void VolumeRaytracer::VVector::Normalize()
 {
 	float length = Length();

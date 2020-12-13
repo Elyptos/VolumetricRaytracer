@@ -25,3 +25,13 @@ unsigned int VolumeRaytracer::VMathHelpers::Index3DTo1D(const unsigned int& x, c
 {
 	return x * yCount * zCount + y * zCount + z;
 }
+
+float VolumeRaytracer::VMathHelpers::Min(const float& a, const float& b)
+{
+	return a <= b ? a : b;
+}
+
+float VolumeRaytracer::VMathHelpers::Max(const float& a, const float& b)
+{
+	return a >= b ? a : b;
+}

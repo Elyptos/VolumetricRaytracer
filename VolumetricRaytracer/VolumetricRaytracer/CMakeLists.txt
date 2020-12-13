@@ -28,6 +28,10 @@ add_executable(VolumeRaytracer WIN32 VolumeRaytracer.cpp ${app_private} ${app_pu
 target_link_libraries(VolumeRaytracer VUI)
 endif(WIN32)
 
+if(OpenMP_CXX_FOUND)
+	target_link_libraries(VolumeRaytracer OpenMP::OpenMP_CXX)
+endif()
+
 target_link_libraries(VolumeRaytracer VEngine)
 
 # Copy resources

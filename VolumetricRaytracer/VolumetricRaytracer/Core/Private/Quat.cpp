@@ -31,6 +31,11 @@ VolumeRaytracer::VQuat VolumeRaytracer::VQuat::FromAxisAngle(const VVector& axis
 	return Eigen::Quaternionf(Eigen::AngleAxisf(angle, eigenAxis));
 }
 
+VolumeRaytracer::VQuat VolumeRaytracer::VQuat::Inverse() const
+{
+	return EigenQuat.inverse();
+}
+
 VolumeRaytracer::VVector VolumeRaytracer::VQuat::GetUpVector()
 {
 	VVector vec = VVector::UP;
