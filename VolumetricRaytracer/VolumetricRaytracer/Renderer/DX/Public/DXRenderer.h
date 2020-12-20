@@ -158,10 +158,8 @@ namespace VolumeRaytracer
 
 				CPtr<ID3D12Device5> GetDXDevice() const { return Device; }
 
-				void BuildAccelerationStructure(const VDXAccelerationStructureBuffers& topLevelAS, std::vector<VDXAccelerationStructureBuffers> bottomLevelAS);
+				void BuildBottomLevelAccelerationStructure(std::vector<VDXAccelerationStructureBuffers> bottomLevelAS);
 				
-				void BuildTopLevelAccelerationStructure(const VDXAccelerationStructureBuffers& topLevelAS);
-
 				void SetSceneToRender(VObjectPtr<Scene::VScene> scene) override;
 
 

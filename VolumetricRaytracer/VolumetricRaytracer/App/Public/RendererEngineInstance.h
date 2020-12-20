@@ -55,6 +55,9 @@ namespace VolumeRaytracer
 
 			void InitScene();
 
+			void InitSnowmanObject();
+			void InitFloor();
+
 		private:
 			Engine::VEngine* Engine = nullptr;
 			VObjectPtr<UI::VWindow> Window = nullptr;
@@ -64,6 +67,7 @@ namespace VolumeRaytracer
 			VObjectPtr<Scene::VLight> DirectionalLight = nullptr;
 			
 			VObjectPtr<Scene::VVoxelObject> Snowman = nullptr;
+			VObjectPtr<Scene::VVoxelObject> Floor = nullptr;
 
 			boost::signals2::connection OnWindowClosedHandle;
 			boost::signals2::connection OnKeyDownHandle;

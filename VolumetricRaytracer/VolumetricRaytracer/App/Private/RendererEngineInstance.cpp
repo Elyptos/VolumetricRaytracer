@@ -156,13 +156,19 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 	DirectionalLight->IlluminationStrength = 5.f;
 
 	Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(140, 200.f);
-	Snowman->SetVoxelVolume(voxelVolume);
+	Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
 
 	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
 	Scene->SetActiveSceneCamera(Camera);
 	Scene->SetActiveDirectionalLight(DirectionalLight);
+
+	InitSnowmanObject();
+	InitFloor();
+}
+
+void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
+{
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(140, 200.f);
 
 	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
 
@@ -194,8 +200,6 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 	std::shared_ptr<Scene::VBox> box = std::make_shared<Scene::VBox>();
 	box->Extends = VVector::ONE * 100.f;
 
-	//densityObj->GetRootShape().AddChild(box);
-
 	densityObj->Position = VVector::FORWARD * -150.f;
 
 	#pragma omp parallel for collapse(3)
@@ -218,5 +222,43 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 			}
 		}
 	}
+
+	Snowman->SetVoxelVolume(voxelVolume);
+}
+
+void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
+{
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(10, 200.f);
+
+	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
+
+	std::shared_ptr<Scene::VBox> box = std::make_shared<Scene::VBox>();
+
+	box->Extends = VVector::ONE * 80.f;
+
+	densityObj->GetRootShape().AddChild(box);
+
+	#pragma omp parallel for collapse(3)
+	for (int x = 0; x < voxelVolume->GetSize(); x++)
+	{
+		for (int y = 0; y < voxelVolume->GetSize(); y++)
+		{
+			for (int z = 0; z < voxelVolume->GetSize(); z++)
+			{
+				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+
+				float density = densityObj->Evaluate(voxelPos);
+
+				Voxel::VVoxel voxel;
+
+				voxel.Material = density <= 0 ? 1 : 0;
+				voxel.Density = density;
+
+				voxelVolume->SetVoxel(x, y, z, voxel);
+			}
+		}
+	}
+
+	Floor->SetVoxelVolume(voxelVolume);
 }
 

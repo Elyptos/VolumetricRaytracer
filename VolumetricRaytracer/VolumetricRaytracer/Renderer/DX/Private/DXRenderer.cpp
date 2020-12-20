@@ -39,7 +39,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::Render()
 
 			SceneRef.lock()->GetActiveCamera()->AspectRatio = (float)WindowRenderTarget->GetWidth() / (float)WindowRenderTarget->GetHeight();
 			SceneToRender->SyncWithScene(weakThis, SceneRef);
-			SceneToRender->PrepareForRendering(weakThis);
+			SceneToRender->PrepareForRendering(weakThis, WindowRenderTarget->GetCurrentBufferIndex());
 
 			PrepareForRendering();
 			DoRendering();
@@ -92,30 +92,14 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ResizeRenderOutput(unsigned int
 	}
 }
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::BuildTopLevelAccelerationStructure(const VDXAccelerationStructureBuffers& topLevelAS)
+void VolumeRaytracer::Renderer::DX::VDXRenderer::BuildBottomLevelAccelerationStructure(std::vector<VDXAccelerationStructureBuffers> bottomLevelAS)
 {
 	ID3D12GraphicsCommandList5* commandList = ComputeCommandHandler->StartCommandRecording();
-	commandList->BuildRaytracingAccelerationStructure(&topLevelAS.AccelerationStructureDesc, 0, nullptr);
-
-	ComputeCommandHandler->ExecuteCommandQueue();
-	ComputeCommandHandler->WaitForGPU();
-}
-
-void VolumeRaytracer::Renderer::DX::VDXRenderer::BuildAccelerationStructure(const VDXAccelerationStructureBuffers& topLevelAS, std::vector<VDXAccelerationStructureBuffers> bottomLevelAS)
-{
-	ID3D12GraphicsCommandList5* commandList = ComputeCommandHandler->StartCommandRecording();
-
-	std::vector<D3D12_RESOURCE_BARRIER> resourceBarriers;
 
 	for (auto& as : bottomLevelAS)
 	{
 		commandList->BuildRaytracingAccelerationStructure(&as.AccelerationStructureDesc, 0, nullptr);
-		resourceBarriers.push_back(CD3DX12_RESOURCE_BARRIER::UAV(as.AccelerationStructure.Get()));
 	}
-
-	commandList->ResourceBarrier(resourceBarriers.size(), resourceBarriers.data());
-
-	commandList->BuildRaytracingAccelerationStructure(&topLevelAS.AccelerationStructureDesc, 0, nullptr);
 
 	ComputeCommandHandler->ExecuteCommandQueue();
 	ComputeCommandHandler->WaitForGPU();
@@ -720,13 +704,21 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::PrepareForRendering()
 	WindowCommandAllocators[backBufferIndex]->Reset();
 	CommandList->Reset(WindowCommandAllocators[backBufferIndex].Get(), nullptr);
 
-	D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(WindowRenderTarget->GetCurrentRenderTarget().Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	CommandList->ResourceBarrier(1, &barrier);
+	VDXAccelerationStructureBuffers* tlas = SceneToRender->GetAccelerationStructureTL(WindowRenderTarget->GetCurrentBufferIndex());
+	CommandList->BuildRaytracingAccelerationStructure(&tlas->AccelerationStructureDesc, 0, nullptr);
+	
+	std::vector<D3D12_RESOURCE_BARRIER> barriers = {
+		CD3DX12_RESOURCE_BARRIER::UAV(tlas->AccelerationStructure.Get()),
+		CD3DX12_RESOURCE_BARRIER::Transition(WindowRenderTarget->GetCurrentRenderTarget().Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET)
+	};
+
+	CommandList->ResourceBarrier(barriers.size(), barriers.data());
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::DoRendering()
 {
 	boost::unordered_map<UINT, VDXResourceBindingPayload> resourceBindings;
+	VDXAccelerationStructureBuffers* tlas = SceneToRender->GetAccelerationStructureTL(WindowRenderTarget->GetCurrentBufferIndex());
 
 	FillDescriptorHeap(resourceBindings);
 
@@ -739,7 +731,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::DoRendering()
 
 	CommandList->SetDescriptorHeaps(2, &descHeaps[0]);
 	CommandList->SetComputeRootConstantBufferView(EGlobalRootSignature::SceneConstant, SceneToRender->CopySceneConstantBufferToGPU(WindowRenderTarget->GetCurrentBufferIndex()));
-	CommandList->SetComputeRootShaderResourceView(EGlobalRootSignature::AccelerationStructure, SceneToRender->GetAccelerationStructureTL()->GetGPUVirtualAddress());
+	CommandList->SetComputeRootShaderResourceView(EGlobalRootSignature::AccelerationStructure, tlas->AccelerationStructure->GetGPUVirtualAddress());
 
 	for (const auto& binding : resourceBindings)
 	{
@@ -853,8 +845,6 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ExecuteCommandList()
 	};
 
 	RenderCommandQueue->ExecuteCommandLists(1, commandLists);
-
-	WaitForGPU();
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::WaitForGPU()

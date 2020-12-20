@@ -100,9 +100,9 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::SyncWithScene(std::weak_ptr<VRend
 	UpdateSceneObjects(dxRenderer, scene);
 }
 
-VolumeRaytracer::Renderer::DX::CPtr<ID3D12Resource> VolumeRaytracer::Renderer::DX::VRDXScene::GetAccelerationStructureTL() const
+VolumeRaytracer::Renderer::DX::VDXAccelerationStructureBuffers* VolumeRaytracer::Renderer::DX::VRDXScene::GetAccelerationStructureTL(const unsigned int& backBufferIndex) const
 {
-	return TLAS->AccelerationStructure;
+	return TLAS[backBufferIndex];
 }
 
 VolumeRaytracer::Renderer::DX::VDXDescriptorHeap* VolumeRaytracer::Renderer::DX::VRDXScene::GetSceneDescriptorHeap() const
@@ -125,13 +125,13 @@ VolumeRaytracer::Renderer::DX::CPtr<ID3D12DescriptorHeap> VolumeRaytracer::Rende
 	return ObjectResourcePool->GetGeometryHeap();
 }
 
-void VolumeRaytracer::Renderer::DX::VRDXScene::PrepareForRendering(std::weak_ptr<VRenderer> renderer)
+void VolumeRaytracer::Renderer::DX::VRDXScene::PrepareForRendering(std::weak_ptr<VRenderer> renderer, const unsigned int& backBufferIndex)
 {
 	VObjectPtr<VDXRenderer> dxRenderer = std::static_pointer_cast<VDXRenderer>(renderer.lock());
 
-	BuildTopLevelAccelerationStructures(dxRenderer.get());
+	BuildTopLevelAccelerationStructures(dxRenderer.get(), backBufferIndex);
 
-	if(!TLAS)
+	if(TLAS.size() <= backBufferIndex)
 		return;
 
 	if (UpdateBLAS)
@@ -145,11 +145,7 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::PrepareForRendering(std::weak_ptr
 			blas.push_back(elem.second->GetBLAS());
 		}
 
-		dxRenderer->BuildAccelerationStructure(*TLAS, blas);
-	}
-	else
-	{
-		dxRenderer->BuildTopLevelAccelerationStructure(*TLAS);
+		dxRenderer->BuildBottomLevelAccelerationStructure(blas);
 	}
 }
 
@@ -268,11 +264,17 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::CleanupStaticResources()
 	SceneConstantBuffers.clear();
 	SceneConstantBufferDataPtrs.clear();
 
-	if (TLAS != nullptr)
+	for (auto& tlas : TLAS)
 	{
-		delete TLAS;
-		TLAS = nullptr;
+		if (tlas != nullptr)
+		{
+			delete tlas;
+			tlas = nullptr;
+		}
 	}
+
+	TLAS.clear();
+	NumObjectsInSceneLastFrame.clear();
 
 	VoxelVolumes.clear();
 	ObjectsInScene.clear();
@@ -282,62 +284,8 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::CleanupStaticResources()
 	ClearInstanceIDPool();
 }
 
-void VolumeRaytracer::Renderer::DX::VRDXScene::BuildTopLevelAccelerationStructures(VDXRenderer* renderer)
+void VolumeRaytracer::Renderer::DX::VRDXScene::BuildTopLevelAccelerationStructures(VDXRenderer* renderer, const unsigned int& backBufferIndex)
 {
-	if (TLAS == nullptr || ObjectsInScene.size() != NumObjectsInSceneLastFrame)
-	{
-		if (TLAS != nullptr)
-		{
-			delete TLAS;
-			TLAS = nullptr;
-		}
-
-		CPtr<ID3D12Device5> device = renderer->GetDXDevice();
-
-		CPtr<ID3D12Resource> scratch;
-		CPtr<ID3D12Resource> topLevelAS;
-		CPtr<ID3D12Resource> instanceDescsResource;
-
-		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
-		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& topLevelInputs = topLevelBuildDesc.Inputs;
-		topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-		topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-		topLevelInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE | D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
-		topLevelInputs.NumDescs = ObjectsInScene.size();
-
-		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
-		device->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
-
-		CD3DX12_HEAP_PROPERTIES uavHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		CD3DX12_RESOURCE_DESC uavResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(topLevelPrebuildInfo.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-
-		device->CreateCommittedResource(&uavHeapProps, D3D12_HEAP_FLAG_NONE, &uavResourceDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&scratch));
-
-		uavHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		uavResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(topLevelPrebuildInfo.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-
-		device->CreateCommittedResource(&uavHeapProps, D3D12_HEAP_FLAG_NONE, &uavResourceDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&topLevelAS));
-		SetDXDebugName<ID3D12Resource>(topLevelAS, "Top Level AS");
-
-		CD3DX12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC));
-
-		device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &bufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&instanceDescsResource));
-
-		SetDXDebugName<ID3D12Resource>(instanceDescsResource, "Instance Description resource");
-
-		topLevelBuildDesc.DestAccelerationStructureData = topLevelAS->GetGPUVirtualAddress();
-		topLevelInputs.InstanceDescs = instanceDescsResource->GetGPUVirtualAddress();
-		topLevelBuildDesc.ScratchAccelerationStructureData = scratch->GetGPUVirtualAddress();
-
-		TLAS = new VDXAccelerationStructureBuffers();
-		TLAS->Scratch = scratch;
-		TLAS->AccelerationStructureDesc = topLevelBuildDesc;
-		TLAS->AccelerationStructure = topLevelAS;
-		TLAS->InstanceDesc = instanceDescsResource;
-		TLAS->ResultDataMaxSizeInBytes = topLevelPrebuildInfo.ResultDataMaxSizeInBytes;
-	}
-
 	std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instances;
 
 	for (auto& elem : ObjectsInScene)
@@ -355,12 +303,78 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::BuildTopLevelAccelerationStructur
 		}
 	}
 
-	void* mappedData;
-	TLAS->InstanceDesc->Map(0, nullptr, &mappedData);
-	memcpy(mappedData, instances.data(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instances.size());
-	TLAS->InstanceDesc->Unmap(0, nullptr);
+	if (TLAS.size() <= backBufferIndex || NumObjectsInSceneLastFrame.size() <= backBufferIndex || ObjectsInScene.size() != NumObjectsInSceneLastFrame[backBufferIndex])
+	{
+		if (TLAS.size() <= backBufferIndex)
+		{
+			TLAS.resize(backBufferIndex + 1, nullptr);
+		}
 
-	NumObjectsInSceneLastFrame = ObjectsInScene.size();
+		if (NumObjectsInSceneLastFrame.size() <= backBufferIndex)
+		{
+			NumObjectsInSceneLastFrame.resize(backBufferIndex + 1, 0);
+		}
+
+		if (TLAS[backBufferIndex] != nullptr)
+		{
+			delete TLAS[backBufferIndex];
+			TLAS[backBufferIndex] = nullptr;
+		}
+
+		CPtr<ID3D12Device5> device = renderer->GetDXDevice();
+
+		CPtr<ID3D12Resource> scratch;
+		CPtr<ID3D12Resource> topLevelAS;
+		CPtr<ID3D12Resource> instanceDescsResource;
+
+		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
+		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& topLevelInputs = topLevelBuildDesc.Inputs;
+		topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+		topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+		topLevelInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE | D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+		topLevelInputs.NumDescs = instances.size();
+
+		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
+		device->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
+
+		CD3DX12_HEAP_PROPERTIES uavHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		CD3DX12_RESOURCE_DESC uavResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(topLevelPrebuildInfo.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+		device->CreateCommittedResource(&uavHeapProps, D3D12_HEAP_FLAG_NONE, &uavResourceDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&scratch));
+
+		uavHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		uavResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(topLevelPrebuildInfo.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+		device->CreateCommittedResource(&uavHeapProps, D3D12_HEAP_FLAG_NONE, &uavResourceDesc, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, nullptr, IID_PPV_ARGS(&topLevelAS));
+		SetDXDebugName<ID3D12Resource>(topLevelAS, "Top Level AS");
+
+		CD3DX12_HEAP_PROPERTIES uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		CD3DX12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instances.size());
+
+		device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &bufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&instanceDescsResource));
+
+		SetDXDebugName<ID3D12Resource>(instanceDescsResource, "Instance Description resource");
+
+		topLevelBuildDesc.DestAccelerationStructureData = topLevelAS->GetGPUVirtualAddress();
+		topLevelInputs.InstanceDescs = instanceDescsResource->GetGPUVirtualAddress();
+		topLevelBuildDesc.ScratchAccelerationStructureData = scratch->GetGPUVirtualAddress();
+
+		VDXAccelerationStructureBuffers* tlas = new VDXAccelerationStructureBuffers();
+		tlas->Scratch = scratch;
+		tlas->AccelerationStructureDesc = topLevelBuildDesc;
+		tlas->AccelerationStructure = topLevelAS;
+		tlas->InstanceDesc = instanceDescsResource;
+		tlas->ResultDataMaxSizeInBytes = topLevelPrebuildInfo.ResultDataMaxSizeInBytes;
+
+		TLAS[backBufferIndex] = tlas;
+	}
+
+	void* mappedData;
+	TLAS[backBufferIndex]->InstanceDesc->Map(0, nullptr, &mappedData);
+	memcpy(mappedData, instances.data(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instances.size());
+	TLAS[backBufferIndex]->InstanceDesc->Unmap(0, nullptr);
+
+	NumObjectsInSceneLastFrame[backBufferIndex] = ObjectsInScene.size();
 }
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::AddVoxelVolume(std::weak_ptr<VDXRenderer> renderer, Voxel::VVoxelVolume* voxelVolume)

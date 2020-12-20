@@ -85,7 +85,7 @@ namespace VolumeRaytracer
 
 				void SyncWithScene(std::weak_ptr<VRenderer> renderer, std::weak_ptr<Scene::VScene> scene) override;
 
-				CPtr<ID3D12Resource> GetAccelerationStructureTL() const;
+				VDXAccelerationStructureBuffers* GetAccelerationStructureTL(const unsigned int& backBufferIndex) const;
 				VDXDescriptorHeap* GetSceneDescriptorHeap() const;
 				VDXDescriptorHeap* GetSceneDescriptorHeapSamplers() const;
 				CPtr<ID3D12DescriptorHeap> GetGeometrySRVDescriptorHeap() const;
@@ -94,7 +94,7 @@ namespace VolumeRaytracer
 				CPtr<ID3D12Resource> GetSceneVolume() const;
 
 
-				void PrepareForRendering(std::weak_ptr<VRenderer> renderer) override;
+				void PrepareForRendering(std::weak_ptr<VRenderer> renderer, const unsigned int& backBufferIndex) override;
 
 			private:
 				void InitEnvironmentMap(VDXRenderer* renderer);
@@ -104,7 +104,7 @@ namespace VolumeRaytracer
 				void AllocSceneConstantBuffer(VDXRenderer* renderer);
 				void CleanupStaticResources();
 
-				void BuildTopLevelAccelerationStructures(VDXRenderer* renderer);
+				void BuildTopLevelAccelerationStructures(VDXRenderer* renderer, const unsigned int& backBufferIndex);
 
 				void AddVoxelVolume(std::weak_ptr<VDXRenderer> renderer, Voxel::VVoxelVolume* voxelVolume);
 				void RemoveVoxelVolume(Voxel::VVoxelVolume* voxelVolume);
@@ -127,7 +127,7 @@ namespace VolumeRaytracer
 
 				VRDXSceneObjectResourcePool* ObjectResourcePool = nullptr;
 
-				VDXAccelerationStructureBuffers* TLAS = nullptr;
+				std::vector<VDXAccelerationStructureBuffers*> TLAS;
 
 				std::vector<CPtr<ID3D12Resource>> SceneConstantBuffers;
 				std::vector<uint8_t*> SceneConstantBufferDataPtrs;
@@ -144,7 +144,7 @@ namespace VolumeRaytracer
 				boost::unordered_map<Voxel::VVoxelVolume*, std::shared_ptr<VDXVoxelVolume>> VoxelVolumes;
 				std::vector<std::shared_ptr<VDXLevelObject>> ObjectsInScene;
 
-				size_t NumObjectsInSceneLastFrame = 0;
+				std::vector<size_t> NumObjectsInSceneLastFrame;
 
 				boost::lockfree::queue<size_t> GeometryInstancePool{0};
 

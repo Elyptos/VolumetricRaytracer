@@ -28,7 +28,7 @@ namespace VolumeRaytracer
 
 			virtual void InitFromScene(std::weak_ptr<VRenderer> renderer, std::weak_ptr<Scene::VScene> scene);
 			virtual void SyncWithScene(std::weak_ptr<VRenderer> renderer, std::weak_ptr<Scene::VScene> scene) {}
-			virtual void PrepareForRendering(std::weak_ptr<VRenderer> renderer) = 0;
+			virtual void PrepareForRendering(std::weak_ptr<VRenderer> renderer, const unsigned int& backBufferIndex) = 0;
 			virtual void Cleanup();
 		};
 	}
