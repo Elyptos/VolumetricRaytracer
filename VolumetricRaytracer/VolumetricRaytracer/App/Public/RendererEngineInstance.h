@@ -29,9 +29,12 @@ namespace VolumeRaytracer
 		enum class EVAxisType;
 	}
 
-	namespace Voxel
+	namespace Scene
 	{
-		class VVoxelScene;
+		class VScene;
+		class VVoxelObject;
+		class VLight;
+		class VCamera;
 	}
 
 	namespace App
@@ -55,13 +58,16 @@ namespace VolumeRaytracer
 		private:
 			Engine::VEngine* Engine = nullptr;
 			VObjectPtr<UI::VWindow> Window = nullptr;
-			VObjectPtr<Voxel::VVoxelScene> Scene = nullptr;
+			VObjectPtr<Scene::VScene> Scene = nullptr;
+
+			VObjectPtr<Scene::VCamera> Camera = nullptr;
+			VObjectPtr<Scene::VLight> DirectionalLight = nullptr;
+			
+			VObjectPtr<Scene::VVoxelObject> Snowman = nullptr;
 
 			boost::signals2::connection OnWindowClosedHandle;
 			boost::signals2::connection OnKeyDownHandle;
 			boost::signals2::connection OnAxisInpuHandle;
-
-			VVector TargetCameraLocation = VVector::ZERO;
 		};
 	}
 }

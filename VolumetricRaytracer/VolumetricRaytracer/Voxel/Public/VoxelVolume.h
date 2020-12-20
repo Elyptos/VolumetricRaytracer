@@ -43,55 +43,64 @@ namespace VolumeRaytracer
 			unsigned int Index;
 		};
 
-		class VVoxelScene : public VObject 
+		class VVoxelVolume : public VObject 
 		{
 		private:
-			class VVoxelSceneIterator : public std::iterator<std::output_iterator_tag, VVoxelIteratorElement>
+			class VVoxelVolumeIterator : public std::iterator<std::output_iterator_tag, VVoxelIteratorElement>
 			{
 			public:
-				explicit VVoxelSceneIterator(VVoxelScene& scene, size_t index = 0);
+				explicit VVoxelVolumeIterator(VVoxelVolume& scene, size_t index = 0);
 
 				VVoxelIteratorElement operator*() const;
-				VVoxelSceneIterator& operator++();
-				VVoxelSceneIterator operator++(int);
-				bool operator!=(const VVoxelSceneIterator& other) const;
+				VVoxelVolumeIterator& operator++();
+				VVoxelVolumeIterator operator++(int);
+				bool operator!=(const VVoxelVolumeIterator& other) const;
 
 			private:
 				size_t Index = 0;
-				VVoxelScene& Scene;
+				VVoxelVolume& Volume;
 			};
 
 		public:
-			VVoxelScene(const unsigned int& size, const float& volumeExtends);
+			VVoxelVolume(const unsigned int& size, const float& volumeExtends);
 
 			unsigned int GetSize() const;
-			unsigned int GetVoxelCount() const;
+			size_t GetVoxelCount() const;
 			float GetVolumeExtends() const;
 			float GetCellSize() const;
 
-			VAABB GetSceneBounds() const;
-
-			VObjectPtr<Scene::VCamera> GetSceneCamera() const;
-			VObjectPtr<Scene::VLight> GetDirectionalLight() const;
+			VAABB GetVolumeBounds() const;
 
 			void SetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos, const VVoxel& voxel);
 			VVoxel GetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
+			VVoxel GetVoxel(const size_t& voxelIndex) const;
 			bool IsValidVoxelIndex(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
-
-			void SetEnvironmentTexture(VObjectPtr<VTextureCube> texture);
-			VObjectPtr<VTextureCube> GetEnvironmentTexture() const;
 
 			VVector VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
 
 			void SetMaterial(const VMaterial& material);
 			VMaterial GetMaterial() const;
 
-			VVoxelSceneIterator begin();
-			VVoxelSceneIterator end();
+			VVoxelVolumeIterator begin();
+			VVoxelVolumeIterator end();
+
+
+			void PostRender() override;
+
+
+			const bool CanEverTick() const override;
+
+
+			bool ShouldTick() const override;
+
+			void MakeDirty();
+			bool IsDirty() const;
 
 		protected:
 			void Initialize() override;
 			void BeginDestroy() override;
+
+			void ClearDirtyFlag();
 
 		private:
 			unsigned int Size = 0;
@@ -101,10 +110,7 @@ namespace VolumeRaytracer
 
 			VMaterial GeometryMaterial;
 
-			VObjectPtr<Scene::VCamera> Camera;
-			VObjectPtr<Scene::VLight> DirectionalLight;
-
-			VObjectPtr<VTextureCube> EnvironmentTexture;
+			bool DirtyFlag = false;
 		};
 	}
 }

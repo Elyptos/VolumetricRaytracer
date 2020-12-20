@@ -56,6 +56,7 @@ namespace VolumeRaytracer
 			std::string GetLoggerFilePath() const;
 
 			void CallVObjectTicks(const float& deltaTime);
+			void CallPostRenderTicks();
 			void TickEngineInstance(const float& deltaTime);
 			void ExecuteRenderCommand();
 

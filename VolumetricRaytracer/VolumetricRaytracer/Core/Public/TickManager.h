@@ -25,6 +25,7 @@ namespace VolumeRaytracer
 		void AddTickableObject(VObject* obj);
 		void RemoveTickableObject(VObject* obj);
 		void CallTickOnAllAllowedObjects(const float& deltaTime);
+		void CallPostRenderOnAllAllowedObjects();
 
 		bool IsAllowedToAddObject(VObject* obj) const;
 

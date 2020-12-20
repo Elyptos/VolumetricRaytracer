@@ -56,9 +56,9 @@ namespace VolumeRaytracer
 			struct VDXAccelerationStructureBuffers
 			{
 			public:
-				CPtr<ID3D12Resource> Scratch;
-				CPtr<ID3D12Resource> AccelerationStructure;
-				CPtr<ID3D12Resource> InstanceDesc;
+				CPtr<ID3D12Resource> Scratch = nullptr;
+				CPtr<ID3D12Resource> AccelerationStructure = nullptr;
+				CPtr<ID3D12Resource> InstanceDesc = nullptr;
 				D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC AccelerationStructureDesc;
 				UINT64 ResultDataMaxSizeInBytes;
 			};

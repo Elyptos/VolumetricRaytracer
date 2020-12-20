@@ -33,10 +33,14 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::Render()
 	{
 		if (WindowRenderTarget != nullptr && SceneToRender != nullptr && !SceneRef.expired())
 		{
+			std::weak_ptr<VDXRenderer> weakThis = std::static_pointer_cast<VDXRenderer>(shared_from_this());
+
 			UploadPendingTexturesToGPU();
 
-			SceneRef.lock()->GetSceneCamera()->AspectRatio = (float)WindowRenderTarget->GetWidth() / (float)WindowRenderTarget->GetHeight();
-			SceneToRender->SyncWithScene(SceneRef.lock().get());
+			SceneRef.lock()->GetActiveCamera()->AspectRatio = (float)WindowRenderTarget->GetWidth() / (float)WindowRenderTarget->GetHeight();
+			SceneToRender->SyncWithScene(weakThis, SceneRef);
+			SceneToRender->PrepareForRendering(weakThis);
+
 			PrepareForRendering();
 			DoRendering();
 			CopyRaytracingOutputToBackbuffer();
@@ -88,21 +92,36 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ResizeRenderOutput(unsigned int
 	}
 }
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::BuildAccelerationStructure(const VDXAccelerationStructureBuffers& topLevelAS, const VDXAccelerationStructureBuffers& bottomLevelAS)
+void VolumeRaytracer::Renderer::DX::VDXRenderer::BuildTopLevelAccelerationStructure(const VDXAccelerationStructureBuffers& topLevelAS)
 {
-	ID3D12GraphicsCommandList5* commandList =  ComputeCommandHandler->StartCommandRecording();
+	ID3D12GraphicsCommandList5* commandList = ComputeCommandHandler->StartCommandRecording();
+	commandList->BuildRaytracingAccelerationStructure(&topLevelAS.AccelerationStructureDesc, 0, nullptr);
 
-	commandList->BuildRaytracingAccelerationStructure(&bottomLevelAS.AccelerationStructureDesc, 0, nullptr);
+	ComputeCommandHandler->ExecuteCommandQueue();
+	ComputeCommandHandler->WaitForGPU();
+}
 
-	D3D12_RESOURCE_BARRIER resourceBarrier = CD3DX12_RESOURCE_BARRIER::UAV(bottomLevelAS.AccelerationStructure.Get());
-	commandList->ResourceBarrier(1, &resourceBarrier);
+void VolumeRaytracer::Renderer::DX::VDXRenderer::BuildAccelerationStructure(const VDXAccelerationStructureBuffers& topLevelAS, std::vector<VDXAccelerationStructureBuffers> bottomLevelAS)
+{
+	ID3D12GraphicsCommandList5* commandList = ComputeCommandHandler->StartCommandRecording();
+
+	std::vector<D3D12_RESOURCE_BARRIER> resourceBarriers;
+
+	for (auto& as : bottomLevelAS)
+	{
+		commandList->BuildRaytracingAccelerationStructure(&as.AccelerationStructureDesc, 0, nullptr);
+		resourceBarriers.push_back(CD3DX12_RESOURCE_BARRIER::UAV(as.AccelerationStructure.Get()));
+	}
+
+	commandList->ResourceBarrier(resourceBarriers.size(), resourceBarriers.data());
 
 	commandList->BuildRaytracingAccelerationStructure(&topLevelAS.AccelerationStructureDesc, 0, nullptr);
 
 	ComputeCommandHandler->ExecuteCommandQueue();
+	ComputeCommandHandler->WaitForGPU();
 }
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::SetSceneToRender(VObjectPtr<Voxel::VVoxelScene> scene)
+void VolumeRaytracer::Renderer::DX::VDXRenderer::SetSceneToRender(VObjectPtr<Scene::VScene> scene)
 {
 	VRenderer::SetSceneToRender(scene);
 
@@ -111,9 +130,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetSceneToRender(VObjectPtr<Vox
 	DeleteScene();
 
 	SceneToRender = new VRDXScene();
-	SceneToRender->InitFromScene(scene.get());
-	SceneToRender->BuildStaticResources(this);
-	SceneToRender->BuildVoxelVolume(scene.get(), weakThis);
+	SceneToRender->InitFromScene(weakThis, scene);
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeTexture(VObjectPtr<VTexture> texture)
@@ -570,12 +587,33 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::InitRendererDescriptorHeap()
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeGlobalRootSignature()
 {
+	/// <summary>
+	/// SRV
+	/// 0 = Acceleration Structure
+	///	1 = Environment Map
+	/// 2 - n = Voxel Volumes
+	/// 
+	/// Sampler
+	/// 0 = Environment Map Sampler
+	/// 
+	/// CB
+	/// 0 = Scene Constant Buffer
+	/// 1 - n = Geometry Constant Buffer
+	/// 
+	/// UAV
+	/// 0 = Output Texture
+	/// </summary>
+
 	CD3DX12_DESCRIPTOR_RANGE outputViewDescRange = {};
 	outputViewDescRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
 
 	CD3DX12_DESCRIPTOR_RANGE sceneDescTable[2];
-	sceneDescTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
+	sceneDescTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
 	sceneDescTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 1, 0);
+
+	CD3DX12_DESCRIPTOR_RANGE geometryDescTable[2];
+	geometryDescTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, VolumeRaytracer::MaxAllowedObjectData, 2);
+	geometryDescTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, VolumeRaytracer::MaxAllowedObjectData, 1);
 
 	CD3DX12_ROOT_PARAMETER rootParameters[EGlobalRootSignature::Max];
 	rootParameters[EGlobalRootSignature::OutputView].InitAsDescriptorTable(1, &outputViewDescRange);
@@ -583,6 +621,8 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeGlobalRootSignature()
 	rootParameters[EGlobalRootSignature::SceneConstant].InitAsConstantBufferView(0);
 	rootParameters[EGlobalRootSignature::SceneTextures].InitAsDescriptorTable(1, &sceneDescTable[0]);
 	rootParameters[EGlobalRootSignature::SceneSamplers].InitAsDescriptorTable(1, &sceneDescTable[1]);
+	rootParameters[EGlobalRootSignature::GeometryVolumes].InitAsDescriptorTable(1, &geometryDescTable[0]);
+	rootParameters[EGlobalRootSignature::GeometryConstants].InitAsDescriptorTable(1, &geometryDescTable[1]);
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(ARRAYSIZE(rootParameters), rootParameters);
 
@@ -682,8 +722,6 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::PrepareForRendering()
 
 	D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(WindowRenderTarget->GetCurrentRenderTarget().Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	CommandList->ResourceBarrier(1, &barrier);
-
-	//SceneToRender->BuildVoxelVolume(CommandList);
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::DoRendering()
@@ -815,6 +853,8 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ExecuteCommandList()
 	};
 
 	RenderCommandQueue->ExecuteCommandLists(1, commandLists);
+
+	WaitForGPU();
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::WaitForGPU()
@@ -871,7 +911,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::FillDescriptorHeap(boost::unord
 	Device->CopyDescriptorsSimple(1, RendererDescriptorHeap->GetCPUHandle(rangeIndex), WindowRenderTarget->GetOutputTextureCPUHandle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 
-	RendererDescriptorHeap->AllocateDescriptorRange(2, rangeIndex);
+	RendererDescriptorHeap->AllocateDescriptorRange(1, rangeIndex);
 	bindingPayload.BindingGPUHandle = RendererDescriptorHeap->GetGPUHandle(rangeIndex);
 
 	outResourceBindings[EGlobalRootSignature::SceneTextures] = bindingPayload;
@@ -885,6 +925,22 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::FillDescriptorHeap(boost::unord
 	outResourceBindings[EGlobalRootSignature::SceneSamplers] = bindingPayload;
 
 	Device->CopyDescriptorsSimple(1, RendererSamplerDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetSceneDescriptorHeapSamplers()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+
+
+	RendererDescriptorHeap->AllocateDescriptorRange(VolumeRaytracer::MaxAllowedObjectData, rangeIndex);
+	bindingPayload.BindingGPUHandle = RendererDescriptorHeap->GetGPUHandle(rangeIndex);
+
+	outResourceBindings[EGlobalRootSignature::GeometryVolumes] = bindingPayload;
+
+	Device->CopyDescriptorsSimple(VolumeRaytracer::MaxAllowedObjectData, RendererDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetGeometrySRVDescriptorHeap()->GetCPUDescriptorHandleForHeapStart(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+
+	RendererDescriptorHeap->AllocateDescriptorRange(VolumeRaytracer::MaxAllowedObjectData, rangeIndex);
+	bindingPayload.BindingGPUHandle = RendererDescriptorHeap->GetGPUHandle(rangeIndex);
+
+	outResourceBindings[EGlobalRootSignature::GeometryConstants] = bindingPayload;
+
+	Device->CopyDescriptorsSimple(VolumeRaytracer::MaxAllowedObjectData, RendererDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetGeometryCBDescriptorHeap()->GetCPUDescriptorHandleForHeapStart(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
 VolumeRaytracer::Renderer::DX::CPtr<ID3D12Resource> VolumeRaytracer::Renderer::DX::VDXRenderer::CreateShaderTable(std::vector<void*> shaderIdentifiers, UINT& outShaderTableSize, void* rootArguments /*= nullptr*/, const size_t& rootArgumentsSize /*= 0*/)

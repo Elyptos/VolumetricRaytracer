@@ -137,6 +137,11 @@ void VolumeRaytracer::Engine::VEngine::CallVObjectTicks(const float& deltaTime)
 	VGlobalTickManager::Instance().CallTickOnAllAllowedObjects(deltaTime);
 }
 
+void VolumeRaytracer::Engine::VEngine::CallPostRenderTicks()
+{
+	VGlobalTickManager::Instance().CallPostRenderOnAllAllowedObjects();
+}
+
 void VolumeRaytracer::Engine::VEngine::TickEngineInstance(const float& deltaTime)
 {
 	if (EngineInstance != nullptr)
@@ -187,6 +192,8 @@ void VolumeRaytracer::Engine::VEngine::EngineLoop()
 			CallVObjectTicks(prevDeltaTime);
 
 			ExecuteRenderCommand();
+
+			CallPostRenderTicks();
 		}
 
 		//std::this_thread::yield();

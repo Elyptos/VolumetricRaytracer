@@ -68,6 +68,7 @@ namespace VolumeRaytracer
 
 	public:
 		virtual void Tick(const float& deltaSeconds) {}
+		virtual void PostRender() {}
 
 		virtual const bool CanEverTick() const { return false; }
 		virtual bool ShouldTick() const { return false; }
