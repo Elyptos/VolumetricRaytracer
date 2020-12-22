@@ -35,6 +35,16 @@ struct Ray
 	float3 direction;
 };
 
+inline Ray GetLocalRay()
+{
+	Ray ray;
+
+	ray.origin = ObjectRayOrigin();
+	ray.direction = ObjectRayDirection();
+
+	return ray;
+}
+
 inline Ray GenerateCameraRay(uint2 index, in float3 cameraPosition, in float4x4 viewInverted, in float4x4 projInverted)
 {
 	float2 xy = index + 0.5f; // center in the middle of the pixel.
@@ -45,6 +55,16 @@ inline Ray GenerateCameraRay(uint2 index, in float3 cameraPosition, in float4x4 
 
 	float4 target = mul(projInverted, float4(screenPos.x, -screenPos.y, 1, 1));
 	ray.direction = mul(viewInverted, float4(target.xyz, 0)).xyz;
+
+	return ray;
+}
+
+inline Ray ReverseRay(in Ray ray)
+{
+	Ray res;
+
+	res.direction = -ray.direction;
+	res.origin = ray.origin;
 
 	return ray;
 }
@@ -61,7 +81,7 @@ float4 TraceRadianceRay(in Ray ray, in uint currentRayRecursionDepth)
 	rayDesc.Direction = ray.direction;
 
 	rayDesc.TMin = 0;
-	rayDesc.TMax = 600;
+	rayDesc.TMax = 10000;
 
 	VolumeRaytracer::VRayPayload rayPayload = { float4(0,0,0,0), currentRayRecursionDepth + 1 };
 
@@ -343,6 +363,27 @@ bool HasIsoSurfaceInsideCell(in int3 cellOriginIndex)
 			v1Sign != sign(v8);
 }
 
+bool IsSolidCell(in int3 cellOriginIndex)
+{
+	float v1 = GetCellVoxel1(cellOriginIndex);
+	float v2 = GetCellVoxel2(cellOriginIndex);
+	float v3 = GetCellVoxel3(cellOriginIndex);
+	float v4 = GetCellVoxel4(cellOriginIndex);
+	float v5 = GetCellVoxel5(cellOriginIndex);
+	float v6 = GetCellVoxel6(cellOriginIndex);
+	float v7 = GetCellVoxel7(cellOriginIndex);
+	float v8 = GetCellVoxel8(cellOriginIndex);
+
+	return	v1 < 0.f &&
+			v2 < 0.f &&
+			v3 < 0.f &&
+			v4 < 0.f &&
+			v5 < 0.f &&
+			v6 < 0.f &&
+			v7 < 0.f &&
+			v8 < 0.f;
+}
+
 inline float SumUVW(in float u0, in float v0, in float w0, in float u1, in float v1, in float w1)
 {
 	return	u0 * v0 * w0 +
@@ -444,7 +485,7 @@ inline float GetDensityWithPolynomial(in float t, in float A, in float B, in flo
 bool GetSurfaceIntersectionT(in Ray ray, in int3 cellIndex, in float tIn, in float tOut, out float tHit)
 {
 	float A, B, C, D = 0;
-	float t0 = 0;
+	float t0 = max(0, -tIn / (tOut - tIn));
 	float t1 = 1;
 
 	GetDensityPolynomial(ray, cellIndex, tIn, tOut, A, B, C, D);
@@ -525,10 +566,9 @@ bool GetSurfaceIntersectionT(in Ray ray, in int3 cellIndex, in float tIn, in flo
 	}
 
 	tHit = t0 + (t1 - t0) * (-f0 / (f1 - f0));
-
 	tHit = lerp(tIn, tOut, tHit);
 
-	return true;
+	return tHit > 0;
 }
 
 float3 GetNormal(in int3 cellIndex, in float3 normPos)
@@ -567,10 +607,21 @@ void VRRaygen()
 void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytracer::VPrimitiveAttributes attr)
 {
 	float3 hitPosition = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
+	float3 shadowRayOrigin = hitPosition + g_sceneCB.dirLightDirection * 0.01;
+
+	Ray shadowRay;
+	shadowRay.origin = shadowRayOrigin;
+	shadowRay.direction = g_sceneCB.dirLightDirection;
+
+	bool shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth);
 
 	float diffuse = (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);
+	//float diffuse = 1.f;
+
+	diffuse *= (shadowRayHit ? 0.2 : 1);
 
 	rayPayload.color.rgb = float3(1.f, 1.f, 1.f) * diffuse;
+	//rayPayload.color.rgb = attr.normal;
 	rayPayload.color.a = 1.f;
 }
 
@@ -584,56 +635,106 @@ void VRIntersection()
 	ray.origin = WorldRayOrigin();
 	ray.direction = WorldRayDirection();
 
+	Ray localRay = GetLocalRay();
+
 	//Check if we intersect voxel volume
 	float3 volumeAABB[2] = {float3(-g_geometryCB[instance].volumeExtend, -g_geometryCB[instance].volumeExtend, -g_geometryCB[instance].volumeExtend), float3(g_geometryCB[instance].volumeExtend, g_geometryCB[instance].volumeExtend, g_geometryCB[instance].volumeExtend)};
 	float tEnter, tExit;
 
 	float tMax = RayTCurrent();
 
-	if (DetermineRayAABBIntersection(ray, volumeAABB, tEnter, tExit))
+	if (DetermineRayAABBIntersection(localRay, volumeAABB, tEnter, tExit))
 	{
-		int3 voxelDir = sign(ray.direction);
+		int3 voxelDir = sign(localRay.direction);
 		int3 voxelPos;
 		int3 nextVoxelPos;
-		float3 hitNormal = -ray.direction;
+		float3 hitNormal = -localRay.direction;
 		float cellExit;
 		float cellEnter;
 		float tHit;
 
-		tEnter += 0.0001;
-
 		if (tEnter >= 0)
 		{
-			voxelPos = WorldSpaceToVoxelSpace(GetPositionAlongRay(ray, tEnter));
+			tEnter += 0.01;
+
+			voxelPos = WorldSpaceToVoxelSpace(GetPositionAlongRay(localRay, tEnter));
+			cellExit = tEnter;
 		}
 		else
 		{
-			voxelPos = WorldSpaceToVoxelSpace(ray.origin);
-		}
+			voxelPos = WorldSpaceToVoxelSpace(localRay.origin);
 
-		cellExit = tEnter;
+			//Cell exit is behind the ray origin, to calculate it we traverse to the previous voxel.
+			GoToNextVoxel(ReverseRay(localRay), voxelPos, -voxelDir, cellExit, hitNormal);
+
+			cellExit = -cellExit;
+			cellExit += 0.01;
+		}
 
 		int maxIterations = 3000;
 
-		while (cellExit <= tMax && maxIterations > 0)
+		if (IsValidCell(voxelPos) && IsSolidCell(voxelPos))
+		{
+			float3 rayPos = GetPositionAlongRay(localRay, tEnter - 0.1);
+
+			VolumeRaytracer::VPrimitiveAttributes attr;
+			attr.normal = sign(rayPos - volumeAABB[1]);
+
+			if (attr.normal.x < 0)
+			{
+				attr.normal.x = rayPos.x < volumeAABB[0].x ? -1 : 0;
+			}
+
+			if (attr.normal.y < 0)
+			{
+				attr.normal.y = rayPos.y < volumeAABB[0].y ? -1 : 0;
+			}
+
+			if (attr.normal.z < 0)
+			{
+				attr.normal.z = rayPos.z < volumeAABB[0].z ? -1 : 0;
+			}
+
+			attr.normal = normalize(attr.normal);
+
+			ReportHit(tEnter, 0, attr);
+
+			return;
+		}
+
+		while (cellExit <= tExit && maxIterations > 0)
 		{
 			maxIterations--;
 
 			cellEnter = cellExit;
 
-			nextVoxelPos = GoToNextVoxel(ray, voxelPos, voxelDir, cellExit, hitNormal);
+			nextVoxelPos = GoToNextVoxel(localRay, voxelPos, voxelDir, cellExit, hitNormal);
 
 			if (IsValidCell(voxelPos))
 			{
+				//VolumeRaytracer::VPrimitiveAttributes attr;
+				//attr.normal = float3(1, 1, 1);
+
+				//ReportHit(10, 0, attr);
+
+				//return;
+
 				if (HasIsoSurfaceInsideCell(voxelPos))
 				{
-					if (GetSurfaceIntersectionT(ray, voxelPos, cellEnter, cellExit, tHit))
+					if (GetSurfaceIntersectionT(localRay, voxelPos, cellEnter, cellExit, tHit))
 					{
 						VolumeRaytracer::VPrimitiveAttributes attr;
-						attr.normal = GetNormal(voxelPos, WorldSpaceToBottomLevelCellSpace(voxelPos, GetPositionAlongRay(ray, tHit)));
+						attr.normal = GetNormal(voxelPos, WorldSpaceToBottomLevelCellSpace(voxelPos, GetPositionAlongRay(localRay, tHit)));
 
 						ReportHit(tHit, 0, attr);
 					}
+					//else
+					//{
+					//	VolumeRaytracer::VPrimitiveAttributes attr;
+					//	attr.normal = float3(1.f, 1.f, 1.f);
+
+					//	ReportHit(tHit, 0, attr);
+					//}
 				}
 			}
 			

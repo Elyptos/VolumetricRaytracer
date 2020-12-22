@@ -155,15 +155,19 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 		* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 135.f * (M_PI / 180.f)), VVector::ONE);
 	DirectionalLight->IlluminationStrength = 5.f;
 
-	Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-	Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+	//Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+	Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
+	Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+	Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);
 
 	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
 	Scene->SetActiveSceneCamera(Camera);
 	Scene->SetActiveDirectionalLight(DirectionalLight);
 
-	InitSnowmanObject();
+	//InitSnowmanObject();
 	InitFloor();
+	InitSphere();
+	InitCube();
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
@@ -228,13 +232,75 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
 
 void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
 {
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(10, 200.f);
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(2, 200.f);
+
+	#pragma omp parallel for collapse(3)
+	for (int x = 0; x < voxelVolume->GetSize(); x++)
+	{
+		for (int y = 0; y < voxelVolume->GetSize(); y++)
+		{
+			for (int z = 0; z < voxelVolume->GetSize(); z++)
+			{
+				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+
+				Voxel::VVoxel voxel;
+
+				voxel.Material = 1;
+				voxel.Density = -1.f;
+
+				voxelVolume->SetVoxel(x, y, z, voxel);
+			}
+		}
+	}
+
+	Floor->SetVoxelVolume(voxelVolume);
+}
+
+void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
+{
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(50, 100.f);
+
+	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
+
+	std::shared_ptr<Scene::VSphere> sphere = std::make_shared<Scene::VSphere>();
+
+	sphere->Radius = 40.f;
+
+	densityObj->GetRootShape().AddChild(sphere);
+
+#pragma omp parallel for collapse(3)
+	for (int x = 0; x < voxelVolume->GetSize(); x++)
+	{
+		for (int y = 0; y < voxelVolume->GetSize(); y++)
+		{
+			for (int z = 0; z < voxelVolume->GetSize(); z++)
+			{
+				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+
+				float density = densityObj->Evaluate(voxelPos);
+
+				Voxel::VVoxel voxel;
+
+				voxel.Material = density <= 0 ? 1 : 0;
+				voxel.Density = density;
+
+				voxelVolume->SetVoxel(x, y, z, voxel);
+			}
+		}
+	}
+
+	Sphere->SetVoxelVolume(voxelVolume);
+}
+
+void VolumeRaytracer::App::RendererEngineInstance::InitCube()
+{
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(50, 100.f);
 
 	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
 
 	std::shared_ptr<Scene::VBox> box = std::make_shared<Scene::VBox>();
 
-	box->Extends = VVector::ONE * 80.f;
+	box->Extends = VVector::ONE * 40.f;
 
 	densityObj->GetRootShape().AddChild(box);
 
@@ -259,6 +325,6 @@ void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
 		}
 	}
 
-	Floor->SetVoxelVolume(voxelVolume);
+	Cube->SetVoxelVolume(voxelVolume);
 }
 
