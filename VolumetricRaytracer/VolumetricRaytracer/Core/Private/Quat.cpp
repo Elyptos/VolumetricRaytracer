@@ -60,6 +60,26 @@ VolumeRaytracer::VVector VolumeRaytracer::VQuat::operator*(const VVector& vec) c
 	return EigenQuat * eigenVec;
 }
 
+float VolumeRaytracer::VQuat::GetX() const
+{
+	return EigenQuat.x();
+}
+
+float VolumeRaytracer::VQuat::GetY() const
+{
+	return EigenQuat.y();
+}
+
+float VolumeRaytracer::VQuat::GetZ() const
+{
+	return EigenQuat.z();
+}
+
+float VolumeRaytracer::VQuat::GetW() const
+{
+	return EigenQuat.w();
+}
+
 VolumeRaytracer::VQuat VolumeRaytracer::VQuat::operator*(const VQuat& other) const
 {
 	return EigenQuat * other.EigenQuat;

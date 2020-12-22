@@ -42,8 +42,8 @@ namespace VolumeRaytracer
 
 				CPtr<ID3D12DescriptorHeap> GetDescriptorHeap() const { return DescHeap;}
 
-				D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle(const UINT& index);
-				D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(const UINT& index);
+				virtual D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle(const UINT& index);
+				virtual D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(const UINT& index);
 
 				void ResetAllocations();
 
@@ -65,13 +65,8 @@ namespace VolumeRaytracer
 			public:
 				VDXDescriptorHeapRingBuffer(CPtr<ID3D12Device5> dxDevice, const UINT& maxDescriptors, const D3D12_DESCRIPTOR_HEAP_TYPE& heapType = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, const D3D12_DESCRIPTOR_HEAP_FLAGS& heapFlags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 
-
-
 				bool AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* outHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle, UINT& outDescriptorIndex) override;
-
-
 				bool AllocateDescriptorRange(const UINT& descriptorCount, UINT& outDescriptorIndexStart) override;
-
 			};
 		}
 	}

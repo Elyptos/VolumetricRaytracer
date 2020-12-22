@@ -14,7 +14,7 @@
 
 #include "Renderer.h"
 
-void VolumeRaytracer::Renderer::VRenderer::SetSceneToRender(VObjectPtr<Voxel::VVoxelScene> scene)
+void VolumeRaytracer::Renderer::VRenderer::SetSceneToRender(VObjectPtr<Scene::VScene> scene)
 {
 	SceneRef = scene;
 }

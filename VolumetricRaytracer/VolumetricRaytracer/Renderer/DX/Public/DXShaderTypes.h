@@ -34,6 +34,8 @@ namespace VolumeRaytracer
 				SceneConstant,
 				SceneTextures,
 				SceneSamplers,
+				GeometryConstants,
+				GeometryVolumes,
 				Max
 			};
 		}

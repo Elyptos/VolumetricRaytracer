@@ -13,38 +13,31 @@
 */
 
 #pragma once
-#include "Vector.h"
-#include <Eigen/Geometry>
+
+#include "LevelObject.h"
+#include "RenderableObject.h"
 
 namespace VolumeRaytracer
 {
-	struct VQuat
+	namespace Voxel
 	{
-	public:
-		VQuat();
-		VQuat(const float& x, const float& y, const float& z, const float& w);
-		VQuat(const Eigen::Quaternionf eigenQuat);
+		class VVoxelVolume;
+	}
 
-		static VQuat FromAxisAngle(const VVector& axis, const float& angle);
+	namespace Scene
+	{
+		class VVoxelObject : public VLevelObject, public IVRenderableObject, public std::enable_shared_from_this<VVoxelObject>
+		{
+		public:
+			void SetVoxelVolume(VObjectPtr<Voxel::VVoxelVolume> volume);
+			std::weak_ptr<Voxel::VVoxelVolume> GetVoxelVolume() override;
 
-		VQuat Inverse() const;
+		private:
+			VObjectPtr<Voxel::VVoxelVolume> VoxelVolume;
+		protected:
+			void Initialize() override;
 
-		VVector GetUpVector();
-		VVector GetForwardVector();
-		VVector GetRightVector();
-
-		VVector operator*(const VVector& vec) const;
-		VQuat operator*(const VQuat& other) const;
-
-		float GetX() const;
-		float GetY() const;
-		float GetZ() const;
-		float GetW() const;
-
-	public:
-		static const VQuat IDENTITY;
-
-	private:
-		Eigen::Quaternionf EigenQuat;
-	};
+			void BeginDestroy() override;
+		};
+	}
 }

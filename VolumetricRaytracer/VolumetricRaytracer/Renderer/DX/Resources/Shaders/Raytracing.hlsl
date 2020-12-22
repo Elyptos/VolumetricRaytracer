@@ -17,7 +17,9 @@
 #include "RaytracingHlsl.h"
 
 RaytracingAccelerationStructure g_scene : register(t0, space0);
-Texture3D<float> g_voxelVolume : register(t2, space0);
+
+Texture3D<float> g_voxelVolume[] : register(t2, space0);
+ConstantBuffer<VolumeRaytracer::VGeometryConstantBuffer> g_geometryCB[] : register(b1);
 
 TextureCube g_envMap : register(t1, space0);
 SamplerState g_envMapSampler : register(s0);
@@ -33,24 +35,36 @@ struct Ray
 	float3 direction;
 };
 
+inline Ray GetLocalRay()
+{
+	Ray ray;
+
+	ray.origin = ObjectRayOrigin();
+	ray.direction = ObjectRayDirection();
+
+	return ray;
+}
+
 inline Ray GenerateCameraRay(uint2 index, in float3 cameraPosition, in float4x4 viewInverted, in float4x4 projInverted)
 {
 	float2 xy = index + 0.5f; // center in the middle of the pixel.
 	float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0 - 1.0;
 
-	// Invert Y for DirectX-style coordinates.
-	//screenPos.y = -screenPos.y;
-
-	// Unproject the pixel coordinate into a world positon.
-	//float4 world = mul(float4(screenPos, 0, 1), projectionToWorld);
-	//world.xyz /= world.w;
-
 	Ray ray;
-	//ray.origin = cameraPosition;
 	ray.origin = mul(viewInverted, float4(0,0,0,1)).xyz;
 
 	float4 target = mul(projInverted, float4(screenPos.x, -screenPos.y, 1, 1));
 	ray.direction = mul(viewInverted, float4(target.xyz, 0)).xyz;
+
+	return ray;
+}
+
+inline Ray ReverseRay(in Ray ray)
+{
+	Ray res;
+
+	res.direction = -ray.direction;
+	res.origin = ray.origin;
 
 	return ray;
 }
@@ -67,7 +81,7 @@ float4 TraceRadianceRay(in Ray ray, in uint currentRayRecursionDepth)
 	rayDesc.Direction = ray.direction;
 
 	rayDesc.TMin = 0;
-	rayDesc.TMax = 600;
+	rayDesc.TMax = 10000;
 
 	VolumeRaytracer::VRayPayload rayPayload = { float4(0,0,0,0), currentRayRecursionDepth + 1 };
 
@@ -133,74 +147,79 @@ bool DetermineRayAABBIntersection(in Ray ray, in float3 aabb[2], out float tEnte
 
 int3 WorldSpaceToVoxelSpace(in float3 worldLocation)
 {
-	float3 volumeOrigin = -g_sceneCB.volumeExtend;
+	uint instance = InstanceID();
+
+	float3 volumeOrigin = -g_geometryCB[instance].volumeExtend;
 	float3 relativeVolumePos = worldLocation - volumeOrigin;
-	float distanceBetweenVoxel = g_sceneCB.distanceBtwVoxels;
+	float distanceBetweenVoxel = g_geometryCB[instance].distanceBtwVoxels;
 
 	return int3(floor(relativeVolumePos.x / distanceBetweenVoxel), floor(relativeVolumePos.y / distanceBetweenVoxel), floor(relativeVolumePos.z / distanceBetweenVoxel));
 }
 
 float3 VoxelIndexToWorldSpace(in int3 voxelIndex)
 {
-	float distanceBetweenVoxel = g_sceneCB.distanceBtwVoxels;
+	uint instance = InstanceID();
+
+	float distanceBetweenVoxel = g_geometryCB[instance].distanceBtwVoxels;
 	float3 voxelIndexF = voxelIndex;
-	float3 volumeOrigin = -g_sceneCB.volumeExtend;
+	float3 volumeOrigin = -g_geometryCB[instance].volumeExtend;
 
 	return voxelIndexF * distanceBetweenVoxel + volumeOrigin;
 }
 
 inline float3 WorldSpaceToCellSpace(in int3 cellOriginPos, in float3 worldLocation)
 {
+	uint instance = InstanceID();
+
 	float3 voxelOriginPos = VoxelIndexToWorldSpace(cellOriginPos);
 	float3 rel = worldLocation - voxelOriginPos;
 
-	return rel / g_sceneCB.distanceBtwVoxels;
+	return rel / g_geometryCB[instance].distanceBtwVoxels;
 }
 
 float3 WorldSpaceToBottomLevelCellSpace(in int3 cellOrigin, in float3 worldSpace)
 {
-	/*float3 voxelPos = VoxelIndexToWorldSpace(cellOrigin + int3(1,1,1));
-
-	return (voxelPos - worldSpace) / g_sceneCB.distanceBtwVoxels;*/
-
+	uint instance = InstanceID();
 	float3 voxelPos = VoxelIndexToWorldSpace(cellOrigin);
 
-	return (worldSpace - voxelPos) / g_sceneCB.distanceBtwVoxels;
+	return (worldSpace - voxelPos) / g_geometryCB[instance].distanceBtwVoxels;
 }
 
 float3 WorldSpaceToTopLevelCellSpace(in int3 cellOrigin, in float3 worldSpace)
 {
-	/*float3 voxelPos = VoxelIndexToWorldSpace(cellOrigin);
-
-	return (worldSpace - voxelPos) / g_sceneCB.distanceBtwVoxels;*/
-
+	uint instance = InstanceID();
 	float3 voxelPos = VoxelIndexToWorldSpace(cellOrigin + int3(1, 1, 1));
 
-	return abs(worldSpace - voxelPos) / g_sceneCB.distanceBtwVoxels;
+	return abs(worldSpace - voxelPos) / g_geometryCB[instance].distanceBtwVoxels;
 }
 
 float3 WorldDirectionToBottomLevelCellSpace(in float3 worldDirection)
 {
-	return worldDirection / g_sceneCB.distanceBtwVoxels;
+	uint instance = InstanceID();
+	return worldDirection / g_geometryCB[instance].distanceBtwVoxels;
 }
 
 float3 WorldDirectionToTopLevelCellSpace(in float3 worldDirection)
 {
-	return -worldDirection / g_sceneCB.distanceBtwVoxels;
+	uint instance = InstanceID();
+	return -worldDirection / g_geometryCB[instance].distanceBtwVoxels;
 }
 
 bool IsValidCell(in int3 originVoxelPos)
 {
+	uint instance = InstanceID();
+
 	return  originVoxelPos.x >= 0 &&
 			originVoxelPos.y >= 0 &&
 			originVoxelPos.z >= 0 &&
-			(originVoxelPos.x + 1) < g_sceneCB.voxelAxisCount &&
-			(originVoxelPos.y + 1) < g_sceneCB.voxelAxisCount &&
-			(originVoxelPos.z + 1) < g_sceneCB.voxelAxisCount;
+			(originVoxelPos.x + 1) < g_geometryCB[instance].voxelAxisCount &&
+			(originVoxelPos.y + 1) < g_geometryCB[instance].voxelAxisCount &&
+			(originVoxelPos.z + 1) < g_geometryCB[instance].voxelAxisCount;
 }
 
 int3 GoToNextVoxel(in Ray ray, in uint3 voxelIndex, in int3 direction, out float newT, out float3 voxelFaceNormal)
 {
+	uint instance = InstanceID();
 	float3 tMax = float3(100000, 100000, 100000);
 	int3 res = voxelIndex;
 	const float FLT_INFINITY = 1.#INF;
@@ -209,8 +228,8 @@ int3 GoToNextVoxel(in Ray ray, in uint3 voxelIndex, in int3 direction, out float
 	int3 sign = ray.direction > 0;
 
 	float3 voxelPos = VoxelIndexToWorldSpace(voxelIndex);
-	float3 voxelExtends = g_sceneCB.distanceBtwVoxels * 0.5;
-	float3 aabb[2] = { voxelPos, voxelPos + g_sceneCB.distanceBtwVoxels };
+	float3 voxelExtends = g_geometryCB[instance].distanceBtwVoxels * 0.5;
+	float3 aabb[2] = { voxelPos, voxelPos + g_geometryCB[instance].distanceBtwVoxels };
 
 	if(ray.direction.x != 0)
 		tMax.x = (aabb[sign.x].x - ray.origin.x) * invRayDirection.x;
@@ -264,52 +283,62 @@ float3 GetPositionAlongRay(in Ray ray, in float t)
 
 bool IsValidVoxelIndex(in int3 index)
 {
-	return index.x >= 0 && index.x < g_sceneCB.voxelAxisCount && index.y >= 0 && index.y < g_sceneCB.voxelAxisCount && index.z >= 0 && index.z < g_sceneCB.voxelAxisCount;
+	uint instance = InstanceID();
+	return index.x >= 0 && index.x < g_geometryCB[instance].voxelAxisCount && index.y >= 0 && index.y < g_geometryCB[instance].voxelAxisCount && index.z >= 0 && index.z < g_geometryCB[instance].voxelAxisCount;
 }
 
 bool IsSolid(in int3 index)
 {
-	return g_voxelVolume[index] <= 0;
+	uint instance = InstanceID();
+	return g_voxelVolume[instance][index] <= 0;
 }
 
 inline float GetCellVoxel1(in int3 cellOriginIndex)
 {
-	return g_voxelVolume[cellOriginIndex];
+	uint instance = InstanceID();
+	return g_voxelVolume[instance][cellOriginIndex];
 }
 
 inline float GetCellVoxel2(in int3 cellOriginIndex)
 {
-	return	g_voxelVolume[int3(cellOriginIndex.x + 1, cellOriginIndex.y, cellOriginIndex.z)];
+	uint instance = InstanceID();
+	return	g_voxelVolume[instance][int3(cellOriginIndex.x + 1, cellOriginIndex.y, cellOriginIndex.z)];
 }
 
 inline float GetCellVoxel3(in int3 cellOriginIndex)
 {
-	return	g_voxelVolume[int3(cellOriginIndex.x + 1, cellOriginIndex.y + 1, cellOriginIndex.z)];
+	uint instance = InstanceID();
+	return	g_voxelVolume[instance][int3(cellOriginIndex.x + 1, cellOriginIndex.y + 1, cellOriginIndex.z)];
 }
 
 inline float GetCellVoxel4(in int3 cellOriginIndex)
 {
-	return	g_voxelVolume[int3(cellOriginIndex.x, cellOriginIndex.y + 1, cellOriginIndex.z)];
+	uint instance = InstanceID();
+	return	g_voxelVolume[instance][int3(cellOriginIndex.x, cellOriginIndex.y + 1, cellOriginIndex.z)];
 }
 
 inline float GetCellVoxel5(in int3 cellOriginIndex)
 {
-	return g_voxelVolume[int3(cellOriginIndex.x, cellOriginIndex.y, cellOriginIndex.z + 1)];
+	uint instance = InstanceID();
+	return g_voxelVolume[instance][int3(cellOriginIndex.x, cellOriginIndex.y, cellOriginIndex.z + 1)];
 }
 
 inline float GetCellVoxel6(in int3 cellOriginIndex)
 {
-	return	g_voxelVolume[int3(cellOriginIndex.x + 1, cellOriginIndex.y, cellOriginIndex.z + 1)];
+	uint instance = InstanceID();
+	return	g_voxelVolume[instance][int3(cellOriginIndex.x + 1, cellOriginIndex.y, cellOriginIndex.z + 1)];
 }
 
 inline float GetCellVoxel7(in int3 cellOriginIndex)
 {
-	return	g_voxelVolume[int3(cellOriginIndex.x + 1, cellOriginIndex.y + 1, cellOriginIndex.z + 1)];
+	uint instance = InstanceID();
+	return	g_voxelVolume[instance][int3(cellOriginIndex.x + 1, cellOriginIndex.y + 1, cellOriginIndex.z + 1)];
 }
 
 inline float GetCellVoxel8(in int3 cellOriginIndex)
 {
-	return	g_voxelVolume[int3(cellOriginIndex.x, cellOriginIndex.y + 1, cellOriginIndex.z + 1)];
+	uint instance = InstanceID();
+	return	g_voxelVolume[instance][int3(cellOriginIndex.x, cellOriginIndex.y + 1, cellOriginIndex.z + 1)];
 }
 
 bool HasIsoSurfaceInsideCell(in int3 cellOriginIndex)
@@ -323,8 +352,6 @@ bool HasIsoSurfaceInsideCell(in int3 cellOriginIndex)
 	float v7 = GetCellVoxel7(cellOriginIndex);
 	float v8 = GetCellVoxel8(cellOriginIndex);
 
-	//return (sign(v1.g) & sign(v2.g) & sign(v3.g) & sign(v4.g) & sign(v5.g) & sign(v6.g) & sign(v7.g) & sign(v8.g)) != sign(v1.g);
-
 	float v1Sign = sign(v1);
 
 	return  v1Sign != sign(v2) ||
@@ -334,6 +361,27 @@ bool HasIsoSurfaceInsideCell(in int3 cellOriginIndex)
 			v1Sign != sign(v6) ||
 			v1Sign != sign(v7) ||
 			v1Sign != sign(v8);
+}
+
+bool IsSolidCell(in int3 cellOriginIndex)
+{
+	float v1 = GetCellVoxel1(cellOriginIndex);
+	float v2 = GetCellVoxel2(cellOriginIndex);
+	float v3 = GetCellVoxel3(cellOriginIndex);
+	float v4 = GetCellVoxel4(cellOriginIndex);
+	float v5 = GetCellVoxel5(cellOriginIndex);
+	float v6 = GetCellVoxel6(cellOriginIndex);
+	float v7 = GetCellVoxel7(cellOriginIndex);
+	float v8 = GetCellVoxel8(cellOriginIndex);
+
+	return	v1 < 0.f &&
+			v2 < 0.f &&
+			v3 < 0.f &&
+			v4 < 0.f &&
+			v5 < 0.f &&
+			v6 < 0.f &&
+			v7 < 0.f &&
+			v8 < 0.f;
 }
 
 inline float SumUVW(in float u0, in float v0, in float w0, in float u1, in float v1, in float w1)
@@ -350,15 +398,11 @@ inline float SumUVW(in float u0, in float v0, in float w0, in float u1, in float
 
 void GetDensityPolynomial(in Ray ray, in int3 cellIndex, in float tIn, in float tOut, out float A, out float B, out float C, out float D)
 {
-	//float3 a0 = WorldSpaceToBottomLevelCellSpace(cellIndex, GetPositionAlongRay(ray, tIn));
-	//float3 a1 = 1 - a0;/* WorldSpaceToTopLevelCellSpace(cellIndex, ray.origin);*/
-	//float3 b0 = WorldSpaceToBottomLevelCellSpace(cellIndex, GetPositionAlongRay(ray, tOut)) - a0; /*WorldDirectionToBottomLevelCellSpace(ray.direction);*/
-	//float3 b1 = -b0; /*WorldDirectionToTopLevelCellSpace(ray.direction);*/
-
+	uint instance = InstanceID();
 	float3 a1 = WorldSpaceToBottomLevelCellSpace(cellIndex, GetPositionAlongRay(ray, tIn));
-	float3 a0 = 1 - a1;/* WorldSpaceToTopLevelCellSpace(cellIndex, ray.origin);*/
-	float3 b1 = WorldSpaceToBottomLevelCellSpace(cellIndex, GetPositionAlongRay(ray, tOut)) - a1; /*WorldDirectionToBottomLevelCellSpace(ray.direction);*/
-	float3 b0 = -b1; /*WorldDirectionToTopLevelCellSpace(ray.direction);*/
+	float3 a0 = 1 - a1;
+	float3 b1 = WorldSpaceToBottomLevelCellSpace(cellIndex, GetPositionAlongRay(ray, tOut)) - a1;
+	float3 b0 = -b1;
 
 	int3 v000 = cellIndex;
 	int3 v100 = cellIndex + int3(1, 0, 0);
@@ -369,41 +413,41 @@ void GetDensityPolynomial(in Ray ray, in int3 cellIndex, in float tIn, in float 
 	int3 v111 = cellIndex + int3(1, 1, 1);
 	int3 v011 = cellIndex + int3(0, 1, 1);
 
-	A =	b0.x * b0.y * b0.z * g_voxelVolume[v000] + 
-		b1.x * b0.y * b0.z * g_voxelVolume[v100] +
-		b0.x * b1.y * b0.z * g_voxelVolume[v010] +
-		b1.x * b1.y * b0.z * g_voxelVolume[v110] +
-		b0.x * b0.y * b1.z * g_voxelVolume[v001] +
-		b1.x * b0.y * b1.z * g_voxelVolume[v101] +
-		b0.x * b1.y * b1.z * g_voxelVolume[v011] +
-		b1.x * b1.y * b1.z * g_voxelVolume[v111];
+	A =	b0.x * b0.y * b0.z * g_voxelVolume[instance][v000] + 
+		b1.x * b0.y * b0.z * g_voxelVolume[instance][v100] +
+		b0.x * b1.y * b0.z * g_voxelVolume[instance][v010] +
+		b1.x * b1.y * b0.z * g_voxelVolume[instance][v110] +
+		b0.x * b0.y * b1.z * g_voxelVolume[instance][v001] +
+		b1.x * b0.y * b1.z * g_voxelVolume[instance][v101] +
+		b0.x * b1.y * b1.z * g_voxelVolume[instance][v011] +
+		b1.x * b1.y * b1.z * g_voxelVolume[instance][v111];
 
-	D = a0.x * a0.y * a0.z * g_voxelVolume[v000] +
-		a1.x * a0.y * a0.z * g_voxelVolume[v100] +
-		a0.x * a1.y * a0.z * g_voxelVolume[v010] +
-		a1.x * a1.y * a0.z * g_voxelVolume[v110] +
-		a0.x * a0.y * a1.z * g_voxelVolume[v001] +
-		a1.x * a0.y * a1.z * g_voxelVolume[v101] +
-		a0.x * a1.y * a1.z * g_voxelVolume[v011] +
-		a1.x * a1.y * a1.z * g_voxelVolume[v111];
+	D = a0.x * a0.y * a0.z * g_voxelVolume[instance][v000] +
+		a1.x * a0.y * a0.z * g_voxelVolume[instance][v100] +
+		a0.x * a1.y * a0.z * g_voxelVolume[instance][v010] +
+		a1.x * a1.y * a0.z * g_voxelVolume[instance][v110] +
+		a0.x * a0.y * a1.z * g_voxelVolume[instance][v001] +
+		a1.x * a0.y * a1.z * g_voxelVolume[instance][v101] +
+		a0.x * a1.y * a1.z * g_voxelVolume[instance][v011] +
+		a1.x * a1.y * a1.z * g_voxelVolume[instance][v111];
 
-	B = (a0.x * b0.y * b0.z + b0.x * a0.y * b0.z + b0.x * b0.y * a0.z) * g_voxelVolume[v000] +
-		(a1.x * b0.y * b0.z + b1.x * a0.y * b0.z + b1.x * b0.y * a0.z) * g_voxelVolume[v100] +
-		(a0.x * b1.y * b0.z + b0.x * a1.y * b0.z + b0.x * b1.y * a0.z) * g_voxelVolume[v010] +
-		(a1.x * b1.y * b0.z + b1.x * a1.y * b0.z + b1.x * b1.y * a0.z) * g_voxelVolume[v110] +
-		(a0.x * b0.y * b1.z + b0.x * a0.y * b1.z + b0.x * b0.y * a1.z) * g_voxelVolume[v001] +
-		(a1.x * b0.y * b1.z + b1.x * a0.y * b1.z + b1.x * b0.y * a1.z) * g_voxelVolume[v101] +
-		(a0.x * b1.y * b1.z + b0.x * a1.y * b1.z + b0.x * b1.y * a1.z) * g_voxelVolume[v011] +
-		(a1.x * b1.y * b1.z + b1.x * a1.y * b1.z + b1.x * b1.y * a1.z) * g_voxelVolume[v111];
+	B = (a0.x * b0.y * b0.z + b0.x * a0.y * b0.z + b0.x * b0.y * a0.z) * g_voxelVolume[instance][v000] +
+		(a1.x * b0.y * b0.z + b1.x * a0.y * b0.z + b1.x * b0.y * a0.z) * g_voxelVolume[instance][v100] +
+		(a0.x * b1.y * b0.z + b0.x * a1.y * b0.z + b0.x * b1.y * a0.z) * g_voxelVolume[instance][v010] +
+		(a1.x * b1.y * b0.z + b1.x * a1.y * b0.z + b1.x * b1.y * a0.z) * g_voxelVolume[instance][v110] +
+		(a0.x * b0.y * b1.z + b0.x * a0.y * b1.z + b0.x * b0.y * a1.z) * g_voxelVolume[instance][v001] +
+		(a1.x * b0.y * b1.z + b1.x * a0.y * b1.z + b1.x * b0.y * a1.z) * g_voxelVolume[instance][v101] +
+		(a0.x * b1.y * b1.z + b0.x * a1.y * b1.z + b0.x * b1.y * a1.z) * g_voxelVolume[instance][v011] +
+		(a1.x * b1.y * b1.z + b1.x * a1.y * b1.z + b1.x * b1.y * a1.z) * g_voxelVolume[instance][v111];
 
-	C = (b0.x * a0.y * a0.z + a0.x * b0.y * a0.z + a0.x * a0.y * b0.z) * g_voxelVolume[v000] +
-		(b1.x * a0.y * a0.z + a1.x * b0.y * a0.z + a1.x * a0.y * b0.z) * g_voxelVolume[v100] +
-		(b0.x * a1.y * a0.z + a0.x * b1.y * a0.z + a0.x * a1.y * b0.z) * g_voxelVolume[v010] +
-		(b1.x * a1.y * a0.z + a1.x * b1.y * a0.z + a1.x * a1.y * b0.z) * g_voxelVolume[v110] +
-		(b0.x * a0.y * a1.z + a0.x * b0.y * a1.z + a0.x * a0.y * b1.z) * g_voxelVolume[v001] +
-		(b1.x * a0.y * a1.z + a1.x * b0.y * a1.z + a1.x * a0.y * b1.z) * g_voxelVolume[v101] +
-		(b0.x * a1.y * a1.z + a0.x * b1.y * a1.z + a0.x * a1.y * b1.z) * g_voxelVolume[v011] +
-		(b1.x * a1.y * a1.z + a1.x * b1.y * a1.z + a1.x * a1.y * b1.z) * g_voxelVolume[v111];
+	C = (b0.x * a0.y * a0.z + a0.x * b0.y * a0.z + a0.x * a0.y * b0.z) * g_voxelVolume[instance][v000] +
+		(b1.x * a0.y * a0.z + a1.x * b0.y * a0.z + a1.x * a0.y * b0.z) * g_voxelVolume[instance][v100] +
+		(b0.x * a1.y * a0.z + a0.x * b1.y * a0.z + a0.x * a1.y * b0.z) * g_voxelVolume[instance][v010] +
+		(b1.x * a1.y * a0.z + a1.x * b1.y * a0.z + a1.x * a1.y * b0.z) * g_voxelVolume[instance][v110] +
+		(b0.x * a0.y * a1.z + a0.x * b0.y * a1.z + a0.x * a0.y * b1.z) * g_voxelVolume[instance][v001] +
+		(b1.x * a0.y * a1.z + a1.x * b0.y * a1.z + a1.x * a0.y * b1.z) * g_voxelVolume[instance][v101] +
+		(b0.x * a1.y * a1.z + a0.x * b1.y * a1.z + a0.x * a1.y * b1.z) * g_voxelVolume[instance][v011] +
+		(b1.x * a1.y * a1.z + a1.x * b1.y * a1.z + a1.x * a1.y * b1.z) * g_voxelVolume[instance][v111];
 }
 
 float GetDensity(in int3 cellOriginIndex, in float3 cellPos)
@@ -411,25 +455,7 @@ float GetDensity(in int3 cellOriginIndex, in float3 cellPos)
 	if(!IsValidCell(cellOriginIndex))
 		return -1.f;
 
-	/*float v1 = GetCellVoxel1(cellOriginIndex);
-	float v2 = GetCellVoxel2(cellOriginIndex);
-	float v3 = GetCellVoxel3(cellOriginIndex);
-	float v4 = GetCellVoxel4(cellOriginIndex);
-	float v5 = GetCellVoxel5(cellOriginIndex);
-	float v6 = GetCellVoxel6(cellOriginIndex);
-	float v7 = GetCellVoxel7(cellOriginIndex);
-	float v8 = GetCellVoxel8(cellOriginIndex);
-
-	float a = v3 + v6 + v1 + v8 - v4 - v7 - v5 - v2;
-	float b = v7 - v6 - v3 + v2;
-	float c = v4 - v1 - v3 + v2;
-	float d = v5 - v1 - v6 + v2;
-	float e = v3 - v2;
-	float f = v6 - v2;
-	float g = v1 - v2;
-	float h = v2;
-
-	return a * cellPos.x * cellPos.y * cellPos.z + b * cellPos.y * cellPos.z + c * cellPos.x * cellPos.z + d * cellPos.x * cellPos.y + e * cellPos.y + f * cellPos.z + g * cellPos.x + h;*/
+	uint instance = InstanceID();
 
 	float p = 0.f;
 
@@ -443,7 +469,7 @@ float GetDensity(in int3 cellOriginIndex, in float3 cellPos)
 				float v = abs((1 - j) - cellPos.y);
 				float w = abs((1 - k) - cellPos.z);
 
-				p += (u * v * w * g_voxelVolume[cellOriginIndex + int3(i, j, k)]);
+				p += (u * v * w * g_voxelVolume[instance][cellOriginIndex + int3(i, j, k)]);
 			}
 		}
 	}
@@ -459,7 +485,7 @@ inline float GetDensityWithPolynomial(in float t, in float A, in float B, in flo
 bool GetSurfaceIntersectionT(in Ray ray, in int3 cellIndex, in float tIn, in float tOut, out float tHit)
 {
 	float A, B, C, D = 0;
-	float t0 = 0;
+	float t0 = max(0, -tIn / (tOut - tIn));
 	float t1 = 1;
 
 	GetDensityPolynomial(ray, cellIndex, tIn, tOut, A, B, C, D);
@@ -477,17 +503,6 @@ bool GetSurfaceIntersectionT(in Ray ray, in int3 cellIndex, in float tIn, in flo
 
 	float f0 = GetDensityWithPolynomial(t0, A, B, C, D);
 	float f1 = GetDensityWithPolynomial(t1, A, B, C, D);
-
-	//if (f0 <= 0)
-	//{
-	//	tHit = t0;
-	//	return true;
-	//}
-	//else
-	//{
-	//	return false;
-	//}
-
 
 	if (ex1 > ex2)
 	{
@@ -551,18 +566,18 @@ bool GetSurfaceIntersectionT(in Ray ray, in int3 cellIndex, in float tIn, in flo
 	}
 
 	tHit = t0 + (t1 - t0) * (-f0 / (f1 - f0));
-	//tHit = (tHit * (tOut - tIn)) / -tIn;
-
 	tHit = lerp(tIn, tOut, tHit);
 
-	return true;
+	return tHit > 0;
 }
 
 float3 GetNormal(in int3 cellIndex, in float3 normPos)
 {
-	float x = (GetDensity(cellIndex + int3(1,0,0), normPos) - GetDensity(cellIndex - int3(1,0,0), normPos)) / (2 * g_sceneCB.distanceBtwVoxels);
-	float y = (GetDensity(cellIndex + int3(0,1,0), normPos) - GetDensity(cellIndex - int3(0,1,0), normPos)) / (2 * g_sceneCB.distanceBtwVoxels);
-	float z = (GetDensity(cellIndex + int3(0,0,1), normPos) - GetDensity(cellIndex - int3(0,0,1), normPos)) / (2 * g_sceneCB.distanceBtwVoxels);
+	uint instance = InstanceID();
+
+	float x = (GetDensity(cellIndex + int3(1,0,0), normPos) - GetDensity(cellIndex - int3(1,0,0), normPos)) / (2 * g_geometryCB[instance].distanceBtwVoxels);
+	float y = (GetDensity(cellIndex + int3(0,1,0), normPos) - GetDensity(cellIndex - int3(0,1,0), normPos)) / (2 * g_geometryCB[instance].distanceBtwVoxels);
+	float z = (GetDensity(cellIndex + int3(0,0,1), normPos) - GetDensity(cellIndex - int3(0,0,1), normPos)) / (2 * g_geometryCB[instance].distanceBtwVoxels);
 
 	float3 norm = float3(x,y,z);
 	bool3 nan = isnan(norm);
@@ -575,42 +590,6 @@ float3 GetNormal(in int3 cellIndex, in float3 normPos)
 	{
 		return normalize(norm);
 	}
-
-	/*float v1 = GetCellVoxel1(cellIndex);
-	float v2 = GetCellVoxel2(cellIndex);
-	float v3 = GetCellVoxel3(cellIndex);
-	float v4 = GetCellVoxel4(cellIndex);
-	float v5 = GetCellVoxel5(cellIndex);
-	float v6 = GetCellVoxel6(cellIndex);
-	float v7 = GetCellVoxel7(cellIndex);
-	float v8 = GetCellVoxel8(cellIndex);
-
-
-
-	float a = v3 + v6 + v1 + v8 - v4 - v7 - v5 - v2;
-	float b = v7 - v6 - v3 + v2;
-	float c = v4 - v1 - v3 + v2;
-	float d = v5 - v1 - v6 + v2;
-	float e = v3 - v2;
-	float f = v6 - v2;
-	float g = v1 - v2;
-
-	float nX = a * normPos.y * normPos.z + c * normPos.z + d * normPos.y + g;
-	float nY = a * normPos.z * normPos.x + b * normPos.z + d * normPos.x + e;
-	float nZ = a * normPos.y * normPos.x + b * normPos.y + c * normPos.x + f;
-
-	float3 norm = normalize(float3(nX, nY, nZ));
-
-	if (isnan(norm.x))
-	{
-		return float3(0,0,0);
-	}
-	else
-	{
-		return norm;
-	}*/
-
-
 }
 
 [shader("raygeneration")]
@@ -628,83 +607,134 @@ void VRRaygen()
 void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytracer::VPrimitiveAttributes attr)
 {
 	float3 hitPosition = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
+	float3 shadowRayOrigin = hitPosition + g_sceneCB.dirLightDirection * 0.01;
 
-	//Ray shadowRay = { hitPosition, -g_sceneCB.dirLightDirection };
+	Ray shadowRay;
+	shadowRay.origin = shadowRayOrigin;
+	shadowRay.direction = g_sceneCB.dirLightDirection;
 
-	//bool shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth);
+	bool shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth);
 
 	float diffuse = (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);
+	//float diffuse = 1.f;
+
+	diffuse *= (shadowRayHit ? 0.2 : 1);
 
 	rayPayload.color.rgb = float3(1.f, 1.f, 1.f) * diffuse;
+	//rayPayload.color.rgb = attr.normal;
 	rayPayload.color.a = 1.f;
-
-	//rayPayload.color = float4(1.f, 1.f, 1.f, 1.f) * (shadowRayHit ? 0.35f : 1.f);
-	//rayPayload.color = float4(abs((attr.normal + 1) * 0.5), 1);
 }
 
 [shader("intersection")]
 void VRIntersection()
 {
+	uint instance = InstanceID();
+	
 	Ray ray;
 
 	ray.origin = WorldRayOrigin();
 	ray.direction = WorldRayDirection();
 
+	Ray localRay = GetLocalRay();
+
 	//Check if we intersect voxel volume
-	float3 volumeAABB[2] = {float3(-g_sceneCB.volumeExtend, -g_sceneCB.volumeExtend, -g_sceneCB.volumeExtend), float3(g_sceneCB.volumeExtend, g_sceneCB.volumeExtend, g_sceneCB.volumeExtend)};
+	float3 volumeAABB[2] = {float3(-g_geometryCB[instance].volumeExtend, -g_geometryCB[instance].volumeExtend, -g_geometryCB[instance].volumeExtend), float3(g_geometryCB[instance].volumeExtend, g_geometryCB[instance].volumeExtend, g_geometryCB[instance].volumeExtend)};
 	float tEnter, tExit;
 
 	float tMax = RayTCurrent();
 
-	if (DetermineRayAABBIntersection(ray, volumeAABB, tEnter, tExit))
+	if (DetermineRayAABBIntersection(localRay, volumeAABB, tEnter, tExit))
 	{
-		int3 voxelDir = sign(ray.direction);
+		int3 voxelDir = sign(localRay.direction);
 		int3 voxelPos;
 		int3 nextVoxelPos;
-		float3 hitNormal = -ray.direction;
+		float3 hitNormal = -localRay.direction;
 		float cellExit;
 		float cellEnter;
 		float tHit;
 
-		tEnter += 0.0001;
-
 		if (tEnter >= 0)
 		{
-			voxelPos = WorldSpaceToVoxelSpace(GetPositionAlongRay(ray, tEnter));
+			tEnter += 0.01;
+
+			voxelPos = WorldSpaceToVoxelSpace(GetPositionAlongRay(localRay, tEnter));
+			cellExit = tEnter;
 		}
 		else
 		{
-			voxelPos = WorldSpaceToVoxelSpace(ray.origin);
-		}
+			voxelPos = WorldSpaceToVoxelSpace(localRay.origin);
 
-		cellExit = tEnter;
+			//Cell exit is behind the ray origin, to calculate it we traverse to the previous voxel.
+			GoToNextVoxel(ReverseRay(localRay), voxelPos, -voxelDir, cellExit, hitNormal);
+
+			cellExit = -cellExit;
+			cellExit += 0.01;
+		}
 
 		int maxIterations = 3000;
 
-		while (cellExit <= tMax && maxIterations > 0)
+		if (IsValidCell(voxelPos) && IsSolidCell(voxelPos))
+		{
+			float3 rayPos = GetPositionAlongRay(localRay, tEnter - 0.1);
+
+			VolumeRaytracer::VPrimitiveAttributes attr;
+			attr.normal = sign(rayPos - volumeAABB[1]);
+
+			if (attr.normal.x < 0)
+			{
+				attr.normal.x = rayPos.x < volumeAABB[0].x ? -1 : 0;
+			}
+
+			if (attr.normal.y < 0)
+			{
+				attr.normal.y = rayPos.y < volumeAABB[0].y ? -1 : 0;
+			}
+
+			if (attr.normal.z < 0)
+			{
+				attr.normal.z = rayPos.z < volumeAABB[0].z ? -1 : 0;
+			}
+
+			attr.normal = normalize(attr.normal);
+
+			ReportHit(tEnter, 0, attr);
+
+			return;
+		}
+
+		while (cellExit <= tExit && maxIterations > 0)
 		{
 			maxIterations--;
 
 			cellEnter = cellExit;
 
-			nextVoxelPos = GoToNextVoxel(ray, voxelPos, voxelDir, cellExit, hitNormal);
+			nextVoxelPos = GoToNextVoxel(localRay, voxelPos, voxelDir, cellExit, hitNormal);
 
 			if (IsValidCell(voxelPos))
 			{
+				//VolumeRaytracer::VPrimitiveAttributes attr;
+				//attr.normal = float3(1, 1, 1);
+
+				//ReportHit(10, 0, attr);
+
+				//return;
+
 				if (HasIsoSurfaceInsideCell(voxelPos))
 				{
-					/*VolumeRaytracer::VPrimitiveAttributes attr;
-					attr.normal = float3(1, 0, 0);
-
-					ReportHit(cellEnter, 0, attr);*/
-
-					if (GetSurfaceIntersectionT(ray, voxelPos, cellEnter, cellExit, tHit))
+					if (GetSurfaceIntersectionT(localRay, voxelPos, cellEnter, cellExit, tHit))
 					{
 						VolumeRaytracer::VPrimitiveAttributes attr;
-						attr.normal = GetNormal(voxelPos, WorldSpaceToBottomLevelCellSpace(voxelPos, GetPositionAlongRay(ray, tHit)));
+						attr.normal = GetNormal(voxelPos, WorldSpaceToBottomLevelCellSpace(voxelPos, GetPositionAlongRay(localRay, tHit)));
 
 						ReportHit(tHit, 0, attr);
 					}
+					//else
+					//{
+					//	VolumeRaytracer::VPrimitiveAttributes attr;
+					//	attr.normal = float3(1.f, 1.f, 1.f);
+
+					//	ReportHit(tHit, 0, attr);
+					//}
 				}
 			}
 			

@@ -17,18 +17,9 @@
 VolumeRaytracer::Renderer::VRScene::~VRScene()
 {}
 
-void VolumeRaytracer::Renderer::VRScene::InitFromScene(Voxel::VVoxelScene* scene)
+void VolumeRaytracer::Renderer::VRScene::InitFromScene(std::weak_ptr<VRenderer> renderer, std::weak_ptr<Scene::VScene> scene)
 {
 	Cleanup();
-
-	Bounds = scene->GetSceneBounds();
-	VolumeExtends = scene->GetVolumeExtends();
-	VoxelCountAlongAxis = scene->GetSize();
-}
-
-void VolumeRaytracer::Renderer::VRScene::SyncWithScene(Voxel::VVoxelScene* scene)
-{
-	
 }
 
 void VolumeRaytracer::Renderer::VRScene::Cleanup()

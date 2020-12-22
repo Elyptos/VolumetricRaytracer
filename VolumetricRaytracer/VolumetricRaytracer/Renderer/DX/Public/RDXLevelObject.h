@@ -13,38 +13,44 @@
 */
 
 #pragma once
-#include "Object.h"
-#include "Vector.h"
-#include "Quat.h"
+
+#include "DXHelper.h"
 
 namespace VolumeRaytracer
 {
 	namespace Scene
 	{
-		class VScene;
+		class VLevelObject;
+	}
 
-		class VLevelObject : public VObject
+	namespace Renderer
+	{
+		namespace DX
 		{
-			friend class VScene;
+			struct VDXLevelObjectDesc
+			{
+			public:
+				Scene::VLevelObject* LevelObject;
+			};
 
-		public:
-			std::weak_ptr<VScene> GetScene() const;
+			class VDXLevelObject
+			{
+			public:
+				VDXLevelObject(const VDXLevelObjectDesc& desc);
+				~VDXLevelObject() = default;
 
-		protected:
-			virtual void OnSceneSet(){}
-			virtual void OnPendingSceneRemoval(){}
+				void ChangeGeometry(const size_t& instanceID, const D3D12_GPU_VIRTUAL_ADDRESS& blasHandle);
+				void Update();
+				D3D12_RAYTRACING_INSTANCE_DESC GetInstanceDesc() const;
 
-		private:
-			void SetScene(std::weak_ptr<VScene> scene);
-			void RemoveFromScene();
+				VDXLevelObjectDesc GetObjectDesc() const;
 
-		public:
-			VVector Position = VVector::ZERO;
-			VQuat Rotation = VQuat::IDENTITY;
-			VVector Scale = VVector::ZERO;
-
-		private:
-			std::weak_ptr<VScene> Scene;
-		};
+			private:
+				VDXLevelObjectDesc Desc;
+				D3D12_RAYTRACING_INSTANCE_DESC InstanceDesc;
+				size_t InstanceID;
+				D3D12_GPU_VIRTUAL_ADDRESS BLASHandle;
+			};
+		}
 	}
 }

@@ -12,26 +12,24 @@
 	copies or substantial portions of the Software.
 */
 
-#include "VoxelScene.h"
+#include "Scene.h"
 
 namespace VolumeRaytracer
 {
 	namespace Renderer
 	{
+		class VRenderer;
+
 		class VRScene
 		{
 		public:
 			VRScene() = default;
 			virtual ~VRScene();
 
-			virtual void InitFromScene(Voxel::VVoxelScene* scene);
-			virtual void SyncWithScene(Voxel::VVoxelScene* scene);
+			virtual void InitFromScene(std::weak_ptr<VRenderer> renderer, std::weak_ptr<Scene::VScene> scene);
+			virtual void SyncWithScene(std::weak_ptr<VRenderer> renderer, std::weak_ptr<Scene::VScene> scene) {}
+			virtual void PrepareForRendering(std::weak_ptr<VRenderer> renderer, const unsigned int& backBufferIndex) = 0;
 			virtual void Cleanup();
-
-		protected:
-			float VolumeExtends = 0.f;
-			unsigned int VoxelCountAlongAxis;
-			VAABB Bounds;
 		};
 	}
 }

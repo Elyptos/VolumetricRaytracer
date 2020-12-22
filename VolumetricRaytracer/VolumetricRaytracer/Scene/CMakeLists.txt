@@ -19,6 +19,9 @@ add_library (VScene ${scene_public} ${scene_private})
 target_include_directories(VScene PUBLIC "Public")
 target_link_libraries(VScene VCore)
 
+if(Boost_FOUND)
+	target_include_directories(VScene PUBLIC ${Boost_INCLUDE_DIRS})
+endif()
 
 #target_include_directories(VCore PUBLIC spdlogIncludeDir)
 

@@ -45,6 +45,19 @@ void VolumeRaytracer::VGlobalTickManager::CallTickOnAllAllowedObjects(const floa
 	}
 }
 
+void VolumeRaytracer::VGlobalTickManager::CallPostRenderOnAllAllowedObjects()
+{
+	for (std::list<VObject*>::iterator it = TickableObjects.begin(); it != TickableObjects.end(); it++)
+	{
+		VObject* obj = *it;
+
+		if (obj->ShouldTick())
+		{
+			obj->PostRender();
+		}
+	}
+}
+
 bool VolumeRaytracer::VGlobalTickManager::IsAllowedToAddObject(VObject* obj) const
 {
 	return obj != nullptr && obj->CanEverTick();

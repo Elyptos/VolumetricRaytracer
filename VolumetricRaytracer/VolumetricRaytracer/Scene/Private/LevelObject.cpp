@@ -13,3 +13,31 @@
 */
 
 #include "LevelObject.h"
+#include "Logger.h"
+
+std::weak_ptr<VolumeRaytracer::Scene::VScene> VolumeRaytracer::Scene::VLevelObject::GetScene() const
+{
+	return Scene;
+}
+
+void VolumeRaytracer::Scene::VLevelObject::SetScene(std::weak_ptr<VScene> scene)
+{
+	if (Scene.expired())
+	{
+		Scene = scene;
+		OnSceneSet();
+	}
+	else
+	{
+		V_LOG_ERROR("Tried to change scene of object which is inside a scene!");
+	}
+}
+
+void VolumeRaytracer::Scene::VLevelObject::RemoveFromScene()
+{
+	if (!Scene.expired())
+	{
+		OnPendingSceneRemoval();
+		Scene.reset();
+	}
+}

@@ -22,7 +22,9 @@
 #include "Camera.h"
 #include "Light.h"
 #include "Quat.h"
-#include "VoxelScene.h"
+#include "Scene.h"
+#include "VoxelObject.h"
+#include "VoxelVolume.h"
 #include "DensityGenerator.h"
 
 #define _USE_MATH_DEFINES
@@ -61,11 +63,6 @@ void VolumeRaytracer::App::RendererEngineInstance::OnEngineShutdown()
 
 void VolumeRaytracer::App::RendererEngineInstance::OnEngineUpdate(const float& deltaTime)
 {
-	//VVector currentPos = Scene->GetSceneCamera()->Position;
-	//currentPos = VVector::Lerp(currentPos, TargetCameraLocation, deltaTime * 10.f);
-
-	//Scene->GetSceneCamera()->Position = currentPos;
-
 	std::wstringstream windowTitle;
 
 	windowTitle << L"Volume Raytracer | FPS: " << Engine->GetFPS();
@@ -98,8 +95,8 @@ void VolumeRaytracer::App::RendererEngineInstance::OnKeyDown(const VolumeRaytrac
 	const float movementSpeed = 100.f;
 	VolumeRaytracer::VVector velocity;
 
-	VolumeRaytracer::VVector forward = Scene->GetSceneCamera()->Rotation.GetForwardVector();
-	VolumeRaytracer::VVector right = Scene->GetSceneCamera()->Rotation.GetRightVector();
+	VolumeRaytracer::VVector forward = Camera->Rotation.GetForwardVector();
+	VolumeRaytracer::VVector right = Camera->Rotation.GetRightVector();
 
 	switch (key)
 	{
@@ -125,7 +122,7 @@ void VolumeRaytracer::App::RendererEngineInstance::OnKeyDown(const VolumeRaytrac
 		break;
 	}
 
-	Scene->GetSceneCamera()->Position = Scene->GetSceneCamera()->Position + velocity;
+	Camera->Position = Camera->Position + velocity;
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::OnAxisInput(const VolumeRaytracer::UI::EVAxisType& axis, const float& delta)
@@ -136,31 +133,46 @@ void VolumeRaytracer::App::RendererEngineInstance::OnAxisInput(const VolumeRaytr
 		{
 			VolumeRaytracer::VQuat deltaRotation = VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, -delta * (M_PI / 180.f));
 
-			Scene->GetSceneCamera()->Rotation = deltaRotation * Scene->GetSceneCamera()->Rotation;
+			Camera->Rotation = deltaRotation * Camera->Rotation;
 		}
 		else if (axis == VolumeRaytracer::UI::EVAxisType::MouseY)
 		{
-			VolumeRaytracer::VQuat currentRotation = Scene->GetSceneCamera()->Rotation;
+			VolumeRaytracer::VQuat currentRotation = Camera->Rotation;
 
 			VolumeRaytracer::VQuat deltaRotation = VolumeRaytracer::VQuat::FromAxisAngle(currentRotation.GetRightVector(), delta * (M_PI / 180.f));
 
-			Scene->GetSceneCamera()->Rotation = deltaRotation * currentRotation;
+			Camera->Rotation = deltaRotation * currentRotation;
 		}
 	}
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
-	Scene = VObject::CreateObject<Voxel::VVoxelScene>(140, 200.f);
-	Scene->GetSceneCamera()->Position = VolumeRaytracer::VVector(300.f, 0.f, 100.f);
-	TargetCameraLocation = Scene->GetSceneCamera()->Position;
-	Scene->GetSceneCamera()->Rotation = VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f));
+	Scene = VObject::CreateObject<Scene::VScene>();
+	Camera = Scene->SpawnObject<Scene::VCamera>(VVector(300.f, 0.f, 100.f), VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f)), VVector::ONE);
+
+	DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
+		* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 135.f * (M_PI / 180.f)), VVector::ONE);
+	DirectionalLight->IlluminationStrength = 5.f;
+
+	//Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+	Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
+	Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+	Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);
 
 	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
-	
-	Scene->GetDirectionalLight()->Rotation = VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
-												* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 135.f * (M_PI / 180.f));
-	Scene->GetDirectionalLight()->IlluminationStrength = 5.f;
+	Scene->SetActiveSceneCamera(Camera);
+	Scene->SetActiveDirectionalLight(DirectionalLight);
+
+	//InitSnowmanObject();
+	InitFloor();
+	InitSphere();
+	InitCube();
+}
+
+void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
+{
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(140, 200.f);
 
 	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
 
@@ -192,18 +204,16 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 	std::shared_ptr<Scene::VBox> box = std::make_shared<Scene::VBox>();
 	box->Extends = VVector::ONE * 100.f;
 
-	//densityObj->GetRootShape().AddChild(box);
-
 	densityObj->Position = VVector::FORWARD * -150.f;
 
 	#pragma omp parallel for collapse(3)
-	for (int x = 0; x < Scene->GetSize(); x++)
+	for (int x = 0; x < voxelVolume->GetSize(); x++)
 	{
-		for (int y = 0; y < Scene->GetSize(); y++)
+		for (int y = 0; y < voxelVolume->GetSize(); y++)
 		{
-			for (int z = 0; z < Scene->GetSize(); z++)
+			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = Scene->VoxelIndexToWorldPosition(x, y, z);
+				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
 
 				float density = densityObj->Evaluate(voxelPos);
 
@@ -212,9 +222,109 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 				voxel.Material = density <= 0 ? 1 : 0;
 				voxel.Density = density;
 
-				Scene->SetVoxel(x, y, z, voxel);
+				voxelVolume->SetVoxel(x, y, z, voxel);
 			}
 		}
 	}
+
+	Snowman->SetVoxelVolume(voxelVolume);
+}
+
+void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
+{
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(2, 200.f);
+
+	#pragma omp parallel for collapse(3)
+	for (int x = 0; x < voxelVolume->GetSize(); x++)
+	{
+		for (int y = 0; y < voxelVolume->GetSize(); y++)
+		{
+			for (int z = 0; z < voxelVolume->GetSize(); z++)
+			{
+				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+
+				Voxel::VVoxel voxel;
+
+				voxel.Material = 1;
+				voxel.Density = -1.f;
+
+				voxelVolume->SetVoxel(x, y, z, voxel);
+			}
+		}
+	}
+
+	Floor->SetVoxelVolume(voxelVolume);
+}
+
+void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
+{
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(50, 100.f);
+
+	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
+
+	std::shared_ptr<Scene::VSphere> sphere = std::make_shared<Scene::VSphere>();
+
+	sphere->Radius = 40.f;
+
+	densityObj->GetRootShape().AddChild(sphere);
+
+#pragma omp parallel for collapse(3)
+	for (int x = 0; x < voxelVolume->GetSize(); x++)
+	{
+		for (int y = 0; y < voxelVolume->GetSize(); y++)
+		{
+			for (int z = 0; z < voxelVolume->GetSize(); z++)
+			{
+				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+
+				float density = densityObj->Evaluate(voxelPos);
+
+				Voxel::VVoxel voxel;
+
+				voxel.Material = density <= 0 ? 1 : 0;
+				voxel.Density = density;
+
+				voxelVolume->SetVoxel(x, y, z, voxel);
+			}
+		}
+	}
+
+	Sphere->SetVoxelVolume(voxelVolume);
+}
+
+void VolumeRaytracer::App::RendererEngineInstance::InitCube()
+{
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(50, 100.f);
+
+	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
+
+	std::shared_ptr<Scene::VBox> box = std::make_shared<Scene::VBox>();
+
+	box->Extends = VVector::ONE * 40.f;
+
+	densityObj->GetRootShape().AddChild(box);
+
+	#pragma omp parallel for collapse(3)
+	for (int x = 0; x < voxelVolume->GetSize(); x++)
+	{
+		for (int y = 0; y < voxelVolume->GetSize(); y++)
+		{
+			for (int z = 0; z < voxelVolume->GetSize(); z++)
+			{
+				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+
+				float density = densityObj->Evaluate(voxelPos);
+
+				Voxel::VVoxel voxel;
+
+				voxel.Material = density <= 0 ? 1 : 0;
+				voxel.Density = density;
+
+				voxelVolume->SetVoxel(x, y, z, voxel);
+			}
+		}
+	}
+
+	Cube->SetVoxelVolume(voxelVolume);
 }
 

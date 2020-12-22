@@ -54,14 +54,14 @@ namespace VolumeRaytracer
 		XMVECTOR cameraPosition;
 		XMFLOAT3 dirLightDirection;
 		float dirLightStrength;
-		UINT voxelAxisCount;
-		float volumeExtend;
-		float distanceBtwVoxels;
 	};
 
 	struct VGeometryConstantBuffer
 	{
-		XMFLOAT4 Albedo;
+		XMFLOAT4 tint;
+		UINT voxelAxisCount;
+		float volumeExtend;
+		float distanceBtwVoxels;
 	};
 
 	static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
@@ -73,4 +73,6 @@ namespace VolumeRaytracer
 		XMFLOAT3(0.0f, 0.0f, 1.0f),
 		XMFLOAT3(0.0f, 0.0f, -1.0f)
 	};
+
+	static const UINT MaxAllowedObjectData = 20;
 }
