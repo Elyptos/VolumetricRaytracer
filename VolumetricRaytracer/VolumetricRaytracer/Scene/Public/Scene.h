@@ -16,6 +16,7 @@
 
 #include "Object.h"
 #include "LevelObject.h"
+#include "ISerializable.h"
 #include <vector>
 #include <boost/unordered_set.hpp>
 #include <boost/unordered_map.hpp>
@@ -41,7 +42,7 @@ namespace VolumeRaytracer
 			boost::unordered_set<std::shared_ptr<IVRenderableObject>> Objects;
 		};
 
-		class VScene : public VObject, public std::enable_shared_from_this<VScene>
+		class VScene : public VObject, public std::enable_shared_from_this<VScene>, public IVSerializable
 		{
 
 		public:
@@ -111,6 +112,12 @@ namespace VolumeRaytracer
 			std::vector<std::weak_ptr<Voxel::VVoxelVolume>> GetAllRegisteredVolumes() const;
 			boost::unordered_set<Voxel::VVoxelVolume*> GetVolumesAddedDuringFrame() const;
 			boost::unordered_set<Voxel::VVoxelVolume*> GetVolumesRemovedDuringFrame() const;
+
+
+			std::shared_ptr<VSerializationArchive> Serialize() const override;
+
+
+			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
 
 		protected:
 			void Initialize() override;

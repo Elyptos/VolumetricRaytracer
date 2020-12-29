@@ -620,8 +620,8 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 
 	diffuse *= (shadowRayHit ? 0.2 : 1);
 
-	rayPayload.color.rgb = float3(1.f, 1.f, 1.f) * diffuse;
-	//rayPayload.color.rgb = attr.normal;
+	//rayPayload.color.rgb = float3(1.f, 1.f, 1.f) * diffuse;
+	rayPayload.color.rgb = attr.normal;
 	rayPayload.color.a = 1.f;
 }
 

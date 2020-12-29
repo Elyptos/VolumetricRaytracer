@@ -60,6 +60,8 @@ namespace VolumeRaytracer
 			void InitSphere();
 			void InitCube();
 
+			void LoadSceneFromFile(const std::string& filePath);
+
 		private:
 			Engine::VEngine* Engine = nullptr;
 			VObjectPtr<UI::VWindow> Window = nullptr;

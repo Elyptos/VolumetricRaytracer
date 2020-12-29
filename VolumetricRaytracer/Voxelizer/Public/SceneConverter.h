@@ -12,16 +12,23 @@
 	copies or substantial portions of the Software.
 */
 
-#include "MathHelpers.h"
+#pragma once
+#include "Object.h"
+#include "SceneInfo.h"
 
-void VolumeRaytracer::VMathHelpers::Index1DTo3D(const unsigned int& index, const unsigned int& yCount, const unsigned int& zCount, unsigned int& outX, unsigned int& outY, unsigned int& outZ)
+namespace VolumeRaytracer
 {
-	outX = (index / (yCount * zCount));
-	outY = ((index - outX * yCount * zCount) / zCount);
-	outZ = (index - outX * yCount * zCount - outY * zCount);
-}
+	namespace Scene
+	{
+		class VScene;
+	}
 
-unsigned int VolumeRaytracer::VMathHelpers::Index3DTo1D(const unsigned int& x, const unsigned int& y, const unsigned int& z, const unsigned int& yCount, const unsigned int& zCount)
-{
-	return x * yCount * zCount + y * zCount + z;
+	namespace Voxelizer
+	{
+		class VSceneConverter
+		{
+		public:
+			static VObjectPtr<Scene::VScene> ConvertSceneInfoToScene(const VSceneInfo& sceneInfo);
+		};
+	}
 }

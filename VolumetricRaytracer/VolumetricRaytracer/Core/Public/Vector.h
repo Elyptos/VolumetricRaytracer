@@ -29,6 +29,8 @@ namespace VolumeRaytracer
 		float LengthSquared() const;
 		float Dot(const VVector& other) const;
 		VVector Cross(const VVector& other) const;
+		
+		static VVector Cross(const VVector& a, const VVector& b);
 
 		VVector Abs() const;
 		static VVector Max(const VVector& vec, const float& scalar);
@@ -39,6 +41,7 @@ namespace VolumeRaytracer
 
 		VVector operator+(const VVector& other) const;
 		VVector operator-(const VVector& other) const;
+		VVector operator-() const;
 		VVector operator*(const VVector& other) const;
 		VVector operator*(const float& scalar) const;
 		VVector operator/(const VVector& other) const;
@@ -47,6 +50,9 @@ namespace VolumeRaytracer
 		operator Eigen::Vector3f() const {return Eigen::Vector3f(X, Y, Z);}
 
 		static VVector Lerp(const VVector& a, const VVector& b, const float& t);
+
+		static VVector PlaneProjection(const VVector& vec, const VVector& planeNormal);
+		static VVector VectorProjection(const VVector& vec, const VVector& target);
 
 	public:
 		static const VVector ZERO;

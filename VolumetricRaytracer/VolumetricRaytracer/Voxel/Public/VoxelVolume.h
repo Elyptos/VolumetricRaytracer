@@ -16,6 +16,7 @@
 
 #include "Voxel.h"
 #include "Object.h"
+#include "ISerializable.h"
 #include "Material.h"
 #include "AABB.h"
 #include <string>
@@ -43,7 +44,7 @@ namespace VolumeRaytracer
 			unsigned int Index;
 		};
 
-		class VVoxelVolume : public VObject 
+		class VVoxelVolume : public VObject, public IVSerializable
 		{
 		private:
 			class VVoxelVolumeIterator : public std::iterator<std::output_iterator_tag, VVoxelIteratorElement>
@@ -76,7 +77,7 @@ namespace VolumeRaytracer
 			VVoxel GetVoxel(const size_t& voxelIndex) const;
 			bool IsValidVoxelIndex(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
 
-			VVector VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
+			//VVector VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
 
 			void SetMaterial(const VMaterial& material);
 			VMaterial GetMaterial() const;
@@ -95,6 +96,15 @@ namespace VolumeRaytracer
 
 			void MakeDirty();
 			bool IsDirty() const;
+
+			VVector VoxelIndexToRelativePosition(const int& xPos, const int& yPos, const int& zPos) const;
+			void RelativePositionToVoxelIndex(const VVector& pos, int& outX, int& outY, int& outZ) const;
+
+
+			std::shared_ptr<VSerializationArchive> Serialize() const override;
+
+
+			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
 
 		protected:
 			void Initialize() override;

@@ -24,6 +24,16 @@ VolumeRaytracer::VVector VolumeRaytracer::VVector::Lerp(const VVector& a, const 
 	);
 }
 
+VolumeRaytracer::VVector VolumeRaytracer::VVector::PlaneProjection(const VVector& vec, const VVector& planeNormal)
+{
+	return vec - VVector::VectorProjection(vec, planeNormal);
+}
+
+VolumeRaytracer::VVector VolumeRaytracer::VVector::VectorProjection(const VVector& vec, const VVector& target)
+{
+	return target * vec.Dot(target);
+}
+
 const VolumeRaytracer::VVector VolumeRaytracer::VVector::ZERO = VolumeRaytracer::VVector(0.f, 0.f, 0.f);
 
 const VolumeRaytracer::VVector VolumeRaytracer::VVector::ONE = VolumeRaytracer::VVector(1.f, 1.f, 1.f);
@@ -55,6 +65,11 @@ float VolumeRaytracer::VVector::Dot(const VVector& other) const
 VolumeRaytracer::VVector VolumeRaytracer::VVector::Cross(const VVector& other) const
 {
 	return VVector(Y*other.Z - Z*other.Y, Z*other.X - X*other.Z, X*other.Y - Y*other.X);
+}
+
+VolumeRaytracer::VVector VolumeRaytracer::VVector::Cross(const VVector& a, const VVector& b)
+{
+	return a.Cross(b);
 }
 
 VolumeRaytracer::VVector VolumeRaytracer::VVector::Abs() const
@@ -124,6 +139,17 @@ VolumeRaytracer::VVector VolumeRaytracer::VVector::operator-(const VVector& othe
 	res.X = X - other.X;
 	res.Y = Y - other.Y;
 	res.Z = Z - other.Z;
+
+	return res;
+}
+
+VolumeRaytracer::VVector VolumeRaytracer::VVector::operator-() const
+{
+	VVector res;
+
+	res.X = -X;
+	res.Y = -Y;
+	res.Z = -Z;
 
 	return res;
 }

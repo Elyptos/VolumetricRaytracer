@@ -13,33 +13,36 @@
 */
 
 #pragma once
+#include "Object.h"
+#include <string>
 
 namespace VolumeRaytracer
 {
-	class VMathHelpers
+	class IVSerializable;
+
+	class VSerializationManager
 	{
+	private:
+		static bool LoadObjectFromFile(std::shared_ptr<IVSerializable> obj, const std::string& filePath);
+
 	public:
-		static void Index1DTo3D(const unsigned int& index, const unsigned int& yCount, const unsigned int& zCount, unsigned int& outX, unsigned int& outY, unsigned int& outZ);
-		static unsigned int Index3DTo1D(const unsigned int& x, const unsigned int& y, const unsigned int& z, const unsigned int& yCount, const unsigned int& zCount);
-		
-
 		template<typename T>
-		static T Clamp(const T& a, const T& min, const T& max)
+		static VObjectPtr<T> LoadFromFile(const std::string& filePath)
 		{
-			T res = a <= min ? min : a;
-			return res >= max ? max : res;
+			VObjectPtr<T> obj = VObject::CreateObject<T>();
+
+			std::shared_ptr<IVSerializable> serializable = std::dynamic_pointer_cast<IVSerializable>(obj);
+
+			if (serializable != nullptr && LoadObjectFromFile(serializable, filePath))
+			{
+				return obj;
+			}
+			else
+			{
+				return nullptr;
+			}
 		}
 
-		template<typename T>
-		static T Min(const T& a, const T& b)
-		{
-			return a <= b ? a : b;
-		}
-
-		template<typename T>
-		static T Max(const T& a, const T& b)
-		{
-			return a >= b ? a : b;
-		}
+		static void SaveToFile(VObjectPtr<VObject> object, const std::string& filePath);
 	};
 }

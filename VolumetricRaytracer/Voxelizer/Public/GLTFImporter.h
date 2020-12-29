@@ -12,16 +12,29 @@
 	copies or substantial portions of the Software.
 */
 
-#include "MathHelpers.h"
+#pragma once
 
-void VolumeRaytracer::VMathHelpers::Index1DTo3D(const unsigned int& index, const unsigned int& yCount, const unsigned int& zCount, unsigned int& outX, unsigned int& outY, unsigned int& outZ)
+#include <memory>
+
+namespace Microsoft
 {
-	outX = (index / (yCount * zCount));
-	outY = ((index - outX * yCount * zCount) / zCount);
-	outZ = (index - outX * yCount * zCount - outY * zCount);
+	namespace glTF
+	{
+		class Document;
+		class GLTFResourceReader;
+	}
 }
 
-unsigned int VolumeRaytracer::VMathHelpers::Index3DTo1D(const unsigned int& x, const unsigned int& y, const unsigned int& z, const unsigned int& yCount, const unsigned int& zCount)
+namespace VolumeRaytracer
 {
-	return x * yCount * zCount + y * zCount + z;
+	namespace Voxelizer
+	{
+		struct VSceneInfo;
+
+		class VGLTFImporter
+		{
+		public:
+			static std::shared_ptr<VSceneInfo> ImportScene(const Microsoft::glTF::Document* document, const Microsoft::glTF::GLTFResourceReader* resourceReader);
+		};
+	}
 }

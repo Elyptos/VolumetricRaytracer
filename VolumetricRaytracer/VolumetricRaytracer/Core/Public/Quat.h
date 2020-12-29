@@ -26,6 +26,10 @@ namespace VolumeRaytracer
 		VQuat(const Eigen::Quaternionf eigenQuat);
 
 		static VQuat FromAxisAngle(const VVector& axis, const float& angle);
+		static VQuat FromTwoVectors(const VVector& vec1, const VVector& vec2);
+		static VQuat FromForwardVector(const VVector& vec);
+		static VQuat FromRightVector(const VVector& vec);
+		static VQuat FromUpVector(const VVector& vec);
 
 		VQuat Inverse() const;
 

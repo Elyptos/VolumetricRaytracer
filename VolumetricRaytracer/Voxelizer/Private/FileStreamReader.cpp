@@ -12,16 +12,13 @@
 	copies or substantial portions of the Software.
 */
 
-#include "MathHelpers.h"
+#include "FileStreamReader.h"
+#include <boost/filesystem.hpp>
 
-void VolumeRaytracer::VMathHelpers::Index1DTo3D(const unsigned int& index, const unsigned int& yCount, const unsigned int& zCount, unsigned int& outX, unsigned int& outY, unsigned int& outZ)
+std::shared_ptr<std::istream> VolumeRaytracer::Voxelizer::VFileStreamReader::GetInputStream(const std::string& filename) const
 {
-	outX = (index / (yCount * zCount));
-	outY = ((index - outX * yCount * zCount) / zCount);
-	outZ = (index - outX * yCount * zCount - outY * zCount);
-}
+	std::string fullPath = boost::filesystem::absolute(filename, BasePath).string();
+	std::shared_ptr<std::ifstream> stream = std::make_shared<std::ifstream>(fullPath, std::ios_base::binary);
 
-unsigned int VolumeRaytracer::VMathHelpers::Index3DTo1D(const unsigned int& x, const unsigned int& y, const unsigned int& z, const unsigned int& yCount, const unsigned int& zCount)
-{
-	return x * yCount * zCount + y * zCount + z;
+	return stream;
 }

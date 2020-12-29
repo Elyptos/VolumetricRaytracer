@@ -18,6 +18,8 @@
 #include "Logger.h"
 #include "RenderableObject.h"
 #include <algorithm>
+#include "VoxelObject.h"
+#include "VoxelVolume.h"
 
 void VolumeRaytracer::Scene::VScene::Tick(const float& deltaSeconds)
 {
@@ -223,6 +225,118 @@ boost::unordered_set<VolumeRaytracer::Voxel::VVoxelVolume*> VolumeRaytracer::Sce
 boost::unordered_set<VolumeRaytracer::Voxel::VVoxelVolume*> VolumeRaytracer::Scene::VScene::GetVolumesRemovedDuringFrame() const
 {
 	return FrameRemovedVolumes;
+}
+
+std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Scene::VScene::Serialize() const
+{
+	std::shared_ptr<VSerializationArchive> res = std::make_shared<VSerializationArchive>();
+	res->BufferSize = 0;
+	res->Buffer = nullptr;
+
+	std::vector<VObjectPtr<Voxel::VVoxelVolume>> volumesList;
+
+	struct ObjectVolumeRef
+	{
+		size_t VolumeIndex;
+		std::shared_ptr<VVoxelObject> Object;
+	};
+
+	std::vector<ObjectVolumeRef> sceneObjects;
+	
+	for (auto& volume : ReferencedVolumes)
+	{
+		volumesList.push_back(volume.first);
+
+		for (auto& obj : volume.second.Objects)
+		{
+			std::shared_ptr<VVoxelObject> voxObj = std::dynamic_pointer_cast<VVoxelObject>(obj);
+
+			if (voxObj != nullptr)
+			{
+				ObjectVolumeRef volumeRef;
+				volumeRef.VolumeIndex = volumesList.size() - 1;
+				volumeRef.Object = voxObj;
+
+				sceneObjects.push_back(volumeRef);
+			}
+		}
+	}
+
+	size_t num = volumesList.size();
+	std::shared_ptr<VSerializationArchive> volumeCount = VSerializationArchive::From(&num);
+
+	num = sceneObjects.size();
+	std::shared_ptr<VSerializationArchive> sceneObjectsCount = VSerializationArchive::From(&num);
+
+	res->Properties["VCount"] = volumeCount;
+
+	for (size_t i = 0; i < volumesList.size(); i++)
+	{
+		std::shared_ptr<VSerializationArchive> volumeArchive = std::static_pointer_cast<IVSerializable>(volumesList[i])->Serialize();
+
+		std::stringstream ss;
+		ss << "V_" << i;
+
+		res->Properties[ss.str()] = volumeArchive;
+	}
+	
+	res->Properties["OCount"] = sceneObjectsCount;
+
+	for (size_t i = 0; i < sceneObjects.size(); i++)
+	{
+		std::shared_ptr<VSerializationArchive> volumeIndex = VSerializationArchive::From(&sceneObjects[i].VolumeIndex);
+
+		std::stringstream ss;
+		ss << "OI_" << i;
+
+		res->Properties[ss.str()] = volumeIndex;
+
+		std::shared_ptr<VSerializationArchive> objectArchive = std::static_pointer_cast<IVSerializable>(sceneObjects[i].Object)->Serialize();
+
+		ss.str(std::string());
+		ss.clear();
+		ss << "O_" << i;
+
+		res->Properties[ss.str()] = objectArchive;
+	}
+
+	return res;
+}
+
+void VolumeRaytracer::Scene::VScene::Deserialize(std::shared_ptr<VSerializationArchive> archive)
+{
+	size_t volumesCount = archive->Properties["VCount"]->To<size_t>();
+	size_t objectsCount = archive->Properties["OCount"]->To<size_t>();
+
+	std::vector<VObjectPtr<Voxel::VVoxelVolume>> volumes;
+
+	for (size_t i = 0; i < volumesCount; i++)
+	{
+		std::stringstream ss;
+		ss << "V_" << i;
+
+		VObjectPtr<Voxel::VVoxelVolume> volume = VObject::CreateObject<Voxel::VVoxelVolume>(1, 1);
+		std::static_pointer_cast<IVSerializable>(volume)->Deserialize(archive->Properties[ss.str()]);
+
+		volumes.push_back(volume);
+	}
+
+	for (size_t i = 0; i < objectsCount; i++)
+	{
+		std::stringstream ss;
+		ss << "OI_" << i;
+
+		size_t volumeIndex = archive->Properties[ss.str()]->To<size_t>();
+
+		ss.str(std::string());
+		ss.clear();
+		ss << "O_" << i;
+
+		VObjectPtr<VVoxelObject> obj = SpawnObject<VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(archive->Properties[ss.str()]);
+
+		obj->SetVoxelVolume(volumes[volumeIndex]);
+	}
 }
 
 void VolumeRaytracer::Scene::VScene::Initialize()

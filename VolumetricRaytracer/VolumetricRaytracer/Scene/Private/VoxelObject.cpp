@@ -33,6 +33,42 @@ std::weak_ptr<VolumeRaytracer::Voxel::VVoxelVolume> VolumeRaytracer::Scene::VVox
 	return VoxelVolume;
 }
 
+std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Scene::VVoxelObject::Serialize() const
+{
+	std::shared_ptr<VSerializationArchive> res = std::make_shared<VSerializationArchive>();
+	res->BufferSize = 0;
+	res->Buffer = nullptr;
+
+	std::shared_ptr<VSerializationArchive> pos = std::make_shared<VSerializationArchive>();
+	std::shared_ptr<VSerializationArchive> scale = std::make_shared<VSerializationArchive>();
+	std::shared_ptr<VSerializationArchive> rot = std::make_shared<VSerializationArchive>();
+
+	pos->BufferSize = sizeof(VVector);
+	scale->BufferSize = sizeof(VVector);
+	rot->BufferSize = sizeof(VQuat);
+
+	pos->Buffer = new char[sizeof(VVector)];
+	scale->Buffer = new char[sizeof(VVector)];
+	rot->Buffer = new char[sizeof(VQuat)];
+
+	memcpy(pos->Buffer, &Position, sizeof(VVector));
+	memcpy(scale->Buffer, &Scale, sizeof(VVector));
+	memcpy(rot->Buffer, &Rotation, sizeof(VQuat));
+
+	res->Properties["Position"] = pos;
+	res->Properties["Scale"] = scale;
+	res->Properties["Rotation"] = rot;
+
+	return res;
+}
+
+void VolumeRaytracer::Scene::VVoxelObject::Deserialize(std::shared_ptr<VSerializationArchive> archive)
+{
+	memcpy(&Position, archive->Properties["Position"]->Buffer, sizeof(VVector));
+	memcpy(&Scale, archive->Properties["Scale"]->Buffer, sizeof(VVector));
+	memcpy(&Rotation, archive->Properties["Rotation"]->Buffer, sizeof(VQuat));
+}
+
 void VolumeRaytracer::Scene::VVoxelObject::Initialize()
 {
 	

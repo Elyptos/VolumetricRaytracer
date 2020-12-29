@@ -14,8 +14,7 @@
 
 #include "VoxelVolume.h"
 #include "MathHelpers.h"
-#include "Camera.h"
-#include "Light.h"
+#include <cmath>
 
 VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolume(const unsigned int& size, const float& volumeExtends) :Size(size),
 	VolumeExtends(volumeExtends)
@@ -87,12 +86,12 @@ bool VolumeRaytracer::Voxel::VVoxelVolume::IsValidVoxelIndex(const unsigned int&
 	return xPos < Size && yPos < Size && zPos < Size;
 }
 
-VolumeRaytracer::VVector VolumeRaytracer::Voxel::VVoxelVolume::VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const
-{
-	VVector volumeOrigin = VVector::ONE * -VolumeExtends;
-
-	return VVector(xPos, yPos, zPos) * CellSize + volumeOrigin;
-}
+//VolumeRaytracer::VVector VolumeRaytracer::Voxel::VVoxelVolume::VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const
+//{
+//	VVector volumeOrigin = VVector::ONE * -VolumeExtends;
+//
+//	return VVector(xPos, yPos, zPos) * CellSize + volumeOrigin;
+//}
 
 void VolumeRaytracer::Voxel::VVoxelVolume::SetMaterial(const VMaterial& material)
 {
@@ -139,6 +138,70 @@ bool VolumeRaytracer::Voxel::VVoxelVolume::IsDirty() const
 	return DirtyFlag;
 }
 
+VolumeRaytracer::VVector VolumeRaytracer::Voxel::VVoxelVolume::VoxelIndexToRelativePosition(const int& xPos, const int& yPos, const int& zPos) const
+{
+	float distanceBetweenVoxel = GetCellSize();
+	VVector voxelIndexF = VVector(xPos, yPos, zPos);
+	VVector volumeOrigin = -VVector::ONE * GetVolumeExtends();
+
+	return voxelIndexF * distanceBetweenVoxel + volumeOrigin;
+}
+
+void VolumeRaytracer::Voxel::VVoxelVolume::RelativePositionToVoxelIndex(const VVector& pos, int& outX, int& outY, int& outZ) const
+{
+	VVector volumeOrigin = -VVector::ONE * GetVolumeExtends();
+	VVector relativeVolumePos = pos - volumeOrigin;
+	float distanceBetweenVoxel = GetCellSize();
+
+	outX = std::floor(relativeVolumePos.X / distanceBetweenVoxel);
+	outY = std::floor(relativeVolumePos.Y / distanceBetweenVoxel);
+	outZ = std::floor(relativeVolumePos.Z / distanceBetweenVoxel);
+}
+
+std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Voxel::VVoxelVolume::Serialize() const
+{
+	std::shared_ptr<VSerializationArchive> res = std::make_shared<VSerializationArchive>();
+	res->BufferSize = GetVoxelCount() * sizeof(VVoxel);
+	res->Buffer = new char[res->BufferSize];
+
+	memcpy(res->Buffer, VoxelArr, res->BufferSize);
+
+	std::shared_ptr<VSerializationArchive> size = std::make_shared<VSerializationArchive>();
+	std::shared_ptr<VSerializationArchive> extends = std::make_shared<VSerializationArchive>();
+
+	size->BufferSize = sizeof(unsigned int);
+	extends->BufferSize = sizeof(float);
+
+	size->Buffer = new char[sizeof(unsigned int)];
+	extends->Buffer = new char[sizeof(float)];
+
+	memcpy(size->Buffer, &Size, sizeof(unsigned int));
+	memcpy(extends->Buffer, &VolumeExtends, sizeof(float));
+
+	res->Properties["Size"] = size;
+	res->Properties["Extends"] = extends;
+
+	return res;
+}
+
+void VolumeRaytracer::Voxel::VVoxelVolume::Deserialize(std::shared_ptr<VSerializationArchive> archive)
+{
+	memcpy(&Size, archive->Properties["Size"]->Buffer, sizeof(unsigned int));
+	memcpy(&VolumeExtends, archive->Properties["Extends"]->Buffer, sizeof(float));
+
+	if (VoxelArr != nullptr)
+	{
+		delete[] VoxelArr;
+	}
+
+	VoxelArr = new VVoxel[GetVoxelCount()];
+	memcpy(VoxelArr, archive->Buffer, GetVoxelCount() * sizeof(VVoxel));
+
+	CellSize = (VolumeExtends * 2) / ((float)Size - 1.f);
+
+	MakeDirty();
+}
+
 void VolumeRaytracer::Voxel::VVoxelVolume::Initialize()
 {
 	if (GetSize() > 0)
@@ -148,7 +211,7 @@ void VolumeRaytracer::Voxel::VVoxelVolume::Initialize()
 		for (unsigned int i = 0; i < GetVoxelCount(); i++)
 		{
 			VoxelArr[i].Material = 0u;
-			VoxelArr[i].Density = 1;
+			VoxelArr[i].Density = 100;
 		}
 
 		MakeDirty();

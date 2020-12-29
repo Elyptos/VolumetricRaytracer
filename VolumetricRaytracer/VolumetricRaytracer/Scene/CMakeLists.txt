@@ -18,6 +18,7 @@ add_library (VScene ${scene_public} ${scene_private})
 
 target_include_directories(VScene PUBLIC "Public")
 target_link_libraries(VScene VCore)
+target_link_libraries(VScene VVoxel)
 
 if(Boost_FOUND)
 	target_include_directories(VScene PUBLIC ${Boost_INCLUDE_DIRS})

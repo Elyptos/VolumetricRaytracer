@@ -30,6 +30,7 @@
 #define _USE_MATH_DEFINES
 
 #include <math.h>
+#include "SerializationManager.h"
 
 void VolumeRaytracer::App::RendererEngineInstance::OnEngineInitialized(Engine::VEngine* owningEngine)
 {
@@ -148,7 +149,9 @@ void VolumeRaytracer::App::RendererEngineInstance::OnAxisInput(const VolumeRaytr
 
 void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
-	Scene = VObject::CreateObject<Scene::VScene>();
+	//Scene = VObject::CreateObject<Scene::VScene>();
+
+	LoadSceneFromFile("TestModel.vox");
 	Camera = Scene->SpawnObject<Scene::VCamera>(VVector(300.f, 0.f, 100.f), VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f)), VVector::ONE);
 
 	DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
@@ -157,17 +160,17 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 
 	//Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
 	Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
-	Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-	Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);
+	/*Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+	Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);*/
 
 	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
 	Scene->SetActiveSceneCamera(Camera);
 	Scene->SetActiveDirectionalLight(DirectionalLight);
 
 	//InitSnowmanObject();
-	InitFloor();
-	InitSphere();
-	InitCube();
+	//InitFloor();
+	//InitSphere();
+	//InitCube();
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
@@ -213,7 +216,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
 		{
 			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(x, y, z);
 
 				float density = densityObj->Evaluate(voxelPos);
 
@@ -241,7 +244,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
 		{
 			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(x, y, z);
 
 				Voxel::VVoxel voxel;
 
@@ -275,7 +278,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 		{
 			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(x, y, z);
 
 				float density = densityObj->Evaluate(voxelPos);
 
@@ -311,7 +314,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitCube()
 		{
 			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(x, y, z);
 
 				float density = densityObj->Evaluate(voxelPos);
 
@@ -328,3 +331,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitCube()
 	Cube->SetVoxelVolume(voxelVolume);
 }
 
+void VolumeRaytracer::App::RendererEngineInstance::LoadSceneFromFile(const std::string& filePath)
+{
+	Scene = VSerializationManager::LoadFromFile<Scene::VScene>(filePath);
+}
