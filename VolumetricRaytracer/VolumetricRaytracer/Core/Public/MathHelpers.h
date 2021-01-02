@@ -14,14 +14,17 @@
 
 #pragma once
 
+#include "Vector.h"
+
 namespace VolumeRaytracer
 {
 	class VMathHelpers
 	{
 	public:
-		static void Index1DTo3D(const unsigned int& index, const unsigned int& yCount, const unsigned int& zCount, unsigned int& outX, unsigned int& outY, unsigned int& outZ);
-		static unsigned int Index3DTo1D(const unsigned int& x, const unsigned int& y, const unsigned int& z, const unsigned int& yCount, const unsigned int& zCount);
-		
+		static void Index1DTo3D(const size_t& index, const size_t& yCount, const size_t& zCount, int& outX, int& outY, int& outZ);
+		static VIntVector Index1DTo3D(const size_t& index, const size_t& yCount, const size_t& zCount);
+		static size_t Index3DTo1D(const int& x, const int& y, const int& z, const size_t& yCount, const size_t& zCount);
+		static size_t Index3DTo1D(const VIntVector& index, const size_t& yCount, const size_t& zCount);
 
 		template<typename T>
 		static T Clamp(const T& a, const T& min, const T& max)
@@ -40,6 +43,18 @@ namespace VolumeRaytracer
 		static T Max(const T& a, const T& b)
 		{
 			return a >= b ? a : b;
+		}
+
+		template<typename T>
+		static int Sign(T val)
+		{
+			return (T(0) < val) - (val < T(0));
+		}
+
+		template<typename T>
+		static T Lerp(const T& a, const T& b, const float& t)
+		{
+			return a + (b - a) * t;
 		}
 	};
 }

@@ -38,10 +38,8 @@ namespace VolumeRaytracer
 		{
 		public:
 			VVoxel Voxel;
-			unsigned int X;
-			unsigned int Y;
-			unsigned int Z;
-			unsigned int Index;
+			VIntVector Index3D;
+			size_t Index;
 		};
 
 		class VVoxelVolume : public VObject, public IVSerializable
@@ -72,12 +70,10 @@ namespace VolumeRaytracer
 
 			VAABB GetVolumeBounds() const;
 
-			void SetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos, const VVoxel& voxel);
-			VVoxel GetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
+			void SetVoxel(const VIntVector& voxelIndex, const VVoxel& voxel);
+			VVoxel GetVoxel(const VIntVector& voxelIndex) const;
 			VVoxel GetVoxel(const size_t& voxelIndex) const;
-			bool IsValidVoxelIndex(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
-
-			//VVector VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
+			bool IsValidVoxelIndex(const VIntVector& voxelIndex) const;
 
 			void SetMaterial(const VMaterial& material);
 			VMaterial GetMaterial() const;
@@ -97,9 +93,9 @@ namespace VolumeRaytracer
 			void MakeDirty();
 			bool IsDirty() const;
 
-			VVector VoxelIndexToRelativePosition(const int& xPos, const int& yPos, const int& zPos) const;
-			void RelativePositionToVoxelIndex(const VVector& pos, int& outX, int& outY, int& outZ) const;
-
+			VVector VoxelIndexToRelativePosition(const VIntVector& voxelIndex) const;
+			VIntVector RelativePositionToCellIndex(const VVector& pos) const;
+			VIntVector RelativePositionToVoxelIndex(const VVector& pos) const;
 
 			std::shared_ptr<VSerializationArchive> Serialize() const override;
 

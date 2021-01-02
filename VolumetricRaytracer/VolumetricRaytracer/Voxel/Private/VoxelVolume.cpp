@@ -52,11 +52,11 @@ VolumeRaytracer::VAABB VolumeRaytracer::Voxel::VVoxelVolume::GetVolumeBounds() c
 	return res;
 }
 
-void VolumeRaytracer::Voxel::VVoxelVolume::SetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos, const VVoxel& voxel)
+void VolumeRaytracer::Voxel::VVoxelVolume::SetVoxel(const VIntVector& voxelIndex, const VVoxel& voxel)
 {
-	if (IsValidVoxelIndex(xPos, yPos, zPos))
+	if (IsValidVoxelIndex(voxelIndex))
 	{
-		unsigned int index = VMathHelpers::Index3DTo1D(xPos, yPos, zPos, GetSize(), GetSize());
+		size_t index = VMathHelpers::Index3DTo1D(voxelIndex, GetSize(), GetSize());
 
 		VoxelArr[index] = voxel;
 
@@ -64,11 +64,11 @@ void VolumeRaytracer::Voxel::VVoxelVolume::SetVoxel(const unsigned int& xPos, co
 	}
 }
 
-VolumeRaytracer::Voxel::VVoxel VolumeRaytracer::Voxel::VVoxelVolume::GetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const
+VolumeRaytracer::Voxel::VVoxel VolumeRaytracer::Voxel::VVoxelVolume::GetVoxel(const VIntVector& voxelIndex) const
 {
-	if (IsValidVoxelIndex(xPos, yPos, zPos))
+	if (IsValidVoxelIndex(voxelIndex))
 	{
-		unsigned int index = VMathHelpers::Index3DTo1D(xPos, yPos, zPos, GetSize(), GetSize());
+		size_t index = VMathHelpers::Index3DTo1D(voxelIndex, GetSize(), GetSize());
 
 		return VoxelArr[index];
 	}
@@ -81,9 +81,11 @@ VolumeRaytracer::Voxel::VVoxel VolumeRaytracer::Voxel::VVoxelVolume::GetVoxel(co
 	return VoxelArr[voxelIndex];
 }
 
-bool VolumeRaytracer::Voxel::VVoxelVolume::IsValidVoxelIndex(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const
+bool VolumeRaytracer::Voxel::VVoxelVolume::IsValidVoxelIndex(const VIntVector& voxelIndex) const
 {
-	return xPos < Size && yPos < Size && zPos < Size;
+	return	voxelIndex.X >= 0 && voxelIndex.X < GetSize() &&
+			voxelIndex.Y >= 0 && voxelIndex.Y < GetSize() &&
+			voxelIndex.Z >= 0 && voxelIndex.Z < GetSize();
 }
 
 //VolumeRaytracer::VVector VolumeRaytracer::Voxel::VVoxelVolume::VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const
@@ -138,24 +140,43 @@ bool VolumeRaytracer::Voxel::VVoxelVolume::IsDirty() const
 	return DirtyFlag;
 }
 
-VolumeRaytracer::VVector VolumeRaytracer::Voxel::VVoxelVolume::VoxelIndexToRelativePosition(const int& xPos, const int& yPos, const int& zPos) const
+VolumeRaytracer::VVector VolumeRaytracer::Voxel::VVoxelVolume::VoxelIndexToRelativePosition(const VIntVector& voxelIndex) const
 {
 	float distanceBetweenVoxel = GetCellSize();
-	VVector voxelIndexF = VVector(xPos, yPos, zPos);
+	VVector voxelIndexF = VVector(voxelIndex.X, voxelIndex.Y, voxelIndex.Z);
 	VVector volumeOrigin = -VVector::ONE * GetVolumeExtends();
 
 	return voxelIndexF * distanceBetweenVoxel + volumeOrigin;
 }
 
-void VolumeRaytracer::Voxel::VVoxelVolume::RelativePositionToVoxelIndex(const VVector& pos, int& outX, int& outY, int& outZ) const
+VolumeRaytracer::VIntVector VolumeRaytracer::Voxel::VVoxelVolume::RelativePositionToCellIndex(const VVector& pos) const
 {
 	VVector volumeOrigin = -VVector::ONE * GetVolumeExtends();
 	VVector relativeVolumePos = pos - volumeOrigin;
 	float distanceBetweenVoxel = GetCellSize();
 
-	outX = std::floor(relativeVolumePos.X / distanceBetweenVoxel);
-	outY = std::floor(relativeVolumePos.Y / distanceBetweenVoxel);
-	outZ = std::floor(relativeVolumePos.Z / distanceBetweenVoxel);
+	VIntVector res;
+
+	res.X = std::floor(relativeVolumePos.X / distanceBetweenVoxel);
+	res.Y = std::floor(relativeVolumePos.Y / distanceBetweenVoxel);
+	res.Z = std::floor(relativeVolumePos.Z / distanceBetweenVoxel);
+
+	return res;
+}
+
+VolumeRaytracer::VIntVector VolumeRaytracer::Voxel::VVoxelVolume::RelativePositionToVoxelIndex(const VVector& pos) const
+{
+	VVector volumeOrigin = -VVector::ONE * GetVolumeExtends();
+	VVector relativeVolumePos = pos - volumeOrigin;
+	float distanceBetweenVoxel = GetCellSize();
+
+	VIntVector res;
+
+	res.X = std::round(relativeVolumePos.X / distanceBetweenVoxel);
+	res.Y = std::round(relativeVolumePos.Y / distanceBetweenVoxel);
+	res.Z = std::round(relativeVolumePos.Z / distanceBetweenVoxel);
+
+	return res;
 }
 
 std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Voxel::VVoxelVolume::Serialize() const
@@ -211,7 +232,7 @@ void VolumeRaytracer::Voxel::VVoxelVolume::Initialize()
 		for (unsigned int i = 0; i < GetVoxelCount(); i++)
 		{
 			VoxelArr[i].Material = 0u;
-			VoxelArr[i].Density = 100;
+			VoxelArr[i].Density = 1;
 		}
 
 		MakeDirty();
@@ -255,7 +276,7 @@ VolumeRaytracer::Voxel::VVoxelIteratorElement VolumeRaytracer::Voxel::VVoxelVolu
 	elem.Voxel = Volume.VoxelArr[Index];
 	elem.Index = Index;
 	
-	VMathHelpers::Index1DTo3D(Index, Volume.GetSize(), Volume.GetSize(), elem.X, elem.Y, elem.Z);
+	elem.Index3D = VMathHelpers::Index1DTo3D(Index, Volume.GetSize(), Volume.GetSize());
 
 	return elem;
 }

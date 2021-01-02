@@ -25,18 +25,10 @@ namespace VolumeRaytracer
 
 	namespace Voxelizer
 	{
-		struct VVertexCellIndex
+		struct VEdgeRay
 		{
-		public:
-			VVertexCellIndex(){}
-			VVertexCellIndex(const unsigned int& x, const unsigned int& y, const unsigned int& z)
-			: X(x),
-			Y(y),
-			Z(z){}
-
-			int X;
-			int Y;
-			int Z;
+			VVector Origin;
+			VVector Direction;
 		};
 
 		struct VTriangle
@@ -55,16 +47,29 @@ namespace VolumeRaytracer
 			static VObjectPtr<Voxel::VVoxelVolume> ConvertMeshInfoToVoxelVolume(const VMeshInfo& meshInfo);
 
 		private:
+			static void VoxelizeVertex(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v);
+			static void VoxelizeEdge(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v1, const VVertex& v2);
+			static void VoxelizeFace(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v1, const VVertex& v2, const VVertex& v3);
+
 			static void VoxelizeTriangle(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v1, const VVertex& v2, const VVertex& v3);
 
-			static VVertexCellIndex GetCellIndex(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v);
+			static VIntVector GetCellIndex(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v);
 
 			static VVector GetTriangleNormal(const VVertex& v1, const VVertex& v2, const VVertex& v3);
 			static VVector GetTriangleMidpoint(const VVertex& v1, const VVertex& v2, const VVertex& v3);
 
-			static void UpdateCellDensity(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertexCellIndex& cellIndex, const VTriangle& triangle);
-			
+			static float GetNearestDistanceFromEdgeToPoint(const VVector& point, /*const VVector& cellStart, const VVector& cellEnd, */const VVector& edgeStart, const VVector& edgeEnd);
+			static float GetNearestDinstanceFromPlaneToPoint(const VVector& point, const VVector& planeNormal);
+
 			static bool IsPointOnTriangleIfProjected(const VVector& relToTrianglePoint, const VTriangle& triangle);
+			static bool IsPointInTriangle(const VVector2D& point, const VVector2D& v1, const VVector2D& v2, const VVector2D& v3);
+
+			static bool IsTriangleInsideVoxelBounds(std::shared_ptr<Voxel::VVoxelVolume> volume, const VIntVector& voxelIndex, const VTriangle& triangle);
+
+			static VIntVector GoToNextVoxelAlongEdge(std::shared_ptr<Voxel::VVoxelVolume> volume, const VEdgeRay& ray, const VIntVector& voxelIndex, const VIntVector& voxelDir, float& outNewT);
+
+			static void UpdateCellDensityWithEdgeIntersection(std::shared_ptr<Voxel::VVoxelVolume> volume, const VIntVector& voxelIndex, const VVector& edgeStart, const VVector& edgeEnd);
+			static void UpdateCellDensityWithTriangleIntersection(std::shared_ptr<Voxel::VVoxelVolume> volume, const VIntVector& voxelIndex, const VTriangle& triangle);
 		};
 	}
 }

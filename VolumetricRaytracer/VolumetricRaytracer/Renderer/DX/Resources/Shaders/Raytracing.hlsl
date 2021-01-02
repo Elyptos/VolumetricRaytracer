@@ -490,10 +490,10 @@ bool GetSurfaceIntersectionT(in Ray ray, in int3 cellIndex, in float tIn, in flo
 
 	GetDensityPolynomial(ray, cellIndex, tIn, tOut, A, B, C, D);
 
-	if (A == 0)
-	{
-		return false;
-	}
+	//if (A == 0)
+	//{
+	//	return false;
+	//}
 
 	float dA = 3 * A;
 	float dB = 2 * B;
@@ -502,6 +502,13 @@ bool GetSurfaceIntersectionT(in Ray ray, in int3 cellIndex, in float tIn, in flo
 	float ex2 = (-dB - sqrt(dB*dB - 4*dA*C)) / (2 * dA);
 
 	float f0 = GetDensityWithPolynomial(t0, A, B, C, D);
+
+	if (sign(f0) <= 0)
+	{
+		tHit = tIn;
+		return true;
+	}
+
 	float f1 = GetDensityWithPolynomial(t1, A, B, C, D);
 
 	if (ex1 > ex2)

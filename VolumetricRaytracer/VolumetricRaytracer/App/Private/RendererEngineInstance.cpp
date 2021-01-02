@@ -151,7 +151,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
 	//Scene = VObject::CreateObject<Scene::VScene>();
 
-	LoadSceneFromFile("TestModel.vox");
+	LoadSceneFromFile("../Voxelizer/Monkey.vox");
 	Camera = Scene->SpawnObject<Scene::VCamera>(VVector(300.f, 0.f, 100.f), VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f)), VVector::ONE);
 
 	DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
@@ -160,8 +160,8 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 
 	//Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
 	Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
-	/*Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-	Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);*/
+	Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+	Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);
 
 	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
 	Scene->SetActiveSceneCamera(Camera);
@@ -216,7 +216,9 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
 		{
 			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(x, y, z);
+				VIntVector voxelIndex = VIntVector(x, y, z);
+
+				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
 
 				float density = densityObj->Evaluate(voxelPos);
 
@@ -225,7 +227,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
 				voxel.Material = density <= 0 ? 1 : 0;
 				voxel.Density = density;
 
-				voxelVolume->SetVoxel(x, y, z, voxel);
+				voxelVolume->SetVoxel(voxelIndex, voxel);
 			}
 		}
 	}
@@ -244,14 +246,16 @@ void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
 		{
 			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(x, y, z);
+				VIntVector voxelIndex = VIntVector(x, y, z);
+
+				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
 
 				Voxel::VVoxel voxel;
 
 				voxel.Material = 1;
 				voxel.Density = -1.f;
 
-				voxelVolume->SetVoxel(x, y, z, voxel);
+				voxelVolume->SetVoxel(voxelIndex, voxel);
 			}
 		}
 	}
@@ -278,7 +282,9 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 		{
 			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(x, y, z);
+				VIntVector voxelIndex = VIntVector(x, y, z);
+
+				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
 
 				float density = densityObj->Evaluate(voxelPos);
 
@@ -287,7 +293,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 				voxel.Material = density <= 0 ? 1 : 0;
 				voxel.Density = density;
 
-				voxelVolume->SetVoxel(x, y, z, voxel);
+				voxelVolume->SetVoxel(voxelIndex, voxel);
 			}
 		}
 	}
@@ -314,7 +320,9 @@ void VolumeRaytracer::App::RendererEngineInstance::InitCube()
 		{
 			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(x, y, z);
+				VIntVector voxelIndex = VIntVector(x, y, z);
+
+				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
 
 				float density = densityObj->Evaluate(voxelPos);
 
@@ -323,7 +331,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitCube()
 				voxel.Material = density <= 0 ? 1 : 0;
 				voxel.Density = density;
 
-				voxelVolume->SetVoxel(x, y, z, voxel);
+				voxelVolume->SetVoxel(voxelIndex, voxel);
 			}
 		}
 	}
