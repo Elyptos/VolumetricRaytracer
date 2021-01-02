@@ -14,24 +14,28 @@
 
 #include "MathHelpers.h"
 
-void VolumeRaytracer::VMathHelpers::Index1DTo3D(const unsigned int& index, const unsigned int& yCount, const unsigned int& zCount, unsigned int& outX, unsigned int& outY, unsigned int& outZ)
+VolumeRaytracer::VIntVector VolumeRaytracer::VMathHelpers::Index1DTo3D(const size_t& index, const size_t& yCount, const size_t& zCount)
+{
+	VIntVector res;
+
+	Index1DTo3D(index, yCount, zCount, res.X, res.Y, res.Z);
+
+	return res;
+}
+
+void VolumeRaytracer::VMathHelpers::Index1DTo3D(const size_t& index, const size_t& yCount, const size_t& zCount, int& outX, int& outY, int& outZ)
 {
 	outX = (index / (yCount * zCount));
 	outY = ((index - outX * yCount * zCount) / zCount);
 	outZ = (index - outX * yCount * zCount - outY * zCount);
 }
 
-unsigned int VolumeRaytracer::VMathHelpers::Index3DTo1D(const unsigned int& x, const unsigned int& y, const unsigned int& z, const unsigned int& yCount, const unsigned int& zCount)
+size_t VolumeRaytracer::VMathHelpers::Index3DTo1D(const VIntVector& index, const size_t& yCount, const size_t& zCount)
+{
+	return Index3DTo1D(index.X, index.Y, index.Z, yCount, zCount);
+}
+
+size_t VolumeRaytracer::VMathHelpers::Index3DTo1D(const int& x, const int& y, const int& z, const size_t& yCount, const size_t& zCount)
 {
 	return x * yCount * zCount + y * zCount + z;
-}
-
-float VolumeRaytracer::VMathHelpers::Min(const float& a, const float& b)
-{
-	return a <= b ? a : b;
-}
-
-float VolumeRaytracer::VMathHelpers::Max(const float& a, const float& b)
-{
-	return a >= b ? a : b;
 }

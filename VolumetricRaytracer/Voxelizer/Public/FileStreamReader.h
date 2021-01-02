@@ -14,37 +14,25 @@
 
 #pragma once
 
-#include "LevelObject.h"
-#include "RenderableObject.h"
-#include "ISerializable.h"
+#include <GLTFSDK/IStreamReader.h>
+#include <memory>
+#include <string>
+#include <iostream>
 
 namespace VolumeRaytracer
 {
-	namespace Voxel
+	namespace Voxelizer
 	{
-		class VVoxelVolume;
-	}
-
-	namespace Scene
-	{
-		class VVoxelObject : public VLevelObject, public IVRenderableObject, public std::enable_shared_from_this<VVoxelObject>, public IVSerializable
+		class VFileStreamReader : public Microsoft::glTF::IStreamReader
 		{
 		public:
-			void SetVoxelVolume(VObjectPtr<Voxel::VVoxelVolume> volume);
-			std::weak_ptr<Voxel::VVoxelVolume> GetVoxelVolume() override;
+			VFileStreamReader(const std::string& baseFilePath)
+				:BasePath(baseFilePath){}
 
-
-			std::shared_ptr<VSerializationArchive> Serialize() const override;
-
-
-			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
+			std::shared_ptr<std::istream> GetInputStream(const std::string& filename) const override;
 
 		private:
-			VObjectPtr<Voxel::VVoxelVolume> VoxelVolume;
-		protected:
-			void Initialize() override;
-
-			void BeginDestroy() override;
+			std::string BasePath;
 		};
 	}
 }

@@ -30,6 +30,7 @@
 #define _USE_MATH_DEFINES
 
 #include <math.h>
+#include "SerializationManager.h"
 
 void VolumeRaytracer::App::RendererEngineInstance::OnEngineInitialized(Engine::VEngine* owningEngine)
 {
@@ -148,7 +149,9 @@ void VolumeRaytracer::App::RendererEngineInstance::OnAxisInput(const VolumeRaytr
 
 void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
-	Scene = VObject::CreateObject<Scene::VScene>();
+	//Scene = VObject::CreateObject<Scene::VScene>();
+
+	LoadSceneFromFile("../Voxelizer/Monkey.vox");
 	Camera = Scene->SpawnObject<Scene::VCamera>(VVector(300.f, 0.f, 100.f), VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f)), VVector::ONE);
 
 	DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
@@ -165,9 +168,9 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 	Scene->SetActiveDirectionalLight(DirectionalLight);
 
 	//InitSnowmanObject();
-	InitFloor();
-	InitSphere();
-	InitCube();
+	//InitFloor();
+	//InitSphere();
+	//InitCube();
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
@@ -213,7 +216,9 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
 		{
 			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+				VIntVector voxelIndex = VIntVector(x, y, z);
+
+				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
 
 				float density = densityObj->Evaluate(voxelPos);
 
@@ -222,7 +227,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
 				voxel.Material = density <= 0 ? 1 : 0;
 				voxel.Density = density;
 
-				voxelVolume->SetVoxel(x, y, z, voxel);
+				voxelVolume->SetVoxel(voxelIndex, voxel);
 			}
 		}
 	}
@@ -241,14 +246,16 @@ void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
 		{
 			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+				VIntVector voxelIndex = VIntVector(x, y, z);
+
+				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
 
 				Voxel::VVoxel voxel;
 
 				voxel.Material = 1;
 				voxel.Density = -1.f;
 
-				voxelVolume->SetVoxel(x, y, z, voxel);
+				voxelVolume->SetVoxel(voxelIndex, voxel);
 			}
 		}
 	}
@@ -275,7 +282,9 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 		{
 			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+				VIntVector voxelIndex = VIntVector(x, y, z);
+
+				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
 
 				float density = densityObj->Evaluate(voxelPos);
 
@@ -284,7 +293,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 				voxel.Material = density <= 0 ? 1 : 0;
 				voxel.Density = density;
 
-				voxelVolume->SetVoxel(x, y, z, voxel);
+				voxelVolume->SetVoxel(voxelIndex, voxel);
 			}
 		}
 	}
@@ -311,7 +320,9 @@ void VolumeRaytracer::App::RendererEngineInstance::InitCube()
 		{
 			for (int z = 0; z < voxelVolume->GetSize(); z++)
 			{
-				VVector voxelPos = voxelVolume->VoxelIndexToWorldPosition(x, y, z);
+				VIntVector voxelIndex = VIntVector(x, y, z);
+
+				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
 
 				float density = densityObj->Evaluate(voxelPos);
 
@@ -320,7 +331,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitCube()
 				voxel.Material = density <= 0 ? 1 : 0;
 				voxel.Density = density;
 
-				voxelVolume->SetVoxel(x, y, z, voxel);
+				voxelVolume->SetVoxel(voxelIndex, voxel);
 			}
 		}
 	}
@@ -328,3 +339,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitCube()
 	Cube->SetVoxelVolume(voxelVolume);
 }
 
+void VolumeRaytracer::App::RendererEngineInstance::LoadSceneFromFile(const std::string& filePath)
+{
+	Scene = VSerializationManager::LoadFromFile<Scene::VScene>(filePath);
+}

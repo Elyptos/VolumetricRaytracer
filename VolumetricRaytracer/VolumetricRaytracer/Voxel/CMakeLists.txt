@@ -18,7 +18,6 @@ add_library (VVoxel ${voxel_public} ${voxel_private})
 
 target_include_directories(VVoxel PUBLIC "Public")
 target_link_libraries(VVoxel VCore)
-target_link_libraries(VVoxel VScene)
 
 
 #target_include_directories(VCore PUBLIC spdlogIncludeDir)

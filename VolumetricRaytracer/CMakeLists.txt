@@ -39,6 +39,24 @@ set(spdlogIncludeDir ${source_dir}/include)
 ExternalProject_Get_Property(Eigen3 source_dir)
 set(eigenIncludeDir ${source_dir})
 
+
+
+#gltf
+ExternalProject_Add(gltf
+	PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/ext/gltf
+	GIT_REPOSITORY https://github.com/microsoft/glTF-SDK.git
+	GIT_TAG r1.9.5.0
+	GIT_PROGRESS 1
+	LOG_DOWNLOAD ON
+	INSTALL_COMMAND ""
+)
+
+ExternalProject_Get_Property(gltf source_dir)
+set(gltfIncludeDir ${source_dir}/GLTFSDK/Inc)
+
+ExternalProject_Get_Property(gltf source_dir)
+set(gltfLibDir ${source_dir}/Built/Out/windows_/Debug/GLTFSDK)
+
 #file(DOWNLOAD https://raw.githubusercontent.com/microsoft/DirectX-Graphics-Samples/v1.5-dxr/Libraries/D3DX12/d3dx12.h ${CMAKE_CURRENT_SOURCE_DIR}/ext/d3dx12/include/d3dx12.h)
 file(DOWNLOAD https://raw.githubusercontent.com/microsoft/DirectX-Graphics-Samples/225977/Libraries/D3DX12/d3dx12.h ${CMAKE_CURRENT_SOURCE_DIR}/ext/d3dx12/include/d3dx12.h)
 set(d3dx12IncludeDir ${CMAKE_CURRENT_SOURCE_DIR}/ext/d3dx12/include)
@@ -58,3 +76,4 @@ find_package(OpenMP)
 # Include sub-projects.
 add_subdirectory("Dependencies/DirectXTex")
 add_subdirectory ("VolumetricRaytracer")
+add_subdirectory("Voxelizer")

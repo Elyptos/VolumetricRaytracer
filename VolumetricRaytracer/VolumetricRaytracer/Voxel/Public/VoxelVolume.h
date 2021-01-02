@@ -16,6 +16,7 @@
 
 #include "Voxel.h"
 #include "Object.h"
+#include "ISerializable.h"
 #include "Material.h"
 #include "AABB.h"
 #include <string>
@@ -37,13 +38,11 @@ namespace VolumeRaytracer
 		{
 		public:
 			VVoxel Voxel;
-			unsigned int X;
-			unsigned int Y;
-			unsigned int Z;
-			unsigned int Index;
+			VIntVector Index3D;
+			size_t Index;
 		};
 
-		class VVoxelVolume : public VObject 
+		class VVoxelVolume : public VObject, public IVSerializable
 		{
 		private:
 			class VVoxelVolumeIterator : public std::iterator<std::output_iterator_tag, VVoxelIteratorElement>
@@ -71,12 +70,10 @@ namespace VolumeRaytracer
 
 			VAABB GetVolumeBounds() const;
 
-			void SetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos, const VVoxel& voxel);
-			VVoxel GetVoxel(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
+			void SetVoxel(const VIntVector& voxelIndex, const VVoxel& voxel);
+			VVoxel GetVoxel(const VIntVector& voxelIndex) const;
 			VVoxel GetVoxel(const size_t& voxelIndex) const;
-			bool IsValidVoxelIndex(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
-
-			VVector VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const;
+			bool IsValidVoxelIndex(const VIntVector& voxelIndex) const;
 
 			void SetMaterial(const VMaterial& material);
 			VMaterial GetMaterial() const;
@@ -95,6 +92,15 @@ namespace VolumeRaytracer
 
 			void MakeDirty();
 			bool IsDirty() const;
+
+			VVector VoxelIndexToRelativePosition(const VIntVector& voxelIndex) const;
+			VIntVector RelativePositionToCellIndex(const VVector& pos) const;
+			VIntVector RelativePositionToVoxelIndex(const VVector& pos) const;
+
+			std::shared_ptr<VSerializationArchive> Serialize() const override;
+
+
+			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
 
 		protected:
 			void Initialize() override;
