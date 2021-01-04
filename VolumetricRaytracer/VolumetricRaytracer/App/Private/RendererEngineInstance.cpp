@@ -149,9 +149,9 @@ void VolumeRaytracer::App::RendererEngineInstance::OnAxisInput(const VolumeRaytr
 
 void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
-	//Scene = VObject::CreateObject<Scene::VScene>();
+	Scene = VObject::CreateObject<Scene::VScene>();
 
-	LoadSceneFromFile("../Voxelizer/Monkey.vox");
+	//LoadSceneFromFile("../Voxelizer/Monkey.vox");
 	Camera = Scene->SpawnObject<Scene::VCamera>(VVector(300.f, 0.f, 100.f), VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f)), VVector::ONE);
 
 	DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
@@ -168,14 +168,14 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 	Scene->SetActiveDirectionalLight(DirectionalLight);
 
 	//InitSnowmanObject();
-	//InitFloor();
-	//InitSphere();
-	//InitCube();
+	InitFloor();
+	InitSphere();
+	InitCube();
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
 {
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(140, 200.f);
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(6, 200.f);
 
 	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
 
@@ -209,7 +209,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
 
 	densityObj->Position = VVector::FORWARD * -150.f;
 
-	#pragma omp parallel for collapse(3)
+	//#pragma omp parallel for collapse(3)
 	for (int x = 0; x < voxelVolume->GetSize(); x++)
 	{
 		for (int y = 0; y < voxelVolume->GetSize(); y++)
@@ -237,9 +237,9 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
 
 void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
 {
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(2, 200.f);
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(0, 200.f);
 
-	#pragma omp parallel for collapse(3)
+	//#pragma omp parallel for collapse(3)
 	for (int x = 0; x < voxelVolume->GetSize(); x++)
 	{
 		for (int y = 0; y < voxelVolume->GetSize(); y++)
@@ -265,7 +265,14 @@ void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 {
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(50, 100.f);
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(4, 100.f);
+
+	//Voxel::VVoxel voxel;
+	//voxel.Material = 1;
+	//voxel.Density = -1;
+
+	//voxelVolume->SetVoxel(VIntVector::ONE, voxel);
+
 
 	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
 
@@ -275,12 +282,14 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 
 	densityObj->GetRootShape().AddChild(sphere);
 
-#pragma omp parallel for collapse(3)
-	for (int x = 0; x < voxelVolume->GetSize(); x++)
+	size_t voxelCount = voxelVolume->GetSize();
+
+	//#pragma omp parallel for collapse(3)
+	for (int x = 0; x < voxelCount; x++)
 	{
-		for (int y = 0; y < voxelVolume->GetSize(); y++)
+		for (int y = 0; y < voxelCount; y++)
 		{
-			for (int z = 0; z < voxelVolume->GetSize(); z++)
+			for (int z = 0; z < voxelCount; z++)
 			{
 				VIntVector voxelIndex = VIntVector(x, y, z);
 
@@ -303,7 +312,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 
 void VolumeRaytracer::App::RendererEngineInstance::InitCube()
 {
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(50, 100.f);
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(5, 100.f);
 
 	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
 
@@ -313,7 +322,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitCube()
 
 	densityObj->GetRootShape().AddChild(box);
 
-	#pragma omp parallel for collapse(3)
+	//#pragma omp parallel for collapse(3)
 	for (int x = 0; x < voxelVolume->GetSize(); x++)
 	{
 		for (int y = 0; y < voxelVolume->GetSize(); y++)

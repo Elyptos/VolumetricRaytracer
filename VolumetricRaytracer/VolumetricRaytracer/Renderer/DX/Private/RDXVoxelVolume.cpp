@@ -210,6 +210,8 @@ void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::UpdateVolumeTexture(std::wea
 		#pragma omp parallel for
 		for (int i = 0; i < voxelCount; i++)
 		{
+			Voxel::VVoxel v = Desc.Volume->GetVoxel(i);
+
 			pixels[i] = Desc.Volume->GetVoxel(i).Density;
 		}
 

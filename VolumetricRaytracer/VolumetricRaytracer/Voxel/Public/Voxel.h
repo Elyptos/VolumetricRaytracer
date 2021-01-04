@@ -14,6 +14,7 @@
 
 #pragma once
 #include <stdint.h>
+#include "MathHelpers.h"
 
 namespace VolumeRaytracer
 {
@@ -23,7 +24,17 @@ namespace VolumeRaytracer
 		{
 		public:
 			uint8_t Material = 0;
-			float Density = 0;
+			float Density = 100.f;
+		};
+
+		struct VCell
+		{
+		public:
+			VVoxel Voxels[8];
+
+			bool HasSurface() const;
+
+			void FillWithVoxel(const VVoxel& voxel);
 		};
 	}
 }

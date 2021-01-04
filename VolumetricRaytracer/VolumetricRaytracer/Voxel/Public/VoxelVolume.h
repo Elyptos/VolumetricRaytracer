@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include "Voxel.h"
+#include "Octree.h"
 #include "Object.h"
 #include "ISerializable.h"
 #include "Material.h"
@@ -61,7 +61,7 @@ namespace VolumeRaytracer
 			};
 
 		public:
-			VVoxelVolume(const unsigned int& size, const float& volumeExtends);
+			VVoxelVolume(const uint8_t& resolution, const float& volumeExtends);
 
 			unsigned int GetSize() const;
 			size_t GetVoxelCount() const;
@@ -109,10 +109,10 @@ namespace VolumeRaytracer
 			void ClearDirtyFlag();
 
 		private:
-			unsigned int Size = 0;
 			float VolumeExtends = 0;
 			float CellSize = 0;
-			VVoxel* VoxelArr = nullptr;
+			
+			VCellOctree* Octree = nullptr; 
 
 			VMaterial GeometryMaterial;
 
