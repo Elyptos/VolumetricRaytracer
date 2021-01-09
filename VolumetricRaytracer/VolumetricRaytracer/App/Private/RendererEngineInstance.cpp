@@ -168,9 +168,9 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 	Scene->SetActiveDirectionalLight(DirectionalLight);
 
 	//InitSnowmanObject();
-	InitFloor();
+	//InitFloor();
 	InitSphere();
-	InitCube();
+	//InitCube();
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
@@ -265,13 +265,20 @@ void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 {
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(4, 100.f);
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(8, 100.f);
 
-	//Voxel::VVoxel voxel;
-	//voxel.Material = 1;
-	//voxel.Density = -1;
+	/*Voxel::VVoxel voxel;
+	voxel.Material = 1;
+	voxel.Density = -1;
 
-	//voxelVolume->SetVoxel(VIntVector::ONE, voxel);
+	voxelVolume->SetVoxel(VIntVector::ONE, voxel);*/
+	//voxelVolume->SetVoxel(VIntVector::ZERO, voxel);
+	//voxelVolume->SetVoxel(VIntVector(1,0,0), voxel);
+	//voxelVolume->SetVoxel(VIntVector(0,1,0), voxel);
+	//voxelVolume->SetVoxel(VIntVector(1,1,0), voxel);
+	//voxelVolume->SetVoxel(VIntVector(1,0,1), voxel);
+	//voxelVolume->SetVoxel(VIntVector(0,1,1), voxel);
+	//voxelVolume->SetVoxel(VIntVector(0,0,1), voxel);
 
 
 	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
@@ -284,7 +291,10 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 
 	size_t voxelCount = voxelVolume->GetSize();
 
-	//#pragma omp parallel for collapse(3)
+	size_t volumeSize = voxelCount * voxelCount * voxelCount;
+	Voxel::VVoxel* voxelArr = new Voxel::VVoxel[volumeSize];
+
+	#pragma omp parallel for collapse(3)
 	for (int x = 0; x < voxelCount; x++)
 	{
 		for (int y = 0; y < voxelCount; y++)
@@ -302,10 +312,22 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 				voxel.Material = density <= 0 ? 1 : 0;
 				voxel.Density = density;
 
-				voxelVolume->SetVoxel(voxelIndex, voxel);
+				//voxelVolume->SetVoxel(voxelIndex, voxel);
+				voxelArr[VMathHelpers::Index3DTo1D(voxelIndex, voxelCount, voxelCount)] = voxel; 
 			}
 		}
 	}
+
+	for (int i = 0; i < volumeSize; i++)
+	{
+		VIntVector voxelIndex = VMathHelpers::Index1DTo3D(i, voxelCount, voxelCount);
+
+		voxelVolume->SetVoxel(voxelIndex, voxelArr[i]);
+	}
+
+	delete[] voxelArr;
+
+	voxelVolume->SimplifyVolume();
 
 	Sphere->SetVoxelVolume(voxelVolume);
 }

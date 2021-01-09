@@ -26,8 +26,8 @@ VolumeRaytracer::VIntVector VolumeRaytracer::VMathHelpers::Index1DTo3D(const siz
 void VolumeRaytracer::VMathHelpers::Index1DTo3D(const size_t& index, const size_t& yCount, const size_t& zCount, int& outX, int& outY, int& outZ)
 {
 	outX = (index / (yCount * zCount));
-	outY = ((index - outX * yCount * zCount) / zCount);
-	outZ = (index - outX * yCount * zCount - outY * zCount);
+	outZ = ((index - outX * yCount * zCount) / yCount);
+	outY = (index - outX * yCount * zCount - outZ * yCount);
 }
 
 size_t VolumeRaytracer::VMathHelpers::Index3DTo1D(const VIntVector& index, const size_t& yCount, const size_t& zCount)
@@ -37,5 +37,5 @@ size_t VolumeRaytracer::VMathHelpers::Index3DTo1D(const VIntVector& index, const
 
 size_t VolumeRaytracer::VMathHelpers::Index3DTo1D(const int& x, const int& y, const int& z, const size_t& yCount, const size_t& zCount)
 {
-	return x * yCount * zCount + y * zCount + z;
+	return x * yCount * zCount + z * yCount + y;
 }

@@ -16,14 +16,17 @@
 
 bool VolumeRaytracer::Voxel::VCell::HasSurface() const
 {
-	bool sameSign = (VMathHelpers::Sign(Voxels[0].Density) &
-		VMathHelpers::Sign(Voxels[1].Density) &
-		VMathHelpers::Sign(Voxels[2].Density) &
-		VMathHelpers::Sign(Voxels[3].Density) &
-		VMathHelpers::Sign(Voxels[4].Density) &
-		VMathHelpers::Sign(Voxels[5].Density) &
-		VMathHelpers::Sign(Voxels[6].Density) &
-		VMathHelpers::Sign(Voxels[7].Density)) == VMathHelpers::Sign(Voxels[0].Density);
+	int v0Sign = VMathHelpers::Sign(Voxels[0].Density);
+
+	bool sameSign = (
+		v0Sign == VMathHelpers::Sign(Voxels[1].Density) &&
+		v0Sign == VMathHelpers::Sign(Voxels[2].Density) &&
+		v0Sign == VMathHelpers::Sign(Voxels[3].Density) &&
+		v0Sign == VMathHelpers::Sign(Voxels[4].Density) &&
+		v0Sign == VMathHelpers::Sign(Voxels[5].Density) &&
+		v0Sign == VMathHelpers::Sign(Voxels[6].Density) &&
+		v0Sign == VMathHelpers::Sign(Voxels[7].Density)
+	);
 
 	bool sameMaterial = (Voxels[0].Material &
 		Voxels[1].Material &
@@ -48,3 +51,28 @@ void VolumeRaytracer::Voxel::VCell::FillWithVoxel(const VVoxel& voxel)
 	Voxels[6] = voxel;
 	Voxels[7] = voxel;
 }
+
+uint8_t VolumeRaytracer::Voxel::VCell::GetVoxelIndex(const VIntVector& index3D)
+{
+	assert(index3D.X >= 0 && index3D.X <= 1 && index3D.Y >= 0 && index3D.Y <= 1 && index3D.Z >= 0 && index3D.Z <= 1);
+
+	uint8_t res = index3D.X;
+
+	res |= (index3D.Y << 1);
+	res |= (index3D.Z << 2);
+
+	return res;
+}
+
+const VolumeRaytracer::VIntVector VolumeRaytracer::Voxel::VCell::VOXEL_COORDS[8] = {
+	VIntVector(0,0,0),
+	VIntVector(1,0,0),
+	VIntVector(0,1,0),
+	VIntVector(1,1,0),
+	VIntVector(0,0,1),
+	VIntVector(1,0,1),
+	VIntVector(0,1,1),
+	VIntVector(1,1,1)
+};
+
+const float VolumeRaytracer::Voxel::VVoxel::DEFAULT_DENSITY = 30.f;

@@ -62,6 +62,7 @@ namespace VolumeRaytracer
 		UINT voxelAxisCount;
 		float volumeExtend;
 		float distanceBtwVoxels;
+		UINT octreeDepth;
 	};
 
 	static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);

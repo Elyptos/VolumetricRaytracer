@@ -211,6 +211,21 @@ void VolumeRaytracer::Voxel::VVoxelVolume::Deserialize(std::shared_ptr<VSerializ
 	MakeDirty();
 }
 
+void VolumeRaytracer::Voxel::VVoxelVolume::SimplifyVolume()
+{
+	Octree->CollapseTree();
+}
+
+void VolumeRaytracer::Voxel::VVoxelVolume::GetGPUOctreeStructure(std::vector<VCellGPUOctreeNode>& outNodes, size_t& outNodeAxisCount) const
+{
+	Octree->GetGPUOctreeStructure(outNodes, outNodeAxisCount);
+}
+
+uint8_t VolumeRaytracer::Voxel::VVoxelVolume::GetResolution() const
+{
+	return Octree->GetMaxDepth();
+}
+
 void VolumeRaytracer::Voxel::VVoxelVolume::Initialize()
 {
 	//if (GetSize() > 0)

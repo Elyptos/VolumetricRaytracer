@@ -23,8 +23,10 @@ namespace VolumeRaytracer
 		struct VVoxel
 		{
 		public:
+			static const float DEFAULT_DENSITY;
+
 			uint8_t Material = 0;
-			float Density = 100.f;
+			float Density = DEFAULT_DENSITY;
 		};
 
 		struct VCell
@@ -35,6 +37,9 @@ namespace VolumeRaytracer
 			bool HasSurface() const;
 
 			void FillWithVoxel(const VVoxel& voxel);
+
+			static uint8_t GetVoxelIndex(const VIntVector& index3D);
+			static const VIntVector VOXEL_COORDS[8];
 		};
 	}
 }

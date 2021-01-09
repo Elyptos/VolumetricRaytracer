@@ -33,7 +33,7 @@ namespace VolumeRaytracer
 			void ToLeaf(const VCell& cell);
 
 			bool CanBeSimplified() const;
-			bool MergeToLeaf();
+			bool TryToMergeNodes();
 
 			bool IsLeaf() const;
 			std::shared_ptr<VCellOctreeNode> GetChild(const uint8_t& childIndex) const;
@@ -46,6 +46,14 @@ namespace VolumeRaytracer
 			size_t Depth;
 		};
 
+		struct VCellGPUOctreeNode
+		{
+		public:
+			bool IsLeaf;
+			VCell Cell;
+			std::vector<VIntVector> Children;
+		};
+
 		class VCellOctree
 		{
 		public:
@@ -55,10 +63,16 @@ namespace VolumeRaytracer
 			VVoxel GetVoxel(const VIntVector& voxelIndex) const;
 			void SetVoxel(const VIntVector& voxelIndex, const VVoxel& voxel);
 			bool IsValidVoxelIndex(const VIntVector& voxelIndex) const;
+			bool IsValidCellIndex(const VIntVector& cellIndex) const;
 
 			size_t GetMaxDepth() const;
 			size_t GetVoxelCountAlongAxis() const;
+			size_t GetCellCountAlongAxis() const;
 			size_t GetVoxelCount() const;
+
+			void CollapseTree();
+
+			void GetGPUOctreeStructure(std::vector<VCellGPUOctreeNode>& outNodes, size_t& outNodeAxisCount) const;
 
 		private:
 			VIntVector CalculateOctreeNodeIndex(const VIntVector& parentIndex, const VIntVector& relativeIndex, const size_t& currentDepth) const;
@@ -67,6 +81,9 @@ namespace VolumeRaytracer
 			std::shared_ptr<VCellOctreeNode> GetOctreeNodeForEditing(std::shared_ptr<VCellOctreeNode> parent, const VIntVector& parentIndex, const VIntVector& nodeIndex, bool subdivide = true);
 
 			void GetNeighbouringVoxelIndices(const VIntVector& cellVoxelIndex, std::vector<VIntVector>& outCellOffsets, std::vector<VIntVector>& outCellVoxelIndex);
+
+			void GetAllNodes(std::shared_ptr<VCellOctreeNode> node, std::vector<std::shared_ptr<VCellOctreeNode>>& nodes) const;
+			void GetGPUNodes(const std::shared_ptr<VCellOctreeNode>& node, const size_t& gpuVolumeSize, const size_t& currentNodeIndex, std::vector<VCellGPUOctreeNode>& outGpuNodes) const;
 
 		private:
 			size_t MaxDepth;

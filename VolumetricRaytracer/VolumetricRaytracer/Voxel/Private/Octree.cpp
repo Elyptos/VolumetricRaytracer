@@ -88,42 +88,39 @@ bool VolumeRaytracer::Voxel::VCellOctreeNode::CanBeSimplified() const
 	}
 }
 
-bool VolumeRaytracer::Voxel::VCellOctreeNode::MergeToLeaf()
+bool VolumeRaytracer::Voxel::VCellOctreeNode::TryToMergeNodes()
 {
-	if (CanBeSimplified())
+	if (IsLeaf())
 	{
-		if (IsLeaf())
+		return !VoxelCell->HasSurface();
+	}
+	else
+	{
+		bool mergeSuccess = true;
+
+		for (auto& child : Children)
 		{
+			mergeSuccess &= child->TryToMergeNodes();
+		}
+
+		if (mergeSuccess)
+		{
+			VCell cell = Children[0]->GetCell();
+			bool inSurface = cell.Voxels[0].Density <= 0;
+
+			VVoxel voxel;
+			voxel.Density = inSurface ? -VVoxel::DEFAULT_DENSITY : VVoxel::DEFAULT_DENSITY;
+			voxel.Material = cell.Voxels[0].Material;
+
+			cell.FillWithVoxel(voxel);
+
+			ToLeaf(cell);
+
 			return true;
 		}
 		else
 		{
-			bool mergeSuccess = true;
-
-			for (auto& child : Children)
-			{
-				mergeSuccess &= child->MergeToLeaf();
-			}
-
-			if (mergeSuccess)
-			{
-				VCell cell = Children[0]->GetCell();
-				bool inSurface = cell.Voxels[0].Density <= 0;
-
-				VVoxel voxel;
-				voxel.Density = inSurface ? -100.f : 100.f;
-				voxel.Material = cell.Voxels[0].Material;
-
-				cell.FillWithVoxel(voxel);
-
-				ToLeaf(cell);
-
-				return true;
-			}
-			else
-			{
-				return false;
-			}
+			return false;
 		}
 	}
 
@@ -181,7 +178,7 @@ VolumeRaytracer::Voxel::VVoxel VolumeRaytracer::Voxel::VCellOctree::GetVoxel(con
 
 	VIntVector cellVoxelIndex = voxelIndex - cellIndex;
 
-	int ind = VMathHelpers::Index3DTo1D(cellVoxelIndex, 2, 2);
+	uint8_t ind = VCell::GetVoxelIndex(cellVoxelIndex);
 
 	assert(ind < 8);
 
@@ -205,19 +202,15 @@ void VolumeRaytracer::Voxel::VCellOctree::SetVoxel(const VIntVector& voxelIndex,
 	{
 		VIntVector currentCellIndex = cellIndex + cellOffset[i];
 
-		if (IsValidVoxelIndex(currentCellIndex))
+		if (IsValidCellIndex(currentCellIndex))
 		{
 			std::shared_ptr<VCellOctreeNode> node = GetOctreeNodeForEditing(Root, VIntVector::ZERO, currentCellIndex, true);
-			
+
 			VCell cell = node->GetCell();
 
-			int ind = VMathHelpers::Index3DTo1D(voxelIndices[i], 2, 2);
+			uint8_t ind = VCell::GetVoxelIndex(voxelIndices[i]);
 
-			if (ind >= 8)
-			{
-				assert(ind < 8);
-			}
-
+			assert(ind < 8);
 
 			cell.Voxels[ind] = voxel;
 
@@ -235,6 +228,15 @@ bool VolumeRaytracer::Voxel::VCellOctree::IsValidVoxelIndex(const VIntVector& vo
 			voxelIndex.Z >= 0 && voxelIndex.Z < voxelAxisCount;
 }
 
+bool VolumeRaytracer::Voxel::VCellOctree::IsValidCellIndex(const VIntVector& cellIndex) const
+{
+	size_t cellAxisCount = GetCellCountAlongAxis();
+
+	return  cellIndex.X >= 0 && cellIndex.X < cellAxisCount &&
+			cellIndex.Y >= 0 && cellIndex.Y < cellAxisCount &&
+			cellIndex.Z >= 0 && cellIndex.Z < cellAxisCount;
+}
+
 size_t VolumeRaytracer::Voxel::VCellOctree::GetMaxDepth() const
 {
 	return MaxDepth;
@@ -245,11 +247,36 @@ size_t VolumeRaytracer::Voxel::VCellOctree::GetVoxelCountAlongAxis() const
 	return 2 + (std::pow(2, MaxDepth) - 1);
 }
 
+size_t VolumeRaytracer::Voxel::VCellOctree::GetCellCountAlongAxis() const
+{
+	return std::pow(2, MaxDepth);
+}
+
 size_t VolumeRaytracer::Voxel::VCellOctree::GetVoxelCount() const
 {
 	size_t axisCount = GetVoxelCountAlongAxis();
 
 	return axisCount * axisCount * axisCount;
+}
+
+void VolumeRaytracer::Voxel::VCellOctree::CollapseTree()
+{
+	Root->TryToMergeNodes();
+}
+
+void VolumeRaytracer::Voxel::VCellOctree::GetGPUOctreeStructure(std::vector<VCellGPUOctreeNode>& outNodes, size_t& outNodeAxisCount) const
+{
+	std::vector<std::shared_ptr<VCellOctreeNode>> nodes;
+	GetAllNodes(Root, nodes);
+
+	size_t size;
+	size = std::ceil(std::cbrtf(nodes.size()));
+
+	outNodeAxisCount = size;
+
+	outNodes.push_back(VCellGPUOctreeNode());
+
+	GetGPUNodes(Root, size, 0, outNodes);
 }
 
 VolumeRaytracer::VIntVector VolumeRaytracer::Voxel::VCellOctree::CalculateOctreeNodeIndex(const VIntVector& parentIndex, const VIntVector& relativeIndex, const size_t& currentDepth) const
@@ -274,7 +301,7 @@ std::shared_ptr<VolumeRaytracer::Voxel::VCellOctreeNode> VolumeRaytracer::Voxel:
 		VIntVector minNodeIndex = CalculateOctreeNodeIndex(parentIndex, relIndex, parent->GetDepth());
 		VIntVector maxNodeIndex = minNodeIndex + VIntVector::ONE * std::pow(2, MaxDepth - (parent->GetDepth() + 1));
 
-		if (cellIndex >= minNodeIndex && cellIndex <= maxNodeIndex)
+		if (cellIndex >= minNodeIndex && cellIndex < maxNodeIndex)
 		{
 			return GetOctreeNode(parent->GetChild(i), minNodeIndex, cellIndex);
 		}
@@ -303,7 +330,7 @@ std::shared_ptr<VolumeRaytracer::Voxel::VCellOctreeNode> VolumeRaytracer::Voxel:
 		VIntVector minNodeIndex = CalculateOctreeNodeIndex(parentIndex, relIndex, parent->GetDepth());
 		VIntVector maxNodeIndex = minNodeIndex + VIntVector::ONE * std::pow(2, MaxDepth - (parent->GetDepth() + 1));
 
-		if (nodeIndex >= minNodeIndex && nodeIndex <= maxNodeIndex)
+		if (nodeIndex >= minNodeIndex && nodeIndex < maxNodeIndex)
 		{
 			std::shared_ptr<VolumeRaytracer::Voxel::VCellOctreeNode> node = parent->GetChild(i);
 
@@ -507,5 +534,54 @@ void VolumeRaytracer::Voxel::VCellOctree::GetNeighbouringVoxelIndices(const VInt
 			VIntVector(1,0,0),
 			VIntVector(0,0,0),
 		};
+	}
+}
+
+void VolumeRaytracer::Voxel::VCellOctree::GetAllNodes(std::shared_ptr<VCellOctreeNode> node, std::vector<std::shared_ptr<VCellOctreeNode>>& nodes) const
+{
+	nodes.push_back(node);
+
+	if (!node->IsLeaf())
+	{
+		for (int i = 0; i < 8; i++)
+		{
+			GetAllNodes(node->GetChild(i), nodes);
+		}
+	}
+}
+
+void VolumeRaytracer::Voxel::VCellOctree::GetGPUNodes(const std::shared_ptr<VCellOctreeNode>& node, const size_t& gpuVolumeSize, const size_t& currentNodeIndex, std::vector<VCellGPUOctreeNode>& outGpuNodes) const
+{
+	if (node->IsLeaf())
+	{
+		VCellGPUOctreeNode& currentNode = outGpuNodes[currentNodeIndex];
+
+		currentNode.IsLeaf = true;
+		currentNode.Cell = node->GetCell();
+	}
+	else
+	{
+		int firstChildIndex = outGpuNodes.size();
+
+		outGpuNodes.push_back(VCellGPUOctreeNode());
+		outGpuNodes.push_back(VCellGPUOctreeNode());
+		outGpuNodes.push_back(VCellGPUOctreeNode());
+		outGpuNodes.push_back(VCellGPUOctreeNode());
+		outGpuNodes.push_back(VCellGPUOctreeNode());
+		outGpuNodes.push_back(VCellGPUOctreeNode());
+		outGpuNodes.push_back(VCellGPUOctreeNode());
+		outGpuNodes.push_back(VCellGPUOctreeNode());
+
+		outGpuNodes[currentNodeIndex].IsLeaf = false;
+
+		for (int i = 0; i < 8; i++)
+		{
+			int index = firstChildIndex + i;
+			VIntVector index3D = VMathHelpers::Index1DTo3D(index, gpuVolumeSize, gpuVolumeSize);
+			
+			outGpuNodes[currentNodeIndex].Children.push_back(index3D);
+
+			GetGPUNodes(node->GetChild(i), gpuVolumeSize, index, outGpuNodes);
+		}
 	}
 }

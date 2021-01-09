@@ -23,13 +23,14 @@ namespace VolumeRaytracer
 	namespace Voxel
 	{
 		class VVoxelVolume;
+		class VVoxel;
 	}
 
 	namespace Renderer
 	{
 		namespace DX
 		{
-			class VDXTexture3DFloat;
+			class VDXTexture3D;
 			class VDXRenderer;
 
 			struct VDXVoxelVolumeDesc
@@ -60,7 +61,7 @@ namespace VolumeRaytracer
 				void Cleanup();
 
 				void CreateBottomLevelAccelerationStructure(std::weak_ptr<VDXRenderer> renderer);
-				void AllocateVolumeTexture(std::weak_ptr<VDXRenderer> renderer);
+				void AllocateVolumeTexture(std::weak_ptr<VDXRenderer> renderer, const size_t& volumeSize);
 				void AllocateAABBBuffer(std::weak_ptr<VDXRenderer> renderer);
 				void AllocateGeometryConstantBuffer(std::weak_ptr<VDXRenderer> renderer);
 
@@ -69,8 +70,10 @@ namespace VolumeRaytracer
 				void UpdateGeometryDesc();
 				void UpdateGeometryConstantBuffer();
 
+				void EncodeVoxel(const Voxel::VVoxel& voxel, uint8_t& outR, uint8_t& outG, uint8_t& outB);
+
 			private:
-				VObjectPtr<VDXTexture3DFloat> VolumeTexture = nullptr;
+				VObjectPtr<VDXTexture3D> VolumeTexture = nullptr;
 				CPtr<ID3D12Resource> AABBBuffer;
 				CPtr<ID3D12Resource> GeometryCB;
 				
@@ -78,6 +81,7 @@ namespace VolumeRaytracer
 
 				VDXVoxelVolumeDesc Desc;
 				size_t LastVoxelCount;
+				size_t LastVolumeSize;
 				float LastCellSize;
 
 				D3D12_RAYTRACING_GEOMETRY_DESC GeometryDesc;

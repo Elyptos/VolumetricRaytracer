@@ -102,6 +102,11 @@ namespace VolumeRaytracer
 
 			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
 
+			void SimplifyVolume();
+			void GetGPUOctreeStructure(std::vector<VCellGPUOctreeNode>& outNodes, size_t& outNodeAxisCount) const;
+
+			uint8_t GetResolution() const;
+
 		protected:
 			void Initialize() override;
 			void BeginDestroy() override;
