@@ -105,14 +105,12 @@ bool VolumeRaytracer::Voxel::VCellOctreeNode::TryToMergeNodes()
 
 		if (mergeSuccess)
 		{
-			VCell cell = Children[0]->GetCell();
-			bool inSurface = cell.Voxels[0].Density <= 0;
+			VCell cell;
 
-			VVoxel voxel;
-			voxel.Density = inSurface ? -VVoxel::DEFAULT_DENSITY : VVoxel::DEFAULT_DENSITY;
-			voxel.Material = cell.Voxels[0].Material;
-
-			cell.FillWithVoxel(voxel);
+			for (int i = 0; i < 8; i++)
+			{
+				cell.Voxels[i] = Children[i]->GetCell().GetAvgVoxel();
+			}
 
 			ToLeaf(cell);
 
@@ -154,6 +152,14 @@ size_t VolumeRaytracer::Voxel::VCellOctreeNode::GetDepth() const
 	return Depth;
 }
 
+void VolumeRaytracer::Voxel::VCellOctreeNode::SetChildren(const std::vector<std::shared_ptr<VCellOctreeNode>>& children)
+{
+	assert(children.size() == 8);
+	VoxelCell = nullptr;
+
+	Children = std::vector<std::shared_ptr<VCellOctreeNode>>(children);
+}
+
 VolumeRaytracer::Voxel::VCellOctree::VCellOctree(const uint8_t& maxDepth, const VVoxel& fillerVoxel)
 	: MaxDepth(maxDepth)
 {
@@ -166,6 +172,57 @@ VolumeRaytracer::Voxel::VCellOctree::VCellOctree(const uint8_t& maxDepth, const 
 
 VolumeRaytracer::Voxel::VCellOctree::~VCellOctree()
 {}
+
+void VolumeRaytracer::Voxel::VCellOctree::ClearTreeAndSubdivideAll()
+{
+	std::vector<std::shared_ptr<VCellOctreeNode>> children;
+	std::vector<std::shared_ptr<VCellOctreeNode>> parents;
+
+	int nodeCount = std::pow(8, MaxDepth);
+	Root = std::make_shared<VCellOctreeNode>(0);
+
+	if (nodeCount == 1)
+	{
+		return;
+	}
+
+	children.resize(nodeCount);
+
+	#pragma omp parallel for
+	for (int n = 0; n < nodeCount; n++)
+	{
+		children[n] = std::make_shared<VCellOctreeNode>(MaxDepth);
+	}
+
+	for (int depth = MaxDepth - 1; depth > 0; depth--)
+	{
+		int nodeCount = std::pow(8, depth);
+
+		parents.resize(nodeCount);
+
+		#pragma omp parallel for
+		for (int n = 0; n < nodeCount; n++)
+		{
+			parents[n] = std::make_shared<VCellOctreeNode>(depth);
+			
+			std::vector<std::shared_ptr<VCellOctreeNode>> childNodes;
+			childNodes.resize(8);
+
+			int firstIndex = n * 8;
+
+			for (int i = 0; i < 8; i++)
+			{
+				childNodes[i] = children[firstIndex + i];
+			}
+
+			parents[n]->SetChildren(childNodes);
+		}
+
+		children = std::vector<std::shared_ptr<VCellOctreeNode>>(parents);
+	}
+
+	Root->SetChildren(children);
+}
 
 VolumeRaytracer::Voxel::VVoxel VolumeRaytracer::Voxel::VCellOctree::GetVoxel(const VIntVector& voxelIndex) const
 {

@@ -362,18 +362,18 @@ float DecodeDensity(int2 data)
 	return ((data.x & 0x80) == 0x80) ? -res : res;
 }
 
-void FillVoxelCellWithDensities(in int3 octreeNodePtr, out VoxelDensityCell cell)
+void FillVoxelCellWithDensities(in int3 octreeNodePtr, in int4 n1, in int4 n2, in int4 n3, in int4 n4, in int4 n5, in int4 n6, in int4 n7, in int4 n8, out VoxelDensityCell cell)
 {
 	uint instance = InstanceID();
 
-	cell.v1 = DecodeDensity(g_voxelVolume[instance][octreeNodePtr].rg);
-	cell.v2 = DecodeDensity(g_voxelVolume[instance][octreeNodePtr + int3(1,0,0)].rg);
-	cell.v3 = DecodeDensity(g_voxelVolume[instance][octreeNodePtr + int3(0,1,0)].rg);
-	cell.v4 = DecodeDensity(g_voxelVolume[instance][octreeNodePtr + int3(1,1,0)].rg);
-	cell.v5 = DecodeDensity(g_voxelVolume[instance][octreeNodePtr + int3(0,0,1)].rg);
-	cell.v6 = DecodeDensity(g_voxelVolume[instance][octreeNodePtr + int3(1,0,1)].rg);
-	cell.v7 = DecodeDensity(g_voxelVolume[instance][octreeNodePtr + int3(0,1,1)].rg);
-	cell.v8 = DecodeDensity(g_voxelVolume[instance][octreeNodePtr + int3(1,1,1)].rg);
+	cell.v1 = DecodeDensity(n1.rg);
+	cell.v2 = DecodeDensity(n2.rg);
+	cell.v3 = DecodeDensity(n3.rg);
+	cell.v4 = DecodeDensity(n4.rg);
+	cell.v5 = DecodeDensity(n5.rg);
+	cell.v6 = DecodeDensity(n6.rg);
+	cell.v7 = DecodeDensity(n7.rg);
+	cell.v8 = DecodeDensity(n8.rg);
 }
 
 inline int3 GetChildNodePtr(in uint instanceID, in int3 parentNodePtr, in int3 childIndex)
@@ -427,13 +427,33 @@ VoxelDensityCell GetVoxelCell(in int3 cellIndex)
 
 		//currentDepth = 0;
 
+		//uint4 n1/*, n2, n3, n4, n5, n6, n7, n8*/;
+		
+		
+		//n2 = g_voxelVolume[instanceID][currentNodePtr + int3(1,0,0)];
+		//n3 = g_voxelVolume[instanceID][currentNodePtr + int3(0,1,0)];
+		//n4 = g_voxelVolume[instanceID][currentNodePtr + int3(1,1,0)];
+		//n5 = g_voxelVolume[instanceID][currentNodePtr + int3(0,0,1)];
+		//n6 = g_voxelVolume[instanceID][currentNodePtr + int3(1,0,1)];
+		//n7 = g_voxelVolume[instanceID][currentNodePtr + int3(0,1,1)];
+		//n8 = g_voxelVolume[instanceID][currentNodePtr + int3(1,1,1)];
+		
 		while (currentDepth <= maxDepth)
 		{
+			uint4 n1 = g_voxelVolume[instanceID][currentNodePtr].rgba;
+			uint4 n2 = g_voxelVolume[instanceID][currentNodePtr + int3(1,0,0)].rgba;
+			uint4 n3 = g_voxelVolume[instanceID][currentNodePtr + int3(0,1,0)].rgba;
+			uint4 n4 = g_voxelVolume[instanceID][currentNodePtr + int3(1,1,0)].rgba;
+			uint4 n5 = g_voxelVolume[instanceID][currentNodePtr + int3(0,0,1)].rgba;
+			uint4 n6 = g_voxelVolume[instanceID][currentNodePtr + int3(1,0,1)].rgba;
+			uint4 n7 = g_voxelVolume[instanceID][currentNodePtr + int3(0,1,1)].rgba;
+			uint4 n8 = g_voxelVolume[instanceID][currentNodePtr + int3(1,1,1)].rgba;
+			
 			currentDepth += 1;
 
-			if (IsLeaf(currentNodePtr))
+			if (n1.a == 1)
 			{
-				FillVoxelCellWithDensities(currentNodePtr, res);
+				FillVoxelCellWithDensities(currentNodePtr, n1, n2, n3, n4, n5, n6, n7, n8, res);
 				res.depth = currentDepth;
 				res.size = GetNodeSize(res.depth);
 				res.index = currentNodeIndex;
@@ -443,10 +463,10 @@ VoxelDensityCell GetVoxelCell(in int3 cellIndex)
 			else
 			{
 				int3 childNodeIndex = int3(0, 0, 0);
-
+				
 				if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
 				{
-					currentNodePtr = GetChildNodePtr(instanceID, currentNodePtr, childNodeIndex);
+					currentNodePtr = n1.rgb;
 					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
 					continue;
 				}
@@ -455,7 +475,7 @@ VoxelDensityCell GetVoxelCell(in int3 cellIndex)
 
 				if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
 				{
-					currentNodePtr = GetChildNodePtr(instanceID, currentNodePtr, childNodeIndex);
+					currentNodePtr = n2.rgb;
 					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
 					continue;
 				}
@@ -464,7 +484,7 @@ VoxelDensityCell GetVoxelCell(in int3 cellIndex)
 
 				if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
 				{
-					currentNodePtr = GetChildNodePtr(instanceID, currentNodePtr, childNodeIndex);
+					currentNodePtr = n3.rgb;
 					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
 					continue;
 				}
@@ -473,7 +493,7 @@ VoxelDensityCell GetVoxelCell(in int3 cellIndex)
 
 				if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
 				{
-					currentNodePtr = GetChildNodePtr(instanceID, currentNodePtr, childNodeIndex);
+					currentNodePtr = n4.rgb;
 					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
 					continue;
 				}
@@ -482,7 +502,7 @@ VoxelDensityCell GetVoxelCell(in int3 cellIndex)
 
 				if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
 				{
-					currentNodePtr = GetChildNodePtr(instanceID, currentNodePtr, childNodeIndex);
+					currentNodePtr = n5.rgb;
 					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
 					continue;
 				}
@@ -491,7 +511,7 @@ VoxelDensityCell GetVoxelCell(in int3 cellIndex)
 
 				if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
 				{
-					currentNodePtr = GetChildNodePtr(instanceID, currentNodePtr, childNodeIndex);
+					currentNodePtr = n6.rgb;
 					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
 					continue;
 				}
@@ -500,7 +520,7 @@ VoxelDensityCell GetVoxelCell(in int3 cellIndex)
 
 				if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
 				{
-					currentNodePtr = GetChildNodePtr(instanceID, currentNodePtr, childNodeIndex);
+					currentNodePtr = n7.rgb;
 					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
 					continue;
 				}
@@ -509,7 +529,7 @@ VoxelDensityCell GetVoxelCell(in int3 cellIndex)
 
 				if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
 				{
-					currentNodePtr = GetChildNodePtr(instanceID, currentNodePtr, childNodeIndex);
+					currentNodePtr = n8.rgb;
 					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
 					continue;
 				}

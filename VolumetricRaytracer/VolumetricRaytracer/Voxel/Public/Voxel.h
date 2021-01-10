@@ -40,6 +40,8 @@ namespace VolumeRaytracer
 
 			static uint8_t GetVoxelIndex(const VIntVector& index3D);
 			static const VIntVector VOXEL_COORDS[8];
+
+			VVoxel GetAvgVoxel() const;
 		};
 	}
 }

@@ -20,6 +20,7 @@ VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolume(const uint8_t& resolution, co
 	VolumeExtends(volumeExtends)
 {
 	Octree = new VCellOctree(resolution, VVoxel());
+	Octree->ClearTreeAndSubdivideAll();
 
 	CellSize = (volumeExtends * 2) / (Octree->GetVoxelCountAlongAxis() - 1.f);
 }

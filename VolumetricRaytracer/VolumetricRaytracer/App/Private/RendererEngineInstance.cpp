@@ -158,7 +158,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 		* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 135.f * (M_PI / 180.f)), VVector::ONE);
 	DirectionalLight->IlluminationStrength = 5.f;
 
-	//Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+	Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
 	Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
 	Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
 	Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);
@@ -167,15 +167,15 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 	Scene->SetActiveSceneCamera(Camera);
 	Scene->SetActiveDirectionalLight(DirectionalLight);
 
-	//InitSnowmanObject();
+	InitSnowmanObject();
 	//InitFloor();
-	InitSphere();
+	//InitSphere();
 	//InitCube();
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
 {
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(6, 200.f);
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(7, 200.f);
 
 	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
 
@@ -209,7 +209,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
 
 	densityObj->Position = VVector::FORWARD * -150.f;
 
-	//#pragma omp parallel for collapse(3)
+	#pragma omp parallel for collapse(3)
 	for (int x = 0; x < voxelVolume->GetSize(); x++)
 	{
 		for (int y = 0; y < voxelVolume->GetSize(); y++)
@@ -231,6 +231,8 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
 			}
 		}
 	}
+
+	voxelVolume->SimplifyVolume();
 
 	Snowman->SetVoxelVolume(voxelVolume);
 }
@@ -260,18 +262,20 @@ void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
 		}
 	}
 
+	voxelVolume->SimplifyVolume();
+
 	Floor->SetVoxelVolume(voxelVolume);
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 {
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(8, 100.f);
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(0, 100.f);
 
-	/*Voxel::VVoxel voxel;
+	Voxel::VVoxel voxel;
 	voxel.Material = 1;
 	voxel.Density = -1;
 
-	voxelVolume->SetVoxel(VIntVector::ONE, voxel);*/
+	voxelVolume->SetVoxel(VIntVector::ONE, voxel);
 	//voxelVolume->SetVoxel(VIntVector::ZERO, voxel);
 	//voxelVolume->SetVoxel(VIntVector(1,0,0), voxel);
 	//voxelVolume->SetVoxel(VIntVector(0,1,0), voxel);
@@ -281,53 +285,54 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 	//voxelVolume->SetVoxel(VIntVector(0,0,1), voxel);
 
 
-	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
+	//VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
 
-	std::shared_ptr<Scene::VSphere> sphere = std::make_shared<Scene::VSphere>();
+	//std::shared_ptr<Scene::VSphere> sphere = std::make_shared<Scene::VSphere>();
 
-	sphere->Radius = 40.f;
+	//sphere->Radius = 40.f;
 
-	densityObj->GetRootShape().AddChild(sphere);
+	//densityObj->GetRootShape().AddChild(sphere);
 
-	size_t voxelCount = voxelVolume->GetSize();
+	//size_t voxelCount = voxelVolume->GetSize();
 
-	size_t volumeSize = voxelCount * voxelCount * voxelCount;
-	Voxel::VVoxel* voxelArr = new Voxel::VVoxel[volumeSize];
+	//size_t volumeSize = voxelCount * voxelCount * voxelCount;
+	//Voxel::VVoxel* voxelArr = new Voxel::VVoxel[volumeSize];
 
-	#pragma omp parallel for collapse(3)
-	for (int x = 0; x < voxelCount; x++)
-	{
-		for (int y = 0; y < voxelCount; y++)
-		{
-			for (int z = 0; z < voxelCount; z++)
-			{
-				VIntVector voxelIndex = VIntVector(x, y, z);
+	//#pragma omp parallel for collapse(3)
+	//for (int x = 0; x < voxelCount; x++)
+	//{
+	//	for (int y = 0; y < voxelCount; y++)
+	//	{
+	//		for (int z = 0; z < voxelCount; z++)
+	//		{
+	//			VIntVector voxelIndex = VIntVector(x, y, z);
 
-				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
+	//			VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
 
-				float density = densityObj->Evaluate(voxelPos);
+	//			float density = densityObj->Evaluate(voxelPos);
 
-				Voxel::VVoxel voxel;
+	//			Voxel::VVoxel voxel;
 
-				voxel.Material = density <= 0 ? 1 : 0;
-				voxel.Density = density;
+	//			voxel.Material = density <= 0 ? 1 : 0;
+	//			voxel.Density = density;
 
-				//voxelVolume->SetVoxel(voxelIndex, voxel);
-				voxelArr[VMathHelpers::Index3DTo1D(voxelIndex, voxelCount, voxelCount)] = voxel; 
-			}
-		}
-	}
+	//			//voxelVolume->SetVoxel(voxelIndex, voxel);
+	//			voxelArr[VMathHelpers::Index3DTo1D(voxelIndex, voxelCount, voxelCount)] = voxel; 
+	//		}
+	//	}
+	//}
 
-	for (int i = 0; i < volumeSize; i++)
-	{
-		VIntVector voxelIndex = VMathHelpers::Index1DTo3D(i, voxelCount, voxelCount);
+	//#pragma omp parallel for
+	//for (int i = 0; i < volumeSize; i++)
+	//{
+	//	VIntVector voxelIndex = VMathHelpers::Index1DTo3D(i, voxelCount, voxelCount);
 
-		voxelVolume->SetVoxel(voxelIndex, voxelArr[i]);
-	}
+	//	voxelVolume->SetVoxel(voxelIndex, voxelArr[i]);
+	//}
 
-	delete[] voxelArr;
+	//delete[] voxelArr;
 
-	voxelVolume->SimplifyVolume();
+	//voxelVolume->SimplifyVolume();
 
 	Sphere->SetVoxelVolume(voxelVolume);
 }

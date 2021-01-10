@@ -40,6 +40,8 @@ namespace VolumeRaytracer
 			VCell GetCell() const;
 			size_t GetDepth() const;
 
+			void SetChildren(const std::vector<std::shared_ptr<VCellOctreeNode>>& children);
+			 
 		private:
 			std::vector<std::shared_ptr<VCellOctreeNode>> Children;
 			std::shared_ptr<VCell> VoxelCell = nullptr;
@@ -59,6 +61,8 @@ namespace VolumeRaytracer
 		public:
 			VCellOctree(const uint8_t& maxDepth, const VVoxel& fillerVoxel);
 			~VCellOctree();
+
+			void ClearTreeAndSubdivideAll();
 
 			VVoxel GetVoxel(const VIntVector& voxelIndex) const;
 			void SetVoxel(const VIntVector& voxelIndex, const VVoxel& voxel);

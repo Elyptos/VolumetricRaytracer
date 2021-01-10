@@ -25,7 +25,7 @@
 #include <sstream>
 #include <vector>
 
-//#undef _DEBUG
+#undef _DEBUG
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::Render()
 {

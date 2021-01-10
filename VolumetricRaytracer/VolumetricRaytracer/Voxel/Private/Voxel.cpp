@@ -75,4 +75,20 @@ const VolumeRaytracer::VIntVector VolumeRaytracer::Voxel::VCell::VOXEL_COORDS[8]
 	VIntVector(1,1,1)
 };
 
+VolumeRaytracer::Voxel::VVoxel VolumeRaytracer::Voxel::VCell::GetAvgVoxel() const
+{
+	VVoxel res;
+
+	res.Material = Voxels[0].Material;
+
+	for (int i = 0; i < 8; i++)
+	{
+		res.Density += Voxels[i].Density;
+	}
+
+	res.Density /= 8.f;
+
+	return res;
+}
+
 const float VolumeRaytracer::Voxel::VVoxel::DEFAULT_DENSITY = 30.f;
