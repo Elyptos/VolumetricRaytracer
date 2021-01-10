@@ -234,7 +234,6 @@ int3 GoToNextVoxel(in Ray ray, in uint3 voxelIndex, in float cellSize, in int de
 	int3 sign = ray.direction > 0;
 
 	float3 voxelPos = VoxelIndexToWorldSpace(voxelIndex);
-	float3 voxelExtends = cellSize * 0.5;
 	float3 aabb[2] = { voxelPos, voxelPos + cellSize };
 
 	int nodeCount = GetChildCountOfNode(depth);
@@ -271,7 +270,7 @@ int3 GoToNextVoxel(in Ray ray, in uint3 voxelIndex, in float cellSize, in int de
 		}
 	}
 
-	res = WorldSpaceToVoxelSpace(GetPositionAlongRay(ray, newT + 0.01f));
+	res = WorldSpaceToVoxelSpace(GetPositionAlongRay(ray, newT + 0.1f));
 
 	return res;
 }
@@ -993,14 +992,16 @@ void VRIntersection()
 			}
 			else
 			{
-				nextVoxelPos = GoToNextVoxel(localRay, nextVoxelPos, g_geometryCB[instance].distanceBtwVoxels, g_geometryCB[instance].octreeDepth, cellExit);
+				//nextVoxelPos = GoToNextVoxel(localRay, nextVoxelPos, g_geometryCB[instance].distanceBtwVoxels, g_geometryCB[instance].octreeDepth, cellExit);
 
-				//VolumeRaytracer::VPrimitiveAttributes attr;
-				//attr.normal = float3(1, 0, 0);
+				////VolumeRaytracer::VPrimitiveAttributes attr;
+				////attr.normal = float3(1, 0, 0);
 
-				//ReportHit(10, 0, attr);
+				////ReportHit(10, 0, attr);
 
-				//return;
+				////return;
+				
+				break;
 			}
 
 			cell = GetVoxelCell(nextVoxelPos);
