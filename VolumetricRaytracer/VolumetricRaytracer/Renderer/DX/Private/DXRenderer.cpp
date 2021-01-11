@@ -595,9 +595,10 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeGlobalRootSignature()
 	sceneDescTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
 	sceneDescTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 1, 0);
 
-	CD3DX12_DESCRIPTOR_RANGE geometryDescTable[2];
+	CD3DX12_DESCRIPTOR_RANGE geometryDescTable[3];
 	geometryDescTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, VolumeRaytracer::MaxAllowedObjectData, 2);
 	geometryDescTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, VolumeRaytracer::MaxAllowedObjectData, 1);
+	geometryDescTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, VolumeRaytracer::MaxAllowedObjectData, 2 + VolumeRaytracer::MaxAllowedObjectData);
 
 	CD3DX12_ROOT_PARAMETER rootParameters[EGlobalRootSignature::Max];
 	rootParameters[EGlobalRootSignature::OutputView].InitAsDescriptorTable(1, &outputViewDescRange);
@@ -607,6 +608,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeGlobalRootSignature()
 	rootParameters[EGlobalRootSignature::SceneSamplers].InitAsDescriptorTable(1, &sceneDescTable[1]);
 	rootParameters[EGlobalRootSignature::GeometryVolumes].InitAsDescriptorTable(1, &geometryDescTable[0]);
 	rootParameters[EGlobalRootSignature::GeometryConstants].InitAsDescriptorTable(1, &geometryDescTable[1]);
+	rootParameters[EGlobalRootSignature::GeometryTraversal].InitAsDescriptorTable(1, &geometryDescTable[2]);
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(ARRAYSIZE(rootParameters), rootParameters);
 
@@ -923,6 +925,14 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::FillDescriptorHeap(boost::unord
 	outResourceBindings[EGlobalRootSignature::GeometryVolumes] = bindingPayload;
 
 	Device->CopyDescriptorsSimple(VolumeRaytracer::MaxAllowedObjectData, RendererDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetGeometrySRVDescriptorHeap()->GetCPUDescriptorHandleForHeapStart(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+
+	RendererDescriptorHeap->AllocateDescriptorRange(VolumeRaytracer::MaxAllowedObjectData, rangeIndex);
+	bindingPayload.BindingGPUHandle = RendererDescriptorHeap->GetGPUHandle(rangeIndex);
+
+	outResourceBindings[EGlobalRootSignature::GeometryTraversal] = bindingPayload;
+
+	Device->CopyDescriptorsSimple(VolumeRaytracer::MaxAllowedObjectData, RendererDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetGeometryTraversalDescriptorHeap()->GetCPUDescriptorHandleForHeapStart(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 
 	RendererDescriptorHeap->AllocateDescriptorRange(VolumeRaytracer::MaxAllowedObjectData, rangeIndex);

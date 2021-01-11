@@ -19,6 +19,7 @@
 RaytracingAccelerationStructure g_scene : register(t0, space0);
 
 Texture3D<uint4> g_voxelVolume[] : register(t2, space0);
+Texture3D<uint4> g_traversalVolume[] : register(t22, space0);
 ConstantBuffer<VolumeRaytracer::VGeometryConstantBuffer> g_geometryCB[] : register(b1);
 
 TextureCube g_envMap : register(t1, space0);

@@ -125,6 +125,11 @@ VolumeRaytracer::Renderer::DX::CPtr<ID3D12DescriptorHeap> VolumeRaytracer::Rende
 	return ObjectResourcePool->GetGeometryHeap();
 }
 
+VolumeRaytracer::Renderer::DX::CPtr<ID3D12DescriptorHeap> VolumeRaytracer::Renderer::DX::VRDXScene::GetGeometryTraversalDescriptorHeap() const
+{
+	return ObjectResourcePool->GetGeometryTraversalHeap();
+}
+
 void VolumeRaytracer::Renderer::DX::VRDXScene::PrepareForRendering(std::weak_ptr<VRenderer> renderer, const unsigned int& backBufferIndex)
 {
 	VObjectPtr<VDXRenderer> dxRenderer = std::static_pointer_cast<VDXRenderer>(renderer.lock());
@@ -554,6 +559,7 @@ VolumeRaytracer::Renderer::DX::VRDXSceneObjectResourcePool::VRDXSceneObjectResou
 {
 	VoxelVolumeHeap = new VDXDescriptorHeap(dxDevice, maxObjects, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
 	GeometryHeap = new VDXDescriptorHeap(dxDevice, maxObjects, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+	GeometryTraversalHeap = new VDXDescriptorHeap(dxDevice, maxObjects, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
 }
 
 VolumeRaytracer::Renderer::DX::VRDXSceneObjectResourcePool::~VRDXSceneObjectResourcePool()
@@ -569,6 +575,12 @@ VolumeRaytracer::Renderer::DX::VRDXSceneObjectResourcePool::~VRDXSceneObjectReso
 		delete GeometryHeap;
 		GeometryHeap = nullptr;
 	}
+
+	if (GeometryTraversalHeap != nullptr)
+	{
+		delete GeometryTraversalHeap;
+		GeometryTraversalHeap = nullptr;
+	}
 }
 
 VolumeRaytracer::Renderer::DX::VRDXSceneObjectDescriptorHandles VolumeRaytracer::Renderer::DX::VRDXSceneObjectResourcePool::GetObjectDescriptorHandles(const size_t& objectIndex) const
@@ -579,6 +591,8 @@ VolumeRaytracer::Renderer::DX::VRDXSceneObjectDescriptorHandles VolumeRaytracer:
 	handles.VoxelVolumeHandleGPU = VoxelVolumeHeap->GetGPUHandle(objectIndex);
 	handles.GeometryHandleCPU = GeometryHeap->GetCPUHandle(objectIndex);
 	handles.GeometryHandleGPU = GeometryHeap->GetGPUHandle(objectIndex);
+	handles.GeometryTraversalCPU = GeometryTraversalHeap->GetCPUHandle(objectIndex);
+	handles.GeometryTraversalGPU = GeometryTraversalHeap->GetGPUHandle(objectIndex);
 
 	return handles;
 }
@@ -591,6 +605,11 @@ VolumeRaytracer::Renderer::DX::CPtr<ID3D12DescriptorHeap> VolumeRaytracer::Rende
 VolumeRaytracer::Renderer::DX::CPtr<ID3D12DescriptorHeap> VolumeRaytracer::Renderer::DX::VRDXSceneObjectResourcePool::GetGeometryHeap() const
 {
 	return GeometryHeap->GetDescriptorHeap();
+}
+
+VolumeRaytracer::Renderer::DX::CPtr<ID3D12DescriptorHeap> VolumeRaytracer::Renderer::DX::VRDXSceneObjectResourcePool::GetGeometryTraversalHeap() const
+{
+	return GeometryTraversalHeap->GetDescriptorHeap();
 }
 
 size_t VolumeRaytracer::Renderer::DX::VRDXSceneObjectResourcePool::GetMaxObjectsAllowed() const

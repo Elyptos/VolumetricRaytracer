@@ -51,6 +51,8 @@ namespace VolumeRaytracer
 				D3D12_GPU_DESCRIPTOR_HANDLE VoxelVolumeHandleGPU;
 				D3D12_CPU_DESCRIPTOR_HANDLE GeometryHandleCPU;
 				D3D12_GPU_DESCRIPTOR_HANDLE GeometryHandleGPU;
+				D3D12_CPU_DESCRIPTOR_HANDLE GeometryTraversalCPU;
+				D3D12_GPU_DESCRIPTOR_HANDLE GeometryTraversalGPU;
 			};
 
 			class VRDXSceneObjectResourcePool
@@ -63,12 +65,14 @@ namespace VolumeRaytracer
 
 				CPtr<ID3D12DescriptorHeap> GetVoxelVolumeHeap() const;
 				CPtr<ID3D12DescriptorHeap> GetGeometryHeap() const;
+				CPtr<ID3D12DescriptorHeap> GetGeometryTraversalHeap() const;
 
 				size_t GetMaxObjectsAllowed() const;
 
 			private:
 				VDXDescriptorHeap* VoxelVolumeHeap = nullptr;
 				VDXDescriptorHeap* GeometryHeap = nullptr;
+				VDXDescriptorHeap* GeometryTraversalHeap = nullptr;
 
 				size_t MaxObjects;
 			};
@@ -90,6 +94,7 @@ namespace VolumeRaytracer
 				VDXDescriptorHeap* GetSceneDescriptorHeapSamplers() const;
 				CPtr<ID3D12DescriptorHeap> GetGeometrySRVDescriptorHeap() const;
 				CPtr<ID3D12DescriptorHeap> GetGeometryCBDescriptorHeap() const;
+				CPtr<ID3D12DescriptorHeap> GetGeometryTraversalDescriptorHeap() const;
 
 				CPtr<ID3D12Resource> GetSceneVolume() const;
 
