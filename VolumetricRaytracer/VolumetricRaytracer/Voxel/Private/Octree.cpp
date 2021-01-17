@@ -35,7 +35,7 @@ namespace VolumeRaytracer
 VolumeRaytracer::Voxel::VCellOctreeNode::VCellOctreeNode(const size_t& depth)
 	:Depth(depth)
 {
-	VoxelCell = std::make_shared<VCell>();
+	ToLeaf(VCell(), VIntVector::ZERO);
 }
 
 VolumeRaytracer::Voxel::VCellOctreeNode::~VCellOctreeNode()
@@ -50,49 +50,28 @@ void VolumeRaytracer::Voxel::VCellOctreeNode::ToBranch()
 		for (int i = 0; i < 8; i++)
 		{
 			Children.push_back(std::make_shared<VCellOctreeNode>(GetDepth() + 1));
-			Children[i]->ToLeaf(*VoxelCell);
+			Children[i]->ToLeaf(VoxelCell, Index);
 		}
 
-		VoxelCell = nullptr;
+		Leaf = false;
 	}
 }
 
-void VolumeRaytracer::Voxel::VCellOctreeNode::ToLeaf(const VCell& cell)
+void VolumeRaytracer::Voxel::VCellOctreeNode::ToLeaf(const VCell& cell, const VIntVector& index)
 {
 	Children.clear();
 
-	if (!IsLeaf())
-	{
-		VoxelCell = std::make_shared<VCell>();
-	}
+	VoxelCell = cell;
+	Index = index;
 
-	*VoxelCell = cell;
-}
-
-bool VolumeRaytracer::Voxel::VCellOctreeNode::CanBeSimplified() const
-{
-	if (IsLeaf())
-	{
-		return !VoxelCell->HasSurface();
-	}
-	else
-	{
-		bool canBeCollapsed = true;
-
-		for (const auto& child : Children)
-		{
-			canBeCollapsed &= child->CanBeSimplified();
-		}
-
-		return canBeCollapsed;
-	}
+	Leaf = true;
 }
 
 bool VolumeRaytracer::Voxel::VCellOctreeNode::TryToMergeNodes()
 {
 	if (IsLeaf())
 	{
-		return !VoxelCell->HasSurface();
+		return !VoxelCell.HasSurface();
 	}
 	else
 	{
@@ -105,6 +84,8 @@ bool VolumeRaytracer::Voxel::VCellOctreeNode::TryToMergeNodes()
 
 		if (mergeSuccess)
 		{
+			VIntVector firstIndex = Children[0]->GetIndex();
+
 			VCell cell;
 
 			for (int i = 0; i < 8; i++)
@@ -112,7 +93,7 @@ bool VolumeRaytracer::Voxel::VCellOctreeNode::TryToMergeNodes()
 				cell.Voxels[i] = Children[i]->GetCell().GetAvgVoxel();
 			}
 
-			ToLeaf(cell);
+			ToLeaf(cell, firstIndex);
 
 			return true;
 		}
@@ -127,7 +108,7 @@ bool VolumeRaytracer::Voxel::VCellOctreeNode::TryToMergeNodes()
 
 bool VolumeRaytracer::Voxel::VCellOctreeNode::IsLeaf() const
 {
-	return VoxelCell != nullptr;
+	return Leaf;
 }
 
 std::shared_ptr<VolumeRaytracer::Voxel::VCellOctreeNode> VolumeRaytracer::Voxel::VCellOctreeNode::GetChild(const uint8_t& childIndex) const
@@ -144,7 +125,12 @@ std::shared_ptr<VolumeRaytracer::Voxel::VCellOctreeNode> VolumeRaytracer::Voxel:
 
 VolumeRaytracer::Voxel::VCell VolumeRaytracer::Voxel::VCellOctreeNode::GetCell() const
 {
-	return *VoxelCell;
+	return VoxelCell;
+}
+
+const VolumeRaytracer::VIntVector& VolumeRaytracer::Voxel::VCellOctreeNode::GetIndex() const
+{
+	return Index;
 }
 
 size_t VolumeRaytracer::Voxel::VCellOctreeNode::GetDepth() const
@@ -155,144 +141,20 @@ size_t VolumeRaytracer::Voxel::VCellOctreeNode::GetDepth() const
 void VolumeRaytracer::Voxel::VCellOctreeNode::SetChildren(const std::vector<std::shared_ptr<VCellOctreeNode>>& children)
 {
 	assert(children.size() == 8);
-	VoxelCell = nullptr;
+	
+	Leaf = false;
 
 	Children = std::vector<std::shared_ptr<VCellOctreeNode>>(children);
 }
 
-VolumeRaytracer::Voxel::VCellOctree::VCellOctree(const uint8_t& maxDepth, const VVoxel& fillerVoxel)
-	: MaxDepth(maxDepth)
+VolumeRaytracer::Voxel::VCellOctree::VCellOctree(const uint8_t& maxDepth, const std::vector<VVoxel>& voxelArray)
+	:MaxDepth(maxDepth)
 {
-	VCell cell;
-	cell.FillWithVoxel(fillerVoxel);
-
-	Root = std::make_shared<VCellOctreeNode>(0);
-	Root->ToLeaf(cell);
+	GenerateOctreeFromVoxelVolume(GetVoxelCountAlongAxis(), voxelArray);
 }
 
 VolumeRaytracer::Voxel::VCellOctree::~VCellOctree()
 {}
-
-void VolumeRaytracer::Voxel::VCellOctree::ClearTreeAndSubdivideAll()
-{
-	std::vector<std::shared_ptr<VCellOctreeNode>> children;
-	std::vector<std::shared_ptr<VCellOctreeNode>> parents;
-
-	int nodeCount = std::pow(8, MaxDepth);
-	Root = std::make_shared<VCellOctreeNode>(0);
-
-	if (nodeCount == 1)
-	{
-		return;
-	}
-
-	children.resize(nodeCount);
-
-	#pragma omp parallel for
-	for (int n = 0; n < nodeCount; n++)
-	{
-		children[n] = std::make_shared<VCellOctreeNode>(MaxDepth);
-	}
-
-	for (int depth = MaxDepth - 1; depth > 0; depth--)
-	{
-		int nodeCount = std::pow(8, depth);
-
-		parents.resize(nodeCount);
-
-		#pragma omp parallel for
-		for (int n = 0; n < nodeCount; n++)
-		{
-			parents[n] = std::make_shared<VCellOctreeNode>(depth);
-			
-			std::vector<std::shared_ptr<VCellOctreeNode>> childNodes;
-			childNodes.resize(8);
-
-			int firstIndex = n * 8;
-
-			for (int i = 0; i < 8; i++)
-			{
-				childNodes[i] = children[firstIndex + i];
-			}
-
-			parents[n]->SetChildren(childNodes);
-		}
-
-		children = std::vector<std::shared_ptr<VCellOctreeNode>>(parents);
-	}
-
-	Root->SetChildren(children);
-}
-
-VolumeRaytracer::Voxel::VVoxel VolumeRaytracer::Voxel::VCellOctree::GetVoxel(const VIntVector& voxelIndex) const
-{
-	if(!IsValidVoxelIndex(voxelIndex))
-		return VVoxel();
-
-	VIntVector cellIndex = voxelIndex.Min(voxelIndex, GetVoxelCountAlongAxis() - 2);
-
-	std::shared_ptr<VCellOctreeNode> node = GetOctreeNode(Root, VIntVector::ZERO, cellIndex);
-
-	VIntVector cellVoxelIndex = voxelIndex - cellIndex;
-
-	uint8_t ind = VCell::GetVoxelIndex(cellVoxelIndex);
-
-	assert(ind < 8);
-
-	return node->GetCell().Voxels[ind];
-}
-
-void VolumeRaytracer::Voxel::VCellOctree::SetVoxel(const VIntVector& voxelIndex, const VVoxel& voxel)
-{
-	if(!IsValidVoxelIndex(voxelIndex))
-		return;
-
-	std::vector<VIntVector> cellOffset;
-	std::vector<VIntVector> voxelIndices;
-
-	VIntVector cellIndex = voxelIndex.Min(voxelIndex, GetVoxelCountAlongAxis() - 2);
-	VIntVector cellVoxelIndex = voxelIndex - cellIndex;
-
-	GetNeighbouringVoxelIndices(cellVoxelIndex, cellOffset, voxelIndices);
-
-	for (int i = 0; i < 8; i++)
-	{
-		VIntVector currentCellIndex = cellIndex + cellOffset[i];
-
-		if (IsValidCellIndex(currentCellIndex))
-		{
-			std::shared_ptr<VCellOctreeNode> node = GetOctreeNodeForEditing(Root, VIntVector::ZERO, currentCellIndex, true);
-
-			VCell cell = node->GetCell();
-
-			uint8_t ind = VCell::GetVoxelIndex(voxelIndices[i]);
-
-			assert(ind < 8);
-
-			cell.Voxels[ind] = voxel;
-
-			node->ToLeaf(cell);
-		}
-	}
-}
-
-bool VolumeRaytracer::Voxel::VCellOctree::IsValidVoxelIndex(const VIntVector& voxelIndex) const
-{
-	size_t voxelAxisCount = GetVoxelCountAlongAxis();
-
-	return	voxelIndex.X >= 0 && voxelIndex.X < voxelAxisCount&&
-			voxelIndex.Y >= 0 && voxelIndex.Y < voxelAxisCount&&
-			voxelIndex.Z >= 0 && voxelIndex.Z < voxelAxisCount;
-}
-
-bool VolumeRaytracer::Voxel::VCellOctree::IsValidCellIndex(const VIntVector& cellIndex) const
-{
-	size_t cellAxisCount = GetCellCountAlongAxis();
-
-	return  cellIndex.X >= 0 && cellIndex.X < cellAxisCount &&
-			cellIndex.Y >= 0 && cellIndex.Y < cellAxisCount &&
-			cellIndex.Z >= 0 && cellIndex.Z < cellAxisCount;
-}
 
 size_t VolumeRaytracer::Voxel::VCellOctree::GetMaxDepth() const
 {
@@ -334,6 +196,69 @@ void VolumeRaytracer::Voxel::VCellOctree::GetGPUOctreeStructure(std::vector<VCel
 	outNodes.push_back(VCellGPUOctreeNode());
 
 	GetGPUNodes(Root, size, 0, outNodes);
+}
+
+void VolumeRaytracer::Voxel::VCellOctree::GenerateOctreeFromVoxelVolume(const size_t& voxelAxisCount, const std::vector<VVoxel>& voxelArray)
+{
+	std::vector<std::shared_ptr<VCellOctreeNode>> nodes;
+
+	int cellCountAlongAxis = GetCellCountAlongAxis();
+	int totalCellCount = cellCountAlongAxis * cellCountAlongAxis * cellCountAlongAxis;
+
+	nodes.resize(totalCellCount);
+
+	//#pragma omp parallel for 
+	for (int i = 0; i < totalCellCount; i++)
+	{
+		size_t voxelIndex1D = (size_t)i;
+		VIntVector cellIndex = VMathHelpers::Index1DTo3D(voxelIndex1D, cellCountAlongAxis, cellCountAlongAxis);
+
+		VCell cell;
+
+		for (int v = 0; v < 8; v++)
+		{
+			cell.Voxels[v] = voxelArray[VMathHelpers::Index3DTo1D(cellIndex + VCell::VOXEL_COORDS[v], voxelAxisCount, voxelAxisCount)];
+		}
+
+		nodes[i] = std::make_shared<VCellOctreeNode>(MaxDepth);
+		nodes[i]->ToLeaf(cell, cellIndex);
+	}
+
+	for (int depth = MaxDepth - 1; depth >= 0; depth--)
+	{
+		int internalAxisCount = std::pow(2, MaxDepth - depth);
+		int voxelIndexOffset = internalAxisCount / 2;
+
+		//#pragma omp parallel for collapse(3)
+		for (int x = 0; x < (cellCountAlongAxis - 1); x += internalAxisCount)
+		{
+			for (int y = 0; y < (cellCountAlongAxis - 1); y += internalAxisCount)
+			{
+				for (int z = 0; z < (cellCountAlongAxis - 1); z += internalAxisCount)
+				{
+					VIntVector cellIndex3D = VIntVector(x, y, z);
+					size_t cellIndex1D = VMathHelpers::Index3DTo1D(cellIndex3D, cellCountAlongAxis, cellCountAlongAxis);
+
+					std::shared_ptr<VCellOctreeNode> parentNode = std::make_shared<VCellOctreeNode>(depth);
+					std::vector<std::shared_ptr<VCellOctreeNode>> childNodes;
+					childNodes.resize(8);
+
+					for (int i = 0; i < 8; i++)
+					{
+						VIntVector childIndex = cellIndex3D + VCell::VOXEL_COORDS[i] * voxelIndexOffset;
+
+						childNodes[i] = nodes[VMathHelpers::Index3DTo1D(childIndex, cellCountAlongAxis, cellCountAlongAxis)];
+					}
+
+					parentNode->SetChildren(childNodes);
+
+					nodes[cellIndex1D] = parentNode;
+				}	
+			}
+		}
+	}
+
+	Root = nodes[0];
 }
 
 VolumeRaytracer::VIntVector VolumeRaytracer::Voxel::VCellOctree::CalculateOctreeNodeIndex(const VIntVector& parentIndex, const VIntVector& relativeIndex, const size_t& currentDepth) const
@@ -607,14 +532,25 @@ void VolumeRaytracer::Voxel::VCellOctree::GetAllNodes(std::shared_ptr<VCellOctre
 	}
 }
 
+void VolumeRaytracer::Voxel::VCellOctree::GetAllBranchNodes(const std::shared_ptr<VCellOctreeNode>& node, std::vector<std::shared_ptr<VCellOctreeNode>>& nodes) const
+{
+	if (!node->IsLeaf())
+	{
+		nodes.push_back(node);
+
+		for (int i = 0; i < 8; i++)
+		{
+			GetAllBranchNodes(node->GetChild(i), nodes);
+		}
+	}
+}
+
 void VolumeRaytracer::Voxel::VCellOctree::GetGPUNodes(const std::shared_ptr<VCellOctreeNode>& node, const size_t& gpuVolumeSize, const size_t& currentNodeIndex, std::vector<VCellGPUOctreeNode>& outGpuNodes) const
 {
 	if (node->IsLeaf())
 	{
-		VCellGPUOctreeNode& currentNode = outGpuNodes[currentNodeIndex];
-
-		currentNode.IsLeaf = true;
-		currentNode.Cell = node->GetCell();
+		outGpuNodes[currentNodeIndex].IsLeaf = true;
+		outGpuNodes[currentNodeIndex].CellIndex = node->GetIndex();
 	}
 	else
 	{
@@ -635,7 +571,7 @@ void VolumeRaytracer::Voxel::VCellOctree::GetGPUNodes(const std::shared_ptr<VCel
 		{
 			int index = firstChildIndex + i;
 			VIntVector index3D = VMathHelpers::Index1DTo3D(index, gpuVolumeSize, gpuVolumeSize);
-			
+
 			outGpuNodes[currentNodeIndex].Children.push_back(index3D);
 
 			GetGPUNodes(node->GetChild(i), gpuVolumeSize, index, outGpuNodes);

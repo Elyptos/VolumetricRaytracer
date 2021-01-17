@@ -34,32 +34,8 @@ namespace VolumeRaytracer
 
 	namespace Voxel
 	{
-		struct VVoxelIteratorElement
-		{
-		public:
-			VVoxel Voxel;
-			VIntVector Index3D;
-			size_t Index;
-		};
-
 		class VVoxelVolume : public VObject, public IVSerializable
 		{
-		private:
-			class VVoxelVolumeIterator : public std::iterator<std::output_iterator_tag, VVoxelIteratorElement>
-			{
-			public:
-				explicit VVoxelVolumeIterator(VVoxelVolume& scene, size_t index = 0);
-
-				VVoxelIteratorElement operator*() const;
-				VVoxelVolumeIterator& operator++();
-				VVoxelVolumeIterator operator++(int);
-				bool operator!=(const VVoxelVolumeIterator& other) const;
-
-			private:
-				size_t Index = 0;
-				VVoxelVolume& Volume;
-			};
-
 		public:
 			VVoxelVolume(const uint8_t& resolution, const float& volumeExtends);
 
@@ -77,9 +53,6 @@ namespace VolumeRaytracer
 
 			void SetMaterial(const VMaterial& material);
 			VMaterial GetMaterial() const;
-
-			VVoxelVolumeIterator begin();
-			VVoxelVolumeIterator end();
 
 
 			void PostRender() override;
@@ -102,8 +75,7 @@ namespace VolumeRaytracer
 
 			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
 
-			void SimplifyVolume();
-			void GetGPUOctreeStructure(std::vector<VCellGPUOctreeNode>& outNodes, size_t& outNodeAxisCount) const;
+			void GenerateGPUOctreeStructure(std::vector<VCellGPUOctreeNode>& outNodes, size_t& outNodeAxisCount) const;
 
 			uint8_t GetResolution() const;
 
@@ -117,7 +89,10 @@ namespace VolumeRaytracer
 			float VolumeExtends = 0;
 			float CellSize = 0;
 			
-			VCellOctree* Octree = nullptr; 
+			uint8_t Resolution = 0;
+			size_t VoxelCountAlongAxis = 0;
+
+			std::vector<VVoxel> Voxels;
 
 			VMaterial GeometryMaterial;
 

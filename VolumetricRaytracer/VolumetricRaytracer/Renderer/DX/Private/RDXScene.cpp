@@ -393,7 +393,8 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::AddVoxelVolume(std::weak_ptr<VDXR
 			VRDXSceneObjectDescriptorHandles handles = ObjectResourcePool->GetObjectDescriptorHandles(volumeDesc.InstanceIndex);
 			volumeDesc.Volume = voxelVolume;
 			volumeDesc.GeometryCBHandle = handles.GeometryHandleCPU;
-			volumeDesc.ResourceHandle = handles.VoxelVolumeHandleCPU;
+			volumeDesc.VolumeHandle = handles.VoxelVolumeHandleCPU;
+			volumeDesc.TraversalHandle = handles.GeometryTraversalCPU;
 
 			std::shared_ptr<VDXVoxelVolume> dxVolume = std::make_shared<VDXVoxelVolume>(renderer, volumeDesc);
 
