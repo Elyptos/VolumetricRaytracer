@@ -54,6 +54,26 @@ namespace VolumeRaytracer
 		XMVECTOR cameraPosition;
 		XMFLOAT3 dirLightDirection;
 		float dirLightStrength;
+		float numPointLights;
+		float numSpotLights;
+	};
+
+	struct VPointLightBuffer
+	{
+		XMVECTOR position;
+		XMFLOAT4 color;
+		float lightIntensity;
+		float falloffDistance;
+	};
+
+	struct VSpotLightBuffer
+	{
+		XMVECTOR position;
+		XMVECTOR forward;
+		XMFLOAT4 color;
+		float lightIntensity;
+		float falloffDistance;
+		float angle;
 	};
 
 	struct VGeometryConstantBuffer
@@ -76,4 +96,6 @@ namespace VolumeRaytracer
 	};
 
 	static const UINT MaxAllowedObjectData = 20;
+	static const UINT MaxAllowedSpotLights = 5;
+	static const UINT MaxAllowedPointLights = 5;
 }
