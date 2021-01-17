@@ -13,7 +13,7 @@
 */
 
 #include "RDXVoxelVolume.h"
-#include "DXTexture3DFloat.h"
+#include "DXTexture3D.h"
 #include "Renderer.h"
 #include "RaytracingHlsl.h"
 #include "VoxelVolume.h"
@@ -36,8 +36,7 @@ void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::UpdateFromVoxelVolume(std::w
 	{
 		if (LastVoxelCount != Desc.Volume->GetSize())
 		{
-			AllocateVolumeTexture(renderer);
-
+			UpdateTraversalTexture(renderer);
 			UpdateVolumeTexture(renderer);
 			UpdateAABBBuffer();
 			UpdateGeometryConstantBuffer();
@@ -46,6 +45,7 @@ void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::UpdateFromVoxelVolume(std::w
 		{
 			if (Desc.Volume->IsDirty())
 			{
+				UpdateTraversalTexture(renderer);
 				UpdateVolumeTexture(renderer);
 				UpdateGeometryConstantBuffer();
 			}
@@ -83,11 +83,11 @@ void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::InitFromVoxelVolume(std::wea
 {
 	Desc = volumeDesc;
 
-	AllocateVolumeTexture(renderer);
 	AllocateAABBBuffer(renderer);
 	AllocateGeometryConstantBuffer(renderer);
 	UpdateGeometryDesc();
 
+	UpdateTraversalTexture(renderer);
 	UpdateVolumeTexture(renderer);
 	UpdateAABBBuffer();
 	UpdateGeometryConstantBuffer();
@@ -104,6 +104,7 @@ void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::Cleanup()
 	}
 
 	VolumeTexture = nullptr;
+	TraversalTexture = nullptr;
 }
 
 void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::CreateBottomLevelAccelerationStructure(std::weak_ptr<VDXRenderer> renderer)
@@ -147,15 +148,31 @@ void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::CreateBottomLevelAcceleratio
 	BLAS.AccelerationStructureDesc = bottomLevelBuildDesc;
 }
 
-void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::AllocateVolumeTexture(std::weak_ptr<VDXRenderer> renderer)
+void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::AllocateTraversalTexture(std::weak_ptr<VDXRenderer> renderer, const size_t& traversalNodeCount)
 {
 	if (!renderer.expired())
 	{
-		size_t volumeSize = Desc.Volume->GetSize();
+		size_t pixelCount = traversalNodeCount * 2;
 
-		VolumeTexture = std::static_pointer_cast<VDXTexture3DFloat>(VolumeRaytracer::Renderer::VTextureFactory::CreateTexture3DFloat(renderer, volumeSize, volumeSize, volumeSize, 1));
+		TraversalTexture = std::static_pointer_cast<VDXTexture3D>(VolumeRaytracer::Renderer::VTextureFactory::CreateTexture3D(renderer, pixelCount, pixelCount, pixelCount, 1));
 
-		renderer.lock()->CreateSRVDescriptor(VolumeTexture, Desc.ResourceHandle);
+		renderer.lock()->CreateSRVDescriptor(TraversalTexture, Desc.TraversalHandle);
+
+		LastTraversalNodeCount = traversalNodeCount;
+	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::AllocateVolumeTexture(std::weak_ptr<VDXRenderer> renderer, const size_t& volumeSize)
+{
+	if (!renderer.expired())
+	{
+		size_t pixelCount = volumeSize;
+
+		VolumeTexture = std::static_pointer_cast<VDXTexture3D>(VolumeRaytracer::Renderer::VTextureFactory::CreateTexture3D(renderer, pixelCount, pixelCount, pixelCount, 1));
+
+		renderer.lock()->CreateSRVDescriptor(VolumeTexture, Desc.VolumeHandle);
+
+		LastVoxelCount = volumeSize;
 	}
 }
 
@@ -196,26 +213,106 @@ void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::AllocateGeometryConstantBuff
 	}
 }
 
+void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::UpdateTraversalTexture(std::weak_ptr<VDXRenderer> renderer)
+{
+	std::vector<Voxel::VCellGPUOctreeNode> gpuNodes;
+	size_t gpuVolumeSize = 0;
+
+	Desc.Volume->GenerateGPUOctreeStructure(gpuNodes, gpuVolumeSize);
+
+	if (!TraversalTexture || gpuVolumeSize != LastTraversalNodeCount)
+	{
+		AllocateTraversalTexture(renderer, gpuVolumeSize);
+	}
+
+	if (TraversalTexture && !renderer.expired())
+	{
+		uint8_t* pixels = nullptr;
+		size_t arraySize = 0;
+
+		TraversalTexture->GetPixels(0, pixels, &arraySize);
+
+		size_t voxelCount = Desc.Volume->GetVoxelCount();
+		
+		VIntVector nodeIndex = VIntVector::ZERO;
+
+		//#pragma omp parallel for
+		for (int i = 0; i < gpuNodes.size(); i++)
+		{
+			const Voxel::VCellGPUOctreeNode& gpuNode = gpuNodes[i];
+			nodeIndex = VMathHelpers::Index1DTo3D(i, gpuVolumeSize, gpuVolumeSize);
+			nodeIndex = VIntVector(nodeIndex.Z, nodeIndex.X, nodeIndex.Y) * VIntVector(2, 8, 2);
+
+			if (gpuNode.IsLeaf)
+			{
+				for (int vi = 0; vi < 8; vi++)
+				{
+					VIntVector relVoxelIndex = Voxel::VCell::VOXEL_COORDS[vi];
+					relVoxelIndex = VIntVector(relVoxelIndex.Z, relVoxelIndex.X, relVoxelIndex.Y) * VIntVector(1, 4, 1);
+
+					size_t voxelIndex = VMathHelpers::Index3DTo1D(nodeIndex + relVoxelIndex, gpuVolumeSize * 8, gpuVolumeSize * 2);
+
+					//EncodeVoxel(gpuNode.Cell.Voxels[vi], pixels[voxelIndex], pixels[voxelIndex + 1], pixels[voxelIndex + 2]);
+					
+					VIntVector volumeIndex = gpuNode.CellIndex;
+
+					pixels[voxelIndex] = volumeIndex.X;
+					pixels[voxelIndex + 1] = volumeIndex.Y;
+					pixels[voxelIndex + 2] = volumeIndex.Z;
+					pixels[voxelIndex + 3] = 1;
+				}
+			}
+			else
+			{
+				for (int ci = 0; ci < 8; ci++)
+				{
+					VIntVector childIndex3D = gpuNode.Children[ci] * VIntVector(2,2,2);
+					childIndex3D = VIntVector(childIndex3D.Z, childIndex3D.X, childIndex3D.Y);
+
+					VIntVector relNodeIndex = Voxel::VCell::VOXEL_COORDS[ci];
+					relNodeIndex = VIntVector(relNodeIndex.Z, relNodeIndex.X, relNodeIndex.Y) * VIntVector(1, 4, 1);
+
+					size_t nodePixelIndex = VMathHelpers::Index3DTo1D(nodeIndex + relNodeIndex, gpuVolumeSize * 8, gpuVolumeSize * 2);
+
+					pixels[nodePixelIndex] = (uint8_t)childIndex3D.Y;
+					pixels[nodePixelIndex + 1] = (uint8_t)childIndex3D.Z;
+					pixels[nodePixelIndex + 2] = (uint8_t)childIndex3D.X;
+					pixels[nodePixelIndex + 3] = 0;
+				}
+			}
+		}
+
+		renderer.lock()->UploadToGPU(TraversalTexture);
+	}
+}
+
 void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::UpdateVolumeTexture(std::weak_ptr<VDXRenderer> renderer)
 {
-	if (VolumeTexture && !renderer.expired())
+	if (!VolumeTexture || Desc.Volume->GetSize() !=  LastVoxelCount)
 	{
-		float* pixels = nullptr;
+		AllocateVolumeTexture(renderer, Desc.Volume->GetSize());
+	}
+
+	if (TraversalTexture && !renderer.expired())
+	{
+		uint8_t* pixels = nullptr;
 		size_t arraySize = 0;
 
 		VolumeTexture->GetPixels(0, pixels, &arraySize);
 
 		size_t voxelCount = Desc.Volume->GetVoxelCount();
-		
-		#pragma omp parallel for
+
+		//#pragma omp parallel for
 		for (int i = 0; i < voxelCount; i++)
 		{
-			pixels[i] = Desc.Volume->GetVoxel(i).Density;
+			Voxel::VVoxel v = Desc.Volume->GetVoxel(i);
+			int pixelIndex = i * 4;
+
+			EncodeVoxel(v, pixels[pixelIndex], pixels[pixelIndex + 1], pixels[pixelIndex + 2]);
+			pixels[pixelIndex + 3] = v.Material;
 		}
 
 		renderer.lock()->UploadToGPU(VolumeTexture);
-
-		LastVoxelCount = Desc.Volume->GetSize();
 	}
 }
 
@@ -274,9 +371,34 @@ void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::UpdateGeometryConstantBuffer
 		constantBufferData.voxelAxisCount = Desc.Volume->GetSize();
 		constantBufferData.volumeExtend = Desc.Volume->GetVolumeExtends();
 		constantBufferData.distanceBtwVoxels = (constantBufferData.volumeExtend * 2) / (constantBufferData.voxelAxisCount - 1);
+		constantBufferData.octreeDepth = Desc.Volume->GetResolution();
 
 		memcpy(dataPtr, &constantBufferData, sizeof(VGeometryConstantBuffer));
 
 		GeometryCB->Unmap(0, nullptr);
 	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::EncodeVoxel(const Voxel::VVoxel& voxel, uint8_t& outR, uint8_t& outG, uint8_t& outB)
+{
+	float density = voxel.Density;
+
+	outR = 0;
+	outG = 0;
+	outB = 0;
+
+	if (density < 0)
+	{
+		outR = 0x80;
+	}
+
+	uint16_t rMask = 0x7f00;
+	uint16_t gMask = 0xff;
+
+	uint16_t iDensity = (uint16_t)(std::abs(density) * 100.f);
+
+	outR |= (uint8_t)((iDensity & rMask) >> 8);
+	outG = (uint8_t)(iDensity & gMask);
+
+	outB = (uint8_t)voxel.Material;
 }

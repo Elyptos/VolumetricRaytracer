@@ -19,6 +19,9 @@ add_library (VVoxel ${voxel_public} ${voxel_private})
 target_include_directories(VVoxel PUBLIC "Public")
 target_link_libraries(VVoxel VCore)
 
+if(Boost_FOUND)
+	target_include_directories(VVoxel PUBLIC ${Boost_INCLUDE_DIRS})
+endif()
 
 #target_include_directories(VCore PUBLIC spdlogIncludeDir)
 

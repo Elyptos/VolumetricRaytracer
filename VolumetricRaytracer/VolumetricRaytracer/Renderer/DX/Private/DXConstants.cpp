@@ -22,7 +22,7 @@ const DXGI_FORMAT VolumeRaytracer::Renderer::DX::VDXConstants::BACK_BUFFER_FORMA
 
 const unsigned int VolumeRaytracer::Renderer::DX::VDXConstants::BACK_BUFFER_COUNT = 3;
 
-const size_t VolumeRaytracer::Renderer::DX::VDXConstants::SRV_CV_UAV_HEAP_SIZE_PER_FRAME = 100;
+const size_t VolumeRaytracer::Renderer::DX::VDXConstants::SRV_CV_UAV_HEAP_SIZE_PER_FRAME = 120;
 
 const size_t VolumeRaytracer::Renderer::DX::VDXConstants::SAMPLER_HEAP_SIZE_PER_FRAME = 20;
 

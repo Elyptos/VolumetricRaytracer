@@ -446,6 +446,26 @@ VolumeRaytracer::VIntVector VolumeRaytracer::VIntVector::operator/(const VIntVec
 	return VIntVector(X / other.X, Y / other.Y, Z / other.Z);
 }
 
+bool VolumeRaytracer::VIntVector::operator>(const VIntVector& other) const
+{
+	return X > other.X && Y > other.Y && Z > other.Z;
+}
+
+bool VolumeRaytracer::VIntVector::operator<(const VIntVector& other) const
+{
+	return X < other.X && Y < other.Y && Z < other.Z;
+}
+
+bool VolumeRaytracer::VIntVector::operator<=(const VIntVector& other) const
+{
+	return X <= other.X&& Y <= other.Y && Z <= other.Z;
+}
+
+bool VolumeRaytracer::VIntVector::operator>=(const VIntVector& other) const
+{
+	return X >= other.X && Y >= other.Y && Z >= other.Z;
+}
+
 bool VolumeRaytracer::VIntVector::operator==(const VIntVector& other) const
 {
 	return X == other.X && Y == other.Y && Z == other.Z;

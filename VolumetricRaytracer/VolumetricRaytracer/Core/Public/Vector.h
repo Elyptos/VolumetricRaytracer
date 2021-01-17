@@ -134,6 +134,10 @@ namespace VolumeRaytracer
 
 		bool operator==(const VIntVector& other) const;
 		bool operator!=(const VIntVector& other) const;
+		bool operator>=(const VIntVector& other) const;
+		bool operator<=(const VIntVector& other) const;
+		bool operator>(const VIntVector& other) const;
+		bool operator<(const VIntVector& other) const;
 
 	public:
 		static const VIntVector ZERO;
