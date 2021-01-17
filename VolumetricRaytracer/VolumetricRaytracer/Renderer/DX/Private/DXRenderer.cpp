@@ -25,7 +25,7 @@
 #include <sstream>
 #include <vector>
 
-#undef _DEBUG
+//#undef _DEBUG
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::Render()
 {
@@ -162,6 +162,16 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::CreateSRVDescriptor(VObjectPtr<
 	{
 		V_LOG_ERROR("SRV creation failed because texture is not of type IDXRenderableTexture!");
 	}
+}
+
+void VolumeRaytracer::Renderer::DX::VDXRenderer::CreateCBDescriptor(CPtr<ID3D12Resource> resource, const size_t& resourceSize, const D3D12_CPU_DESCRIPTOR_HANDLE& descHandle)
+{
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbViewDesc = {};
+
+	cbViewDesc.BufferLocation = resource->GetGPUVirtualAddress();
+	cbViewDesc.SizeInBytes = resourceSize;
+
+	Device->CreateConstantBufferView(&cbViewDesc, descHandle);
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::UploadToGPU(VObjectPtr<VTexture> texture)
@@ -591,13 +601,15 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeGlobalRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE outputViewDescRange = {};
 	outputViewDescRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
 
-	CD3DX12_DESCRIPTOR_RANGE sceneDescTable[2];
+	CD3DX12_DESCRIPTOR_RANGE sceneDescTable[4];
 	sceneDescTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
 	sceneDescTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 1, 0);
+	sceneDescTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, VolumeRaytracer::MaxAllowedPointLights, 1);
+	sceneDescTable[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, VolumeRaytracer::MaxAllowedSpotLights, 1 + MaxAllowedPointLights);
 
 	CD3DX12_DESCRIPTOR_RANGE geometryDescTable[3];
 	geometryDescTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, VolumeRaytracer::MaxAllowedObjectData, 2);
-	geometryDescTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, VolumeRaytracer::MaxAllowedObjectData, 1);
+	geometryDescTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, VolumeRaytracer::MaxAllowedObjectData, 1 + MaxAllowedPointLights + MaxAllowedSpotLights);
 	geometryDescTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, VolumeRaytracer::MaxAllowedObjectData, 2 + VolumeRaytracer::MaxAllowedObjectData);
 
 	CD3DX12_ROOT_PARAMETER rootParameters[EGlobalRootSignature::Max];
@@ -606,6 +618,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeGlobalRootSignature()
 	rootParameters[EGlobalRootSignature::SceneConstant].InitAsConstantBufferView(0);
 	rootParameters[EGlobalRootSignature::SceneTextures].InitAsDescriptorTable(1, &sceneDescTable[0]);
 	rootParameters[EGlobalRootSignature::SceneSamplers].InitAsDescriptorTable(1, &sceneDescTable[1]);
+	rootParameters[EGlobalRootSignature::SceneLights].InitAsDescriptorTable(2, &sceneDescTable[2]);
 	rootParameters[EGlobalRootSignature::GeometryVolumes].InitAsDescriptorTable(1, &geometryDescTable[0]);
 	rootParameters[EGlobalRootSignature::GeometryConstants].InitAsDescriptorTable(1, &geometryDescTable[1]);
 	rootParameters[EGlobalRootSignature::GeometryTraversal].InitAsDescriptorTable(1, &geometryDescTable[2]);
@@ -895,6 +908,8 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::FillDescriptorHeap(boost::unord
 	UINT rangeIndex = 0;
 	VDXResourceBindingPayload bindingPayload;
 
+	unsigned int backBufferIndex = WindowRenderTarget->GetCurrentBufferIndex();
+
 	RendererDescriptorHeap->AllocateDescriptorRange(1, rangeIndex);
 	bindingPayload.BindingGPUHandle = RendererDescriptorHeap->GetGPUHandle(rangeIndex);
 
@@ -917,6 +932,14 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::FillDescriptorHeap(boost::unord
 	outResourceBindings[EGlobalRootSignature::SceneSamplers] = bindingPayload;
 
 	Device->CopyDescriptorsSimple(1, RendererSamplerDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetSceneDescriptorHeapSamplers()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+
+
+	RendererDescriptorHeap->AllocateDescriptorRange(1, rangeIndex);
+	bindingPayload.BindingGPUHandle = RendererDescriptorHeap->GetGPUHandle(rangeIndex);
+
+	outResourceBindings[EGlobalRootSignature::SceneLights] = bindingPayload;
+
+	Device->CopyDescriptorsSimple(MaxAllowedPointLights + MaxAllowedSpotLights, RendererDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetSceneLightsHeapStart(backBufferIndex), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 
 	RendererDescriptorHeap->AllocateDescriptorRange(VolumeRaytracer::MaxAllowedObjectData, rangeIndex);

@@ -20,7 +20,9 @@ RaytracingAccelerationStructure g_scene : register(t0, space0);
 
 Texture3D<uint4> g_voxelVolume[VolumeRaytracer::MaxAllowedObjectData] : register(t2, space0);
 Texture3D<uint4> g_traversalVolume[VolumeRaytracer::MaxAllowedObjectData] : register(t22, space0);
-ConstantBuffer<VolumeRaytracer::VGeometryConstantBuffer> g_geometryCB[VolumeRaytracer::MaxAllowedObjectData] : register(b1);
+ConstantBuffer<VolumeRaytracer::VPointLightBuffer> g_pointLightsCB[VolumeRaytracer::MaxAllowedPointLights] : register(b1);
+ConstantBuffer<VolumeRaytracer::VSpotLightBuffer> g_spotLightsCB[VolumeRaytracer::MaxAllowedSpotLights] : register(b6);
+ConstantBuffer<VolumeRaytracer::VGeometryConstantBuffer> g_geometryCB[VolumeRaytracer::MaxAllowedObjectData] : register(b11);
 
 TextureCube g_envMap : register(t1, space0);
 SamplerState g_envMapSampler : register(s0);

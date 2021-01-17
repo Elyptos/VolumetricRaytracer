@@ -25,6 +25,8 @@ typedef uint UINT;
 #else
 	#include <DirectXMath.h>
 	using namespace DirectX;
+
+	typedef unsigned int UINT;
 #endif
 
 #define MAX_RAY_RECURSION_DEPTH 3
