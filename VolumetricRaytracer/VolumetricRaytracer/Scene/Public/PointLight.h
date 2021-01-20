@@ -23,7 +23,8 @@ namespace VolumeRaytracer
 		class VPointLight : public VLight
 		{
 		public:
-			float FalloffDistance = 500.f;
+			float AttenuationLinear = 0.5f;
+			float AttenuationExp = 0.005f;
 		};
 	}
 }

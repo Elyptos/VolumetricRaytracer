@@ -104,7 +104,7 @@ float4 TraceRadianceRay(in Ray ray, in uint currentRayRecursionDepth)
 	return rayPayload.color;
 }
 
-bool TraceShadowRay(in Ray ray, in uint currentRayRecursionDepth)
+bool TraceShadowRay(in Ray ray, in uint currentRayRecursionDepth, in float maxDistance)
 {
 	if (currentRayRecursionDepth >= MAX_RAY_RECURSION_DEPTH)
 	{
@@ -116,7 +116,7 @@ bool TraceShadowRay(in Ray ray, in uint currentRayRecursionDepth)
 	rayDesc.Direction = ray.direction;
 
 	rayDesc.TMin = 0;
-	rayDesc.TMax = 600;
+	rayDesc.TMax = maxDistance;
 
 	VolumeRaytracer::VShadowRayPayload rayPayload = { true };
 
@@ -325,6 +325,8 @@ int3 GetOctreeNodeIndex(in int3 parentIndex, in int3 relativeIndex, in int curre
 {
 	uint instance = InstanceID();
 
+	int depthDiff = g_geometryCB[instance].octreeDepth - currentDepth;
+	
 	int nodeCount = pow(2, g_geometryCB[instance].octreeDepth - currentDepth);
 	int3 nodeCountVec = int3(nodeCount, nodeCount, nodeCount);
 
@@ -901,24 +903,97 @@ void VRRaygen()
 	g_renderTarget[DispatchRaysIndex().xy] = color;
 }
 
+float ComputePointLightIntensity(in float intensity, in float distance, in float attL, in float attExp)
+{
+	return intensity / (1 + attL * distance + attExp * distance * distance);
+}
+
+float CalculateConeFalloff(in float cosSurface, in float cosAngle, in float cosFalloffAngle)
+{
+	float delta = (cosSurface - cosAngle) / (cosFalloffAngle - cosAngle);
+	
+	return min(delta, 1.f);
+}
+
+float ComputeSpotLightIntensity(in float3 surfacePoint, in float distanceToSurface, in float3 lightPosition, in float3 lightDirection, in float intensity, in float attL, in float attExp, in float cosAngle, in float cosFalloffAngle)
+{
+	float3 surfaceDir = normalize(surfacePoint - lightPosition);
+	float cosSurface = dot(lightDirection, surfaceDir);
+	
+	float calculatedIntensity = 0.f;
+	
+	if(cosSurface >= 0.f && cosSurface > cosAngle)
+	{
+		calculatedIntensity = intensity * CalculateConeFalloff(cosSurface, cosAngle, cosFalloffAngle);
+		calculatedIntensity = ComputePointLightIntensity(calculatedIntensity, distanceToSurface, attL, attExp);
+		
+		return calculatedIntensity;
+		//return 100.f;
+	}
+	else
+	{
+		return 0.f;		  
+	}
+}
+
 [shader("closesthit")]
 void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytracer::VPrimitiveAttributes attr)
 {
 	float3 hitPosition = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
-	float3 shadowRayOrigin = hitPosition + g_sceneCB.dirLightDirection * 0.01;
+	float3 shadowRayOrigin = hitPosition - WorldRayDirection() * 0.1f;
 
+	//Trace for directional light
 	Ray shadowRay;
 	shadowRay.origin = shadowRayOrigin;
 	shadowRay.direction = g_sceneCB.dirLightDirection;
 
-	bool shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth);
+	bool shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, 600.f);
+	
+	float diffuse = 0.1f;
+	
+	//if(!shadowRayHit)
+	//{
+	//	diffuse = (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);	  
+	//}
 
-	float diffuse = (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);
-	//float diffuse = 1.f;
-
-	diffuse *= (shadowRayHit ? 0.2 : 1);
-
-	rayPayload.color.rgb = float3(1.f, 1.f, 1.f) * diffuse;
+	float distanceToLightSource = 0;
+	float lightIntensity = 0;
+	
+	for (int pi = 0; pi < g_sceneCB.numPointLights; pi++)
+	{
+		distanceToLightSource = length(g_pointLightsCB[pi].position - shadowRayOrigin);
+		lightIntensity = ComputePointLightIntensity(g_pointLightsCB[pi].lightIntensity, distanceToLightSource, g_pointLightsCB[pi].attLinear, g_pointLightsCB[pi].attExp);
+		
+		if(lightIntensity > 0.f)
+		{
+			shadowRay.direction = normalize(g_pointLightsCB[pi].position - shadowRayOrigin);
+			shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, distanceToLightSource);
+		
+			if(!shadowRayHit)
+			{
+				diffuse += lightIntensity;
+			}	 
+		}
+	}
+	
+	for(int si = 0; si < g_sceneCB.numSpotLights; si++)
+	{
+		distanceToLightSource = length(g_spotLightsCB[si].position - shadowRayOrigin);
+		lightIntensity = ComputeSpotLightIntensity(shadowRayOrigin, distanceToLightSource, g_spotLightsCB[si].position, g_spotLightsCB[si].forward, g_spotLightsCB[si].lightIntensity, g_spotLightsCB[si].attLinear, g_spotLightsCB[si].attExp, g_spotLightsCB[si].cosAngle, g_spotLightsCB[si].cosFalloffAngle);
+		
+		if(lightIntensity > 0.f)
+		{
+			shadowRay.direction = normalize(g_spotLightsCB[si].position - shadowRayOrigin);
+			shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, distanceToLightSource);
+		
+			if(!shadowRayHit)
+			{
+				diffuse += lightIntensity;
+			}	 
+		}
+	}
+	
+	rayPayload.color.rgb = float3(1.f, 1.f, 1.f) * (diffuse * 0.01f);
 	//rayPayload.color.rgb = attr.normal;
 	rayPayload.color.a = 1.f;
 }

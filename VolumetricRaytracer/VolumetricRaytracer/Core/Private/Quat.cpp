@@ -13,6 +13,7 @@
 */
 
 #include "Quat.h"
+#include "MathHelpers.h"
 
 VolumeRaytracer::VQuat::VQuat()
 	:EigenQuat(Eigen::Quaternionf::Identity())
@@ -52,6 +53,16 @@ VolumeRaytracer::VQuat VolumeRaytracer::VQuat::FromRightVector(const VVector& ve
 VolumeRaytracer::VQuat VolumeRaytracer::VQuat::FromUpVector(const VVector& vec)
 {
 	return FromTwoVectors(VVector::UP, vec);
+}
+
+VolumeRaytracer::VQuat VolumeRaytracer::VQuat::FromEulerAngles(const float& roll, const float& yaw, const float& pitch)
+{
+	return FromAxisAngle(VVector::RIGHT, pitch) * FromAxisAngle(VVector::UP, yaw) * FromAxisAngle(VVector::FORWARD, roll);
+}
+
+VolumeRaytracer::VQuat VolumeRaytracer::VQuat::FromEulerAnglesDegrees(const float& roll, const float& yaw, const float& pitch)
+{
+	return FromEulerAngles(VMathHelpers::ToRadians(roll), VMathHelpers::ToRadians(yaw), VMathHelpers::ToRadians(pitch));
 }
 
 VolumeRaytracer::VQuat VolumeRaytracer::VQuat::Inverse() const

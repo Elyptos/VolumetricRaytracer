@@ -93,8 +93,8 @@ D3D12_GPU_VIRTUAL_ADDRESS VolumeRaytracer::Renderer::DX::VRDXScene::CopySceneCon
 
 	constantBufferData.dirLightDirection = DirectionalLightDirection;
 	constantBufferData.dirLightStrength = DirectionalLightStrength;
-	constantBufferData.numPointLights = VMathHelpers::Max((UINT)PointLights.size(), MaxAllowedPointLights);
-	constantBufferData.numSpotLights = VMathHelpers::Max((UINT)SpotLights.size(), MaxAllowedSpotLights);
+	constantBufferData.numPointLights = VMathHelpers::Min((UINT)PointLights.size(), MaxAllowedPointLights);
+	constantBufferData.numSpotLights = VMathHelpers::Min((UINT)SpotLights.size(), MaxAllowedSpotLights);
 
 	memcpy(SceneConstantBufferDataPtrs[backBufferIndex], &constantBufferData, sizeof(VSceneConstantBuffer));
 

@@ -21,6 +21,8 @@
 #include "Renderer.h"
 #include "Camera.h"
 #include "Light.h"
+#include "PointLight.h"
+#include "SpotLight.h"
 #include "Quat.h"
 #include "Scene.h"
 #include "VoxelObject.h"
@@ -156,7 +158,18 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 
 	DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
 		* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 135.f * (M_PI / 180.f)), VVector::ONE);
-	DirectionalLight->IlluminationStrength = 5.f;
+	DirectionalLight->IlluminationStrength = 0.f;
+
+	/*VObjectPtr<Scene::VPointLight> pointLight = Scene->SpawnObject<Scene::VPointLight>(VVector(0.f, 0.f, 100.f), VQuat::IDENTITY, VVector::ZERO);
+	pointLight->IlluminationStrength = 100.f;
+	pointLight->AttenuationLinear = 0.5f;
+	pointLight->AttenuationExp = 0.005f;*/
+
+	VObjectPtr<Scene::VSpotLight> spotLight = Scene->SpawnObject<Scene::VSpotLight>(VVector(-100.f, 0.f, 100.f), VQuat::FromEulerAnglesDegrees(0.f, 0.f, 45.f), VVector::ZERO);
+	spotLight->Angle = 120.f;
+	spotLight->IlluminationStrength = 300.f;
+	spotLight->AttenuationExp = 0.0005f;
+	spotLight->AttenuationLinear = 0.f;
 
 	Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
 	Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
@@ -315,8 +328,6 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 			}
 		}
 	}
-
-	//voxelVolume->SimplifyVolume();
 
 	Sphere->SetVoxelVolume(voxelVolume);
 }

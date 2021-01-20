@@ -25,7 +25,7 @@
 #include <sstream>
 #include <vector>
 
-//#undef _DEBUG
+#undef _DEBUG
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::Render()
 {
@@ -923,7 +923,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::FillDescriptorHeap(boost::unord
 
 	outResourceBindings[EGlobalRootSignature::SceneTextures] = bindingPayload;
 
-	Device->CopyDescriptorsSimple(2, RendererDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetSceneDescriptorHeap()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	Device->CopyDescriptorsSimple(1, RendererDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetSceneDescriptorHeap()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 
 	RendererSamplerDescriptorHeap->AllocateDescriptorRange(1, rangeIndex);
@@ -934,7 +934,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::FillDescriptorHeap(boost::unord
 	Device->CopyDescriptorsSimple(1, RendererSamplerDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetSceneDescriptorHeapSamplers()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 
 
-	RendererDescriptorHeap->AllocateDescriptorRange(1, rangeIndex);
+	RendererDescriptorHeap->AllocateDescriptorRange(MaxAllowedPointLights + MaxAllowedSpotLights, rangeIndex);
 	bindingPayload.BindingGPUHandle = RendererDescriptorHeap->GetGPUHandle(rangeIndex);
 
 	outResourceBindings[EGlobalRootSignature::SceneLights] = bindingPayload;

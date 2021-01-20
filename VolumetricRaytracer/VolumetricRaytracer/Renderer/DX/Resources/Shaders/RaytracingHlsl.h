@@ -62,20 +62,24 @@ namespace VolumeRaytracer
 
 	struct VPointLightBuffer
 	{
-		XMVECTOR position;
 		XMFLOAT4 color;
 		float lightIntensity;
-		float falloffDistance;
+		float attLinear;
+		float attExp;
+		float padding1;
+		XMFLOAT3 position;
 	};
 
 	struct VSpotLightBuffer
 	{
-		XMVECTOR position;
-		XMVECTOR forward;
 		XMFLOAT4 color;
 		float lightIntensity;
-		float falloffDistance;
-		float angle;
+		float attLinear;
+		float attExp;
+		float cosAngle;
+		float cosFalloffAngle;
+		XMFLOAT3 position;
+		XMFLOAT3 forward;
 	};
 
 	struct VGeometryConstantBuffer
