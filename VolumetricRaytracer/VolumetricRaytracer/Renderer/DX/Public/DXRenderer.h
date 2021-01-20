@@ -166,6 +166,7 @@ namespace VolumeRaytracer
 				void InitializeTexture(VObjectPtr<VTexture> texture) override;
 
 				void CreateSRVDescriptor(VObjectPtr<VTexture> texture, const D3D12_CPU_DESCRIPTOR_HANDLE& descHandle);
+				void CreateCBDescriptor(CPtr<ID3D12Resource> resource, const size_t& resourceSize, const D3D12_CPU_DESCRIPTOR_HANDLE& descHandle);
 
 				void UploadToGPU(VObjectPtr<VTexture> texture) override;
 

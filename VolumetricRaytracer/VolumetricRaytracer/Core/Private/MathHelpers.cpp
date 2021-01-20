@@ -35,6 +35,11 @@ size_t VolumeRaytracer::VMathHelpers::Index3DTo1D(const VIntVector& index, const
 	return Index3DTo1D(index.X, index.Y, index.Z, yCount, zCount);
 }
 
+float VolumeRaytracer::VMathHelpers::ToRadians(float degrees)
+{
+	return degrees * (3.141592f / 180.f);
+}
+
 size_t VolumeRaytracer::VMathHelpers::Index3DTo1D(const int& x, const int& y, const int& z, const size_t& yCount, const size_t& zCount)
 {
 	return x * yCount * zCount + z * yCount + y;

@@ -27,6 +27,10 @@
 #include "RDXLevelObject.h"
 #include "RenderableObject.h"
 #include "Logger.h"
+#include "../../Scene/Public/PointLight.h"
+#include "../../Scene/Public/SpotLight.h"
+#include "DXLightFactory.h"
+#include "../../Core/Public/MathHelpers.h"
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::InitFromScene(std::weak_ptr<VRenderer> renderer, std::weak_ptr<Scene::VScene> scene)
 {
@@ -62,12 +66,18 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::BuildStaticResources(VDXRenderer*
 		DXSceneDescriptorHeapSamplers = new VDXDescriptorHeap(renderer->GetDXDevice(), 1, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
 	}
 
+	if (DXSceneLightsDescriptorHeap == nullptr)
+	{
+		DXSceneLightsDescriptorHeap = new VDXDescriptorHeap(renderer->GetDXDevice(), VDXConstants::BACK_BUFFER_COUNT * (MaxAllowedPointLights + MaxAllowedSpotLights), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+	}
+
 	if (ObjectResourcePool == nullptr)
 	{
 		ObjectResourcePool = new VRDXSceneObjectResourcePool(renderer->GetDXDevice(), MaxAllowedObjectData);
 	}
 
 	AllocSceneConstantBuffer(renderer);
+	AllocLightConstantBuffers(renderer);
 	InitEnvironmentMap(renderer);
 }
 
@@ -83,6 +93,8 @@ D3D12_GPU_VIRTUAL_ADDRESS VolumeRaytracer::Renderer::DX::VRDXScene::CopySceneCon
 
 	constantBufferData.dirLightDirection = DirectionalLightDirection;
 	constantBufferData.dirLightStrength = DirectionalLightStrength;
+	constantBufferData.numPointLights = VMathHelpers::Min((UINT)PointLights.size(), MaxAllowedPointLights);
+	constantBufferData.numSpotLights = VMathHelpers::Min((UINT)SpotLights.size(), MaxAllowedSpotLights);
 
 	memcpy(SceneConstantBufferDataPtrs[backBufferIndex], &constantBufferData, sizeof(VSceneConstantBuffer));
 
@@ -132,6 +144,8 @@ VolumeRaytracer::Renderer::DX::CPtr<ID3D12DescriptorHeap> VolumeRaytracer::Rende
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::PrepareForRendering(std::weak_ptr<VRenderer> renderer, const unsigned int& backBufferIndex)
 {
+	UpdateLights(backBufferIndex);
+
 	VObjectPtr<VDXRenderer> dxRenderer = std::static_pointer_cast<VDXRenderer>(renderer.lock());
 
 	BuildTopLevelAccelerationStructures(dxRenderer.get(), backBufferIndex);
@@ -152,6 +166,11 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::PrepareForRendering(std::weak_ptr
 
 		dxRenderer->BuildBottomLevelAccelerationStructure(blas);
 	}
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE VolumeRaytracer::Renderer::DX::VRDXScene::GetSceneLightsHeapStart(const unsigned int& backBufferIndex) const
+{
+	return DXSceneLightsDescriptorHeap->GetCPUHandle(backBufferIndex * (MaxAllowedPointLights + MaxAllowedSpotLights));
 }
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::InitEnvironmentMap(VDXRenderer* renderer)
@@ -203,7 +222,103 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::InitSceneObjects(std::weak_ptr<VD
 
 	for (auto& elem : objects)
 	{
+		std::shared_ptr<Scene::VLevelObject> levelObject = elem.lock();
+		std::shared_ptr<Scene::VPointLight> pointLight = std::dynamic_pointer_cast<Scene::VPointLight>(levelObject);
+
+		if (pointLight != nullptr)
+		{
+			AddPointLight(pointLight.get());
+			continue;
+		}
+
+		std::shared_ptr<Scene::VSpotLight> spotLight = std::dynamic_pointer_cast<Scene::VSpotLight>(levelObject);
+		if (spotLight != nullptr)
+		{
+			AddSpotLight(spotLight.get());
+			continue;
+		}
+
 		AddLevelObject(renderer, elem.lock().get());
+	}
+}
+
+void VolumeRaytracer::Renderer::DX::VRDXScene::AllocLightConstantBuffers(VDXRenderer* renderer)
+{
+	CPtr<ID3D12Device5> dxDevice = renderer->GetDXDevice();
+	
+	size_t pointLightBufferSize = VDXHelper::Align(sizeof(VPointLightBuffer), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+	size_t spotLightBufferSize = VDXHelper::Align(sizeof(VSpotLightBuffer), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+
+	ScenePointLightBuffers.resize(VDXConstants::BACK_BUFFER_COUNT);
+	SceneSpotLightBuffers.resize(VDXConstants::BACK_BUFFER_COUNT);
+
+	for (auto& elem : ScenePointLightBuffers)
+	{
+		elem.resize(MaxAllowedPointLights);
+
+		for (auto& pointLightBuffer : elem)
+		{
+			pointLightBuffer = std::make_shared<VD3DConstantBuffer>();
+
+			CD3DX12_RESOURCE_DESC constantBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(pointLightBufferSize, D3D12_RESOURCE_FLAG_NONE);
+			CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+
+			dxDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE, &constantBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&pointLightBuffer->Resource));
+
+			uint8_t* dataPtr = nullptr;
+
+			CD3DX12_RANGE mapRange(0, 0);
+			pointLightBuffer->Resource->Map(0, &mapRange, reinterpret_cast<void**>(&dataPtr));
+			pointLightBuffer->DataPtr = dataPtr;
+			pointLightBuffer->BufferSize = pointLightBufferSize;
+		}
+	}
+
+	for (auto& elem : SceneSpotLightBuffers)
+	{
+		elem.resize(MaxAllowedSpotLights);
+
+		for (auto& spotLightBuffer : elem)
+		{
+			spotLightBuffer = std::make_shared<VD3DConstantBuffer>();
+
+			CD3DX12_RESOURCE_DESC constantBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(spotLightBufferSize, D3D12_RESOURCE_FLAG_NONE);
+			CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+
+			dxDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE, &constantBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&spotLightBuffer->Resource));
+
+			uint8_t* dataPtr = nullptr;
+
+			CD3DX12_RANGE mapRange(0, 0);
+			spotLightBuffer->Resource->Map(0, &mapRange, reinterpret_cast<void**>(&dataPtr));
+			spotLightBuffer->DataPtr = dataPtr;
+			spotLightBuffer->BufferSize = spotLightBufferSize;
+		}
+	}
+
+	for (int frame = 0; frame < VDXConstants::BACK_BUFFER_COUNT; frame++)
+	{
+		for (int pLIndex = 0; pLIndex < MaxAllowedPointLights; pLIndex++)
+		{
+			std::shared_ptr<VD3DConstantBuffer> buffer = ScenePointLightBuffers[frame][pLIndex];
+
+			UINT descIndex = 0;
+
+			DXSceneLightsDescriptorHeap->AllocateDescriptor(&buffer->CPUDescHandle, &buffer->GPUDescHandle, descIndex);
+
+			renderer->CreateCBDescriptor(buffer->Resource, buffer->BufferSize, buffer->CPUDescHandle);
+		}
+
+		for (int sLIndex = 0; sLIndex < MaxAllowedSpotLights; sLIndex++)
+		{
+			std::shared_ptr<VD3DConstantBuffer> buffer = SceneSpotLightBuffers[frame][sLIndex];
+
+			UINT descIndex = 0;
+
+			DXSceneLightsDescriptorHeap->AllocateDescriptor(&buffer->CPUDescHandle, &buffer->GPUDescHandle, descIndex);
+
+			renderer->CreateCBDescriptor(buffer->Resource, buffer->BufferSize, buffer->CPUDescHandle);
+		}
 	}
 }
 
@@ -250,6 +365,12 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::CleanupStaticResources()
 		DXSceneDescriptorHeap = nullptr;
 	}
 
+	if (DXSceneLightsDescriptorHeap != nullptr)
+	{
+		delete DXSceneLightsDescriptorHeap;
+		DXSceneLightsDescriptorHeap = nullptr;
+	}
+
 	if (ObjectResourcePool != nullptr)
 	{
 		delete ObjectResourcePool;
@@ -269,6 +390,9 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::CleanupStaticResources()
 	SceneConstantBuffers.clear();
 	SceneConstantBufferDataPtrs.clear();
 
+	ScenePointLightBuffers.clear();
+	SceneSpotLightBuffers.clear();
+
 	for (auto& tlas : TLAS)
 	{
 		if (tlas != nullptr)
@@ -283,6 +407,8 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::CleanupStaticResources()
 
 	VoxelVolumes.clear();
 	ObjectsInScene.clear();
+	PointLights.clear();
+	SpotLights.clear();
 
 	UpdateBLAS = false;
 
@@ -456,6 +582,48 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::RemoveLevelObject(Scene::VLevelOb
 	}
 }	
 
+void VolumeRaytracer::Renderer::DX::VRDXScene::AddPointLight(Scene::VPointLight* pointLight)
+{
+	if (pointLight != nullptr && std::find(PointLights.begin(), PointLights.end(), pointLight) == PointLights.end())
+	{
+		PointLights.push_back(pointLight);
+	}
+}
+
+void VolumeRaytracer::Renderer::DX::VRDXScene::RemovePointLight(Scene::VPointLight* pointLight)
+{
+	if (pointLight != nullptr)
+	{
+		auto index = std::find(PointLights.begin(), PointLights.end(), pointLight);
+
+		if (index != PointLights.end())
+		{
+			PointLights.erase(index);
+		}
+	}
+}
+
+void VolumeRaytracer::Renderer::DX::VRDXScene::AddSpotLight(Scene::VSpotLight* spotLight)
+{
+	if (spotLight != nullptr && std::find(SpotLights.begin(), SpotLights.end(), spotLight) == SpotLights.end())
+	{
+		SpotLights.push_back(spotLight);
+	}
+}
+
+void VolumeRaytracer::Renderer::DX::VRDXScene::RemoveSpotLight(Scene::VSpotLight* spotLight)
+{
+	if (spotLight != nullptr)
+	{
+		auto index = std::find(SpotLights.begin(),SpotLights.end(), spotLight);
+
+		if (index != SpotLights.end())
+		{
+			SpotLights.erase(index);
+		}
+	}
+}
+
 void VolumeRaytracer::Renderer::DX::VRDXScene::ClearInstanceIDPool()
 {
 	size_t elem = 0;
@@ -499,6 +667,37 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::UpdateSceneConstantBuffer(std::we
 	DirectionalLightStrength = scenePtr->GetActiveDirectionalLight()->IlluminationStrength;
 }
 
+void VolumeRaytracer::Renderer::DX::VRDXScene::UpdateLights(const unsigned int& backBufferIndex)
+{
+	for (int i = 0; i < PointLights.size(); i++)
+	{
+		if (i < MaxAllowedPointLights)
+		{
+			VPointLightBuffer lightBuffer = VDXLightFactory::GetLightBuffer(PointLights[i]);
+
+			memcpy(ScenePointLightBuffers[backBufferIndex][i]->DataPtr, &lightBuffer, sizeof(VPointLightBuffer));
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	for (int i = 0; i < SpotLights.size(); i++)
+	{
+		if (i < MaxAllowedSpotLights)
+		{
+			VSpotLightBuffer lightBuffer = VDXLightFactory::GetLightBuffer(SpotLights[i]);
+
+			memcpy(SceneSpotLightBuffers[backBufferIndex][i]->DataPtr, &lightBuffer, sizeof(VSpotLightBuffer));
+		}
+		else
+		{
+			break;
+		}
+	}
+}
+
 void VolumeRaytracer::Renderer::DX::VRDXScene::UpdateSceneGeometry(std::weak_ptr<VDXRenderer> renderer, std::weak_ptr<Scene::VScene> scene)
 {
 	VObjectPtr<Scene::VScene> scenePtr = scene.lock();
@@ -537,11 +736,41 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::UpdateSceneObjects(std::weak_ptr<
 
 	for (auto& elem : objectsRemoved)
 	{
+		Scene::VPointLight* pointLight = dynamic_cast<Scene::VPointLight*>(elem);
+
+		if (pointLight != nullptr)
+		{
+			RemovePointLight(pointLight);
+			continue;
+		}
+
+		Scene::VSpotLight* spotLight = dynamic_cast<Scene::VSpotLight*>(elem);
+		if (spotLight != nullptr)
+		{
+			RemoveSpotLight(spotLight);
+			continue;
+		}
+
 		RemoveLevelObject(elem);
 	}
 
 	for (auto& elem : objectsAdded)
 	{
+		Scene::VPointLight* pointLight = dynamic_cast<Scene::VPointLight*>(elem);
+
+		if (pointLight != nullptr)
+		{
+			AddPointLight(pointLight);
+			continue;
+		}
+
+		Scene::VSpotLight* spotLight = dynamic_cast<Scene::VSpotLight*>(elem);
+		if (spotLight != nullptr)
+		{
+			AddSpotLight(spotLight);
+			continue;
+		}
+
 		AddLevelObject(renderer, elem);
 	}
 }

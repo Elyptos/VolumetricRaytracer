@@ -26,6 +26,8 @@ namespace VolumeRaytracer
 		static size_t Index3DTo1D(const int& x, const int& y, const int& z, const size_t& yCount, const size_t& zCount);
 		static size_t Index3DTo1D(const VIntVector& index, const size_t& yCount, const size_t& zCount);
 
+		static float ToRadians(float degrees);
+
 		template<typename T>
 		static T Clamp(const T& a, const T& min, const T& max)
 		{
@@ -56,5 +58,7 @@ namespace VolumeRaytracer
 		{
 			return a + (b - a) * t;
 		}
+
+		
 	};
 }

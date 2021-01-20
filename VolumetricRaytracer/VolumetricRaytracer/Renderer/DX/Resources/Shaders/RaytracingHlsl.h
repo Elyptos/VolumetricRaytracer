@@ -25,6 +25,8 @@ typedef uint UINT;
 #else
 	#include <DirectXMath.h>
 	using namespace DirectX;
+
+	typedef unsigned int UINT;
 #endif
 
 #define MAX_RAY_RECURSION_DEPTH 3
@@ -54,6 +56,30 @@ namespace VolumeRaytracer
 		XMVECTOR cameraPosition;
 		XMFLOAT3 dirLightDirection;
 		float dirLightStrength;
+		float numPointLights;
+		float numSpotLights;
+	};
+
+	struct VPointLightBuffer
+	{
+		XMFLOAT4 color;
+		float lightIntensity;
+		float attLinear;
+		float attExp;
+		float padding1;
+		XMFLOAT3 position;
+	};
+
+	struct VSpotLightBuffer
+	{
+		XMFLOAT4 color;
+		float lightIntensity;
+		float attLinear;
+		float attExp;
+		float cosAngle;
+		float cosFalloffAngle;
+		XMFLOAT3 position;
+		XMFLOAT3 forward;
 	};
 
 	struct VGeometryConstantBuffer
@@ -76,4 +102,6 @@ namespace VolumeRaytracer
 	};
 
 	static const UINT MaxAllowedObjectData = 20;
+	static const UINT MaxAllowedSpotLights = 5;
+	static const UINT MaxAllowedPointLights = 5;
 }

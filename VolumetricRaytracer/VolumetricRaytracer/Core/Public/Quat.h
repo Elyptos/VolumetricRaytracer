@@ -30,6 +30,8 @@ namespace VolumeRaytracer
 		static VQuat FromForwardVector(const VVector& vec);
 		static VQuat FromRightVector(const VVector& vec);
 		static VQuat FromUpVector(const VVector& vec);
+		static VQuat FromEulerAngles(const float& roll, const float& yaw, const float& pitch);
+		static VQuat FromEulerAnglesDegrees(const float& roll, const float& yaw, const float& pitch);
 
 		VQuat Inverse() const;
 

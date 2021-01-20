@@ -24,7 +24,7 @@ namespace VolumeRaytracer
 		class VLight : public VLevelObject
 		{
 		public:
-			float IlluminationStrength;
+			float IlluminationStrength = 1.f;
 			VColor Color;
 		protected:
 			void Initialize() override;
