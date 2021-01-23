@@ -70,6 +70,8 @@ namespace VolumeRaytracer
 
 			static void UpdateCellDensityWithEdgeIntersection(std::shared_ptr<Voxel::VVoxelVolume> volume, const VIntVector& voxelIndex, const VVector& edgeStart, const VVector& edgeEnd);
 			static void UpdateCellDensityWithTriangleIntersection(std::shared_ptr<Voxel::VVoxelVolume> volume, const VIntVector& voxelIndex, const VTriangle& triangle);
+
+			static bool ExtractResolutionFromName(const std::string& name, uint8_t& outResolution);
 		};
 	}
 }

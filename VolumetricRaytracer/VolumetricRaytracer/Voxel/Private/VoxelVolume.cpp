@@ -170,43 +170,31 @@ VolumeRaytracer::VIntVector VolumeRaytracer::Voxel::VVoxelVolume::RelativePositi
 std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Voxel::VVoxelVolume::Serialize() const
 {
 	std::shared_ptr<VSerializationArchive> res = std::make_shared<VSerializationArchive>();
-	//res->BufferSize = GetVoxelCount() * sizeof(VVoxel);
-	//res->Buffer = new char[res->BufferSize];
+	res->BufferSize = Voxels.size() * sizeof(VVoxel);
+	res->Buffer = new char[res->BufferSize];
 
-	//memcpy(res->Buffer, VoxelArr, res->BufferSize);
+	memcpy(res->Buffer, Voxels.data(), res->BufferSize);
 
-	//std::shared_ptr<VSerializationArchive> size = std::make_shared<VSerializationArchive>();
-	//std::shared_ptr<VSerializationArchive> extends = std::make_shared<VSerializationArchive>();
+	std::shared_ptr<VSerializationArchive> resolution = VSerializationArchive::From<uint8_t>(&Resolution);
+	std::shared_ptr<VSerializationArchive> extends = VSerializationArchive::From<float>(&VolumeExtends);
 
-	//size->BufferSize = sizeof(unsigned int);
-	//extends->BufferSize = sizeof(float);
-
-	//size->Buffer = new char[sizeof(unsigned int)];
-	//extends->Buffer = new char[sizeof(float)];
-
-	//memcpy(size->Buffer, &Size, sizeof(unsigned int));
-	//memcpy(extends->Buffer, &VolumeExtends, sizeof(float));
-
-	//res->Properties["Size"] = size;
-	//res->Properties["Extends"] = extends;
+	res->Properties["Resolution"] = resolution;
+	res->Properties["Extends"] = extends;
 
 	return res;
 }
 
 void VolumeRaytracer::Voxel::VVoxelVolume::Deserialize(std::shared_ptr<VSerializationArchive> archive)
 {
-	//memcpy(&Size, archive->Properties["Size"]->Buffer, sizeof(unsigned int));
-	//memcpy(&VolumeExtends, archive->Properties["Extends"]->Buffer, sizeof(float));
+	Resolution = archive->Properties["Resolution"]->To<uint8_t>();
+	VolumeExtends = archive->Properties["Extends"]->To<float>();
 
-	//if (VoxelArr != nullptr)
-	//{
-	//	delete[] VoxelArr;
-	//}
+	VoxelCountAlongAxis = 2 + (std::pow(2, Resolution) - 1);
+	CellSize = (VolumeExtends * 2) / (VoxelCountAlongAxis - 1.f);
 
-	//VoxelArr = new VVoxel[GetVoxelCount()];
-	//memcpy(VoxelArr, archive->Buffer, GetVoxelCount() * sizeof(VVoxel));
+	Voxels.resize(GetVoxelCount(), VVoxel());
 
-	//CellSize = (VolumeExtends * 2) / ((float)Size - 1.f);
+	memcpy(Voxels.data(), archive->Buffer, GetVoxelCount() * sizeof(VVoxel));
 
 	MakeDirty();
 }
@@ -215,7 +203,7 @@ void VolumeRaytracer::Voxel::VVoxelVolume::GenerateGPUOctreeStructure(std::vecto
 {
 	VCellOctree octree(Resolution, Voxels);
 
-	octree.CollapseTree();
+	//octree.CollapseTree();
 	octree.GetGPUOctreeStructure(outNodes, outNodeAxisCount);
 }
 

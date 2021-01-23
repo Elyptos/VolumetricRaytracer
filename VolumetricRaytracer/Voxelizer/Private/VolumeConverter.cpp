@@ -15,13 +15,21 @@
 #include "VolumeConverter.h"
 #include "VoxelVolume.h"
 #include "MathHelpers.h"
+#include <iostream>
 #include <cmath>
 
 VolumeRaytracer::VObjectPtr<VolumeRaytracer::Voxel::VVoxelVolume> VolumeRaytracer::Voxelizer::VVolumeConverter::ConvertMeshInfoToVoxelVolume(const VMeshInfo& meshInfo)
 {
 	float extends = VMathHelpers::Max(meshInfo.Bounds.GetExtends().X, VMathHelpers::Max(meshInfo.Bounds.GetExtends().Y, meshInfo.Bounds.GetExtends().Z));
+	uint8_t desiredResolution = 5;
 
-	VObjectPtr<Voxel::VVoxelVolume> volume = VObject::CreateObject<Voxel::VVoxelVolume>(200, extends);
+	if (!ExtractResolutionFromName(meshInfo.MeshName, desiredResolution))
+	{
+		desiredResolution = 5;
+		std::cout << "[WARNING] Mesh with name " << meshInfo.MeshName << " has no or invalid resolution specifier. Correct syntax is meshName_resolution (cubeMesh_6). Using default resolution of 5!" << std::endl;
+	}
+
+	VObjectPtr<Voxel::VVoxelVolume> volume = VObject::CreateObject<Voxel::VVoxelVolume>(desiredResolution, extends);
 
 	for (size_t index = 0; index <= (meshInfo.Indices.size() - 3); index += 3)
 	{
@@ -754,4 +762,29 @@ void VolumeRaytracer::Voxelizer::VVolumeConverter::UpdateCellDensityWithTriangle
 			}
 		}
 	}
+}
+
+bool VolumeRaytracer::Voxelizer::VVolumeConverter::ExtractResolutionFromName(const std::string& name, uint8_t& outResolution)
+{
+	size_t terminatorIndex = name.rfind('_');
+
+	if (terminatorIndex != std::string::npos)
+	{
+		std::string resStr = name.substr(terminatorIndex + 1, terminatorIndex - name.size());
+
+		int res = 0;
+
+		try
+		{
+			res = std::stoi(resStr);
+			outResolution = (uint8_t)res;
+			return true;
+		}
+		catch (std::invalid_argument)
+		{}
+		catch (std::out_of_range)
+		{}
+	}
+
+	return false;
 }

@@ -31,8 +31,8 @@ namespace VolumeRaytracer
 			}
 		}
 
-		template<typename T>
-		static std::shared_ptr<VSerializationArchive> From(T* src)
+		template<typename T> 
+		static std::shared_ptr<VSerializationArchive> From(const T* src)
 		{
 			std::shared_ptr<VSerializationArchive> res = std::make_shared<VSerializationArchive>();
 

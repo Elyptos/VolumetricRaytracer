@@ -32,6 +32,7 @@ namespace VolumeRaytracer
 
 		struct VMeshInfo
 		{
+			std::string MeshName;
 			std::vector<VVertex> Vertices;
 			std::vector<size_t> Indices;
 			VAABB Bounds;

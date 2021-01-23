@@ -951,10 +951,10 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 	
 	float diffuse = 0.1f;
 	
-	//if(!shadowRayHit)
-	//{
-	//	diffuse = (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);	  
-	//}
+	if (!shadowRayHit)
+	{
+		diffuse += (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);
+	}
 
 	float distanceToLightSource = 0;
 	float lightIntensity = 0;

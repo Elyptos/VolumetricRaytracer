@@ -31,6 +31,7 @@ std::shared_ptr<VolumeRaytracer::Voxelizer::VSceneInfo> VolumeRaytracer::Voxeliz
 		std::cout << "[INFO] Importing mesh: " << mesh.name << std::endl;
 
 		VMeshInfo meshInfo;
+		meshInfo.MeshName = mesh.name;
 
 		for (auto& primitive : mesh.primitives)
 		{
