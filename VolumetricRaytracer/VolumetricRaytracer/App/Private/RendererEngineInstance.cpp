@@ -153,37 +153,37 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
 	Scene = VObject::CreateObject<Scene::VScene>();
 
-	//LoadSceneFromFile("../Voxelizer/Monkey.vox");
+	LoadSceneFromFile("../Voxelizer/Monkey.vox");
 	Camera = Scene->SpawnObject<Scene::VCamera>(VVector(300.f, 0.f, 100.f), VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f)), VVector::ONE);
 
 	DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
 		* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 135.f * (M_PI / 180.f)), VVector::ONE);
-	DirectionalLight->IlluminationStrength = 0.f;
-
-	/*VObjectPtr<Scene::VPointLight> pointLight = Scene->SpawnObject<Scene::VPointLight>(VVector(0.f, 0.f, 100.f), VQuat::IDENTITY, VVector::ZERO);
-	pointLight->IlluminationStrength = 100.f;
-	pointLight->AttenuationLinear = 0.5f;
-	pointLight->AttenuationExp = 0.005f;*/
-
-	VObjectPtr<Scene::VSpotLight> spotLight = Scene->SpawnObject<Scene::VSpotLight>(VVector(-100.f, 0.f, 100.f), VQuat::FromEulerAnglesDegrees(0.f, 0.f, 45.f), VVector::ZERO);
-	spotLight->Angle = 120.f;
-	spotLight->IlluminationStrength = 300.f;
-	spotLight->AttenuationExp = 0.0005f;
-	spotLight->AttenuationLinear = 0.f;
-
-	Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-	Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
-	Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-	Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);
+	DirectionalLight->IlluminationStrength = 100.f;
 
 	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
 	Scene->SetActiveSceneCamera(Camera);
 	Scene->SetActiveDirectionalLight(DirectionalLight);
 
-	//InitSnowmanObject();
-	InitFloor();
-	InitSphere();
-	InitCube();
+	///*VObjectPtr<Scene::VPointLight> pointLight = Scene->SpawnObject<Scene::VPointLight>(VVector(0.f, 0.f, 100.f), VQuat::IDENTITY, VVector::ZERO);
+	//pointLight->IlluminationStrength = 100.f;
+	//pointLight->AttenuationLinear = 0.5f;
+	//pointLight->AttenuationExp = 0.005f;*/
+
+	//VObjectPtr<Scene::VSpotLight> spotLight = Scene->SpawnObject<Scene::VSpotLight>(VVector(-100.f, 0.f, 100.f), VQuat::FromEulerAnglesDegrees(0.f, 0.f, 45.f), VVector::ZERO);
+	//spotLight->Angle = 120.f;
+	//spotLight->IlluminationStrength = 300.f;
+	//spotLight->AttenuationExp = 0.0005f;
+	//spotLight->AttenuationLinear = 0.f;
+
+	//Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+	//Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
+	//Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+	//Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);
+
+	////InitSnowmanObject();
+	//InitFloor();
+	//InitSphere();
+	//InitCube();
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
@@ -306,7 +306,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 
 	size_t volumeSize = voxelCount * voxelCount * voxelCount;
 
-	#pragma omp parallel for collapse(3)
+#pragma omp parallel for collapse(3)
 	for (int x = 0; x < voxelCount; x++)
 	{
 		for (int y = 0; y < voxelCount; y++)

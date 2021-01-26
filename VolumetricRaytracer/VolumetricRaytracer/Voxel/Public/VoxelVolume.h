@@ -54,7 +54,7 @@ namespace VolumeRaytracer
 			void SetMaterial(const VMaterial& material);
 			VMaterial GetMaterial() const;
 
-
+			void FillVolume(const VVoxel& voxel);
 			void PostRender() override;
 
 

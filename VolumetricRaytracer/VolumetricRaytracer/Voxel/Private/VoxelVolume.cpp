@@ -103,6 +103,14 @@ VolumeRaytracer::VMaterial VolumeRaytracer::Voxel::VVoxelVolume::GetMaterial() c
 	return GeometryMaterial;
 }
 
+void VolumeRaytracer::Voxel::VVoxelVolume::FillVolume(const VVoxel& voxel)
+{
+	Voxels.clear();
+	Voxels.resize(GetVoxelCount(), voxel);
+
+	MakeDirty();
+}
+
 void VolumeRaytracer::Voxel::VVoxelVolume::PostRender()
 {
 	ClearDirtyFlag();

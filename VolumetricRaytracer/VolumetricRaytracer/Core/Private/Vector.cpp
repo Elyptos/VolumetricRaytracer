@@ -87,6 +87,15 @@ VolumeRaytracer::VVector VolumeRaytracer::VVector::Max(const VVector& vec, const
 	return VVector(x, y, z);
 }
 
+VolumeRaytracer::VVector VolumeRaytracer::VVector::Max(const VVector& vec1, const VVector& vec2)
+{
+	return VVector(
+		VMathHelpers::Max(vec1.X, vec2.X),
+		VMathHelpers::Max(vec1.Y, vec2.Y),
+		VMathHelpers::Max(vec1.Z, vec2.Z)
+	);
+}
+
 VolumeRaytracer::VVector VolumeRaytracer::VVector::Min(const VVector& vec, const float& scalar)
 {
 	float x = vec.X <= scalar ? vec.X : scalar;
@@ -94,6 +103,15 @@ VolumeRaytracer::VVector VolumeRaytracer::VVector::Min(const VVector& vec, const
 	float z = vec.Z <= scalar ? vec.Z : scalar;
 
 	return VVector(x, y, z);
+}
+
+VolumeRaytracer::VVector VolumeRaytracer::VVector::Min(const VVector& vec1, const VVector& vec2)
+{
+	return VVector(
+		VMathHelpers::Min(vec1.X, vec2.X),
+		VMathHelpers::Min(vec1.Y, vec2.Y),
+		VMathHelpers::Min(vec1.Z, vec2.Z)
+	);
 }
 
 void VolumeRaytracer::VVector::Normalize()

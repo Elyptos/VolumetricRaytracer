@@ -18,9 +18,20 @@
 #include <iostream>
 #include <cmath>
 
+namespace VolumeRaytracer
+{
+	namespace VolumeConversionInternal
+	{
+		const float W = 2 * std::sqrt(3);
+		//const float W = 1.f;
+	}
+}
+
 VolumeRaytracer::VObjectPtr<VolumeRaytracer::Voxel::VVoxelVolume> VolumeRaytracer::Voxelizer::VVolumeConverter::ConvertMeshInfoToVoxelVolume(const VMeshInfo& meshInfo)
 {
 	float extends = VMathHelpers::Max(meshInfo.Bounds.GetExtends().X, VMathHelpers::Max(meshInfo.Bounds.GetExtends().Y, meshInfo.Bounds.GetExtends().Z));
+	extends += extends * 0.25f;
+
 	uint8_t desiredResolution = 5;
 
 	if (!ExtractResolutionFromName(meshInfo.MeshName, desiredResolution))
@@ -31,13 +42,21 @@ VolumeRaytracer::VObjectPtr<VolumeRaytracer::Voxel::VVoxelVolume> VolumeRaytrace
 
 	VObjectPtr<Voxel::VVoxelVolume> volume = VObject::CreateObject<Voxel::VVoxelVolume>(desiredResolution, extends);
 
+	Voxel::VVoxel defaultVoxel;
+	defaultVoxel.Material = 0;
+	defaultVoxel.Density = extends * 2.f;
+
+	volume->FillVolume(defaultVoxel);
+
+	float extractionThreshold = volume->GetCellSize() /** 0.5f*/ * std::sqrt(3);
+
 	for (size_t index = 0; index <= (meshInfo.Indices.size() - 3); index += 3)
 	{
 		const VVertex& v1 = meshInfo.Vertices[meshInfo.Indices[index]];
 		const VVertex& v2 = meshInfo.Vertices[meshInfo.Indices[index + 1]];
 		const VVertex& v3 = meshInfo.Vertices[meshInfo.Indices[index + 2]];
 
-		VoxelizeTriangle(volume, v1, v2, v3);
+		VoxelizeTriangle(volume, v1, v2, v3, extractionThreshold);
 	}
 
 	return volume;
@@ -118,20 +137,8 @@ void VolumeRaytracer::Voxelizer::VVolumeConverter::VoxelizeEdge(std::shared_ptr<
 	}
 }
 
-void VolumeRaytracer::Voxelizer::VVolumeConverter::VoxelizeFace(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v1, const VVertex& v2, const VVertex& v3)
+void VolumeRaytracer::Voxelizer::VVolumeConverter::VoxelizeFace(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v1, const VVertex& v2, const VVertex& v3, const float& surfaceThreshold)
 {
-	VIntVector cornerIndices[3] = {
-		volume->RelativePositionToVoxelIndex(v1.Position),
-		volume->RelativePositionToVoxelIndex(v2.Position),
-		volume->RelativePositionToVoxelIndex(v3.Position)
-	};
-
-	VIntVector minCellIndex;
-	VIntVector maxCellIndex;
-
-	minCellIndex = VIntVector::Min(cornerIndices[0], VIntVector::Min(cornerIndices[1], cornerIndices[2]));
-	maxCellIndex = VIntVector::Max(cornerIndices[0], VIntVector::Max(cornerIndices[1], cornerIndices[2]));
-
 	VTriangle triangle;
 	triangle.V1 = v1.Position;
 	triangle.V2 = v2.Position;
@@ -139,236 +146,97 @@ void VolumeRaytracer::Voxelizer::VVolumeConverter::VoxelizeFace(std::shared_ptr<
 	triangle.Mid = GetTriangleMidpoint(v1, v2, v3);
 	triangle.Normal = GetTriangleNormal(v1, v2, v3);
 
-	VVector absNormal = triangle.Normal.Abs();
+	VTriangleRegions triangleRegions = CalculateTriangleRegionVectors(triangle);
 
-	if (absNormal.X >= absNormal.Y && absNormal.X >= absNormal.Z)
+	VAABB triangleBoundingBox = GetTriangleBoundingBox(triangle, 0.f);
+
+	VIntVector minCellIndex;
+	VIntVector maxCellIndex;
+
+	GetVoxelizedBoundingBox(volume, triangleBoundingBox, minCellIndex, maxCellIndex, surfaceThreshold);
+	
+	minCellIndex = minCellIndex.Max(minCellIndex, 0);
+	maxCellIndex = maxCellIndex.Min(maxCellIndex, volume->GetSize() - 1);
+
+	for (int x = minCellIndex.X; x <= maxCellIndex.X; x++)
 	{
-		for (int y = VMathHelpers::Max(0, minCellIndex.Y); y <= maxCellIndex.Y; y++)
+		for (int y = minCellIndex.Y; y <= maxCellIndex.Y; y++)
 		{
-			if (y >= volume->GetSize())
+			for (int z = minCellIndex.Z; z <= maxCellIndex.Z; z++)
 			{
-				break;
-			}
+				VIntVector voxelIndex = VIntVector(x, y, z);
+				VVector voxelPos = volume->VoxelIndexToRelativePosition(voxelIndex);
 
-			for (int z = VMathHelpers::Max(0, minCellIndex.Z); z <= maxCellIndex.Z; z++)
-			{
-				if (z >= volume->GetSize())
+				VTriangleRegionalVoxelDistances distances = CalculateTriangleRegionDistances(triangleRegions, triangle, voxelPos);
+
+				EVTriangleRegion region = GetTriangleRegion(triangleRegions, distances);
+
+				Voxel::VVoxel voxel = volume->GetVoxel(voxelIndex);
+				float density = voxel.Density;
+
+				switch (region)
 				{
+				case EVTriangleRegion::R1:
+					density = 1.f - (std::abs(distances.A) / surfaceThreshold);
+					density = -1.f * density + 0.5f;
+					break;
+				case EVTriangleRegion::R2:
+					density = 1.f - (std::sqrt(distances.A * distances.A + distances.G * distances.G) / surfaceThreshold);
+					density = -1.f * density + 0.5f;
+					break;
+				case EVTriangleRegion::R3:
+					density = 1.f - (std::sqrt(distances.A * distances.A + distances.F * distances.F) / surfaceThreshold);
+					density = -1.f * density + 0.5f;
+					break;
+				case EVTriangleRegion::R4:
+					density = 1.f - (std::sqrt(distances.A * distances.A + distances.E * distances.E) / surfaceThreshold);
+					density = -1.f * density + 0.5f;
+					break;
+				case EVTriangleRegion::R5:
+					density = 1.f - ((voxelPos - triangle.V1).Length() / surfaceThreshold);
+					density = -1.f * density + 0.5f;
+					break;
+				case EVTriangleRegion::R6:
+					density = 1.f - ((voxelPos - triangle.V2).Length() / surfaceThreshold);
+					density = -1.f * density + 0.5f;
+					break;
+				case EVTriangleRegion::R7:
+					density = 1.f - ((voxelPos - triangle.V3).Length() / surfaceThreshold);
+					density = -1.f * density + 0.5f;
 					break;
 				}
 
-				VVector voxelPos = volume->VoxelIndexToRelativePosition(VIntVector(0, y, z));
 
-				if (IsPointInTriangle(VVector2D(voxelPos.Y, voxelPos.Z), VVector2D(v1.Position.Y, v1.Position.Z), VVector2D(v2.Position.Y, v2.Position.Z), VVector2D(v3.Position.Y, v3.Position.Z)))
+				/*if (std::abs(density) < std::abs(voxel.Density))
 				{
-					bool intersectionFound = false;
-
-					for (int x = VMathHelpers::Max(0, minCellIndex.X); x <= maxCellIndex.X; x++)
+					if (!(voxel.Density < 0.f && density > 0.f))
 					{
-						VIntVector voxelIndex = VIntVector(x, y, z);
+						voxel.Density = density;
+						voxel.Material = voxel.Density <= 0.f ? 1 : 0;
 
-						if (x < volume->GetSize() && IsTriangleInsideVoxelBounds(volume, voxelIndex, triangle))
-						{
-							intersectionFound = true;
-
-							Voxel::VVoxel v = volume->GetVoxel(voxelIndex);
-
-							if (v.Density > 0)
-							{
-								v.Density = -1;
-								v.Material = 1;
-
-								volume->SetVoxel(voxelIndex, v);
-							}
-						}
-						else if (intersectionFound)
-						{
-							break;
-						}
+						volume->SetVoxel(voxelIndex, voxel);
 					}
+				}*/
 
-					/*VVector relColumnPos = voxelPos - triangleMid;
-					relColumnPos.X = 0.f;
-
-					relColumnPos = VVector::PlaneProjection(relColumnPos, triangleNormal);
-
-					VVector faceVoxelPos = relColumnPos + triangleMid;
-
-					VVoxelIndex faceVoxelIndex;
-
-					volume->RelativePositionToVoxelIndex(faceVoxelPos, faceVoxelIndex.X, faceVoxelIndex.Y, faceVoxelIndex.Z);
-
-					if (faceVoxelIndex.X >= 0 && faceVoxelIndex.Y >= 0 && faceVoxelIndex.Z >= 0 && volume->IsValidVoxelIndex(faceVoxelIndex.X, faceVoxelIndex.Y, faceVoxelIndex.Z))
-					{
-						Voxel::VVoxel v = volume->GetVoxel(faceVoxelIndex.X, faceVoxelIndex.Y, faceVoxelIndex.Z);
-
-						if (v.Density > 0)
-						{
-							v.Density = -1;
-							v.Material = 1;
-
-							volume->SetVoxel(faceVoxelIndex.X, faceVoxelIndex.Y, faceVoxelIndex.Z, v);
-						}
-					}*/
-				}
-			}
-		}
-	}
-	else if (absNormal.Y >= absNormal.X && absNormal.Y >= absNormal.Z)
-	{
-		for (int x = VMathHelpers::Max(0, minCellIndex.X); x <= maxCellIndex.X; x++)
-		{
-			if (x >= volume->GetSize())
-			{
-				break;
-			}
-
-			for (int z = VMathHelpers::Max(0, minCellIndex.Z); z <= maxCellIndex.Z; z++)
-			{
-				if (z >= volume->GetSize())
+				if (density < voxel.Density)
 				{
-					break;
-				}
+					voxel.Density = density;
+					voxel.Material = voxel.Density <= 0.f ? 1 : 0;
 
-				VVector voxelPos = volume->VoxelIndexToRelativePosition(VIntVector(x, 0, z));
-
-				if (IsPointInTriangle(VVector2D(voxelPos.X, voxelPos.Z), VVector2D(v1.Position.X, v1.Position.Z), VVector2D(v2.Position.X, v2.Position.Z), VVector2D(v3.Position.X, v3.Position.Z)))
-				{
-					bool intersectionFound = false;
-
-					for (int y = VMathHelpers::Max(0, minCellIndex.Y); y <= maxCellIndex.Y; y++)
-					{
-						VIntVector voxelIndex = VIntVector(x, y, z);
-
-						if (y < volume->GetSize() && IsTriangleInsideVoxelBounds(volume, voxelIndex, triangle))
-						{
-							intersectionFound = true;
-
-							Voxel::VVoxel v = volume->GetVoxel(voxelIndex);
-
-							if (v.Density > 0)
-							{
-								v.Density = -1;
-								v.Material = 1;
-
-								volume->SetVoxel(voxelIndex, v);
-							}
-						}
-						else if (intersectionFound)
-						{
-							break;
-						}
-					}
-
-					/*VVector relColumnPos = voxelPos - triangleMid;
-					relColumnPos.Y = 0.f;
-
-					relColumnPos = VVector::PlaneProjection(relColumnPos, triangleNormal);
-
-					VVector faceVoxelPos = relColumnPos + triangleMid;
-
-					VVoxelIndex faceVoxelIndex;
-
-					volume->RelativePositionToVoxelIndex(faceVoxelPos, faceVoxelIndex.X, faceVoxelIndex.Y, faceVoxelIndex.Z);
-
-					if (faceVoxelIndex.X >= 0 && faceVoxelIndex.Y >= 0 && faceVoxelIndex.Z >= 0 && volume->IsValidVoxelIndex(faceVoxelIndex.X, faceVoxelIndex.Y, faceVoxelIndex.Z))
-					{
-						Voxel::VVoxel v = volume->GetVoxel(faceVoxelIndex.X, faceVoxelIndex.Y, faceVoxelIndex.Z);
-
-						if (v.Density > 0)
-						{
-							v.Density = -1;
-							v.Material = 1;
-
-							volume->SetVoxel(faceVoxelIndex.X, faceVoxelIndex.Y, faceVoxelIndex.Z, v);
-						}
-					}*/
-				}
-			}
-		}
-	}
-	else
-	{
-		for (int x = VMathHelpers::Max(0, minCellIndex.X); x <= maxCellIndex.X; x++)
-		{
-			if (x >= volume->GetSize())
-			{
-				break;
-			}
-
-			for (int y = VMathHelpers::Max(0, minCellIndex.Y); y <= maxCellIndex.Y; y++)
-			{
-				if (y >= volume->GetSize())
-				{
-					break;
-				}
-
-				VVector voxelPos = volume->VoxelIndexToRelativePosition(VIntVector(x, y, 0));
-
-				if (IsPointInTriangle(VVector2D(voxelPos.X, voxelPos.Y), VVector2D(v1.Position.X, v1.Position.Y), VVector2D(v2.Position.X, v2.Position.Y), VVector2D(v3.Position.X, v3.Position.Y)))
-				{
-					bool intersectionFound = false;
-
-					for (int z = VMathHelpers::Max(0, minCellIndex.Z); z <= maxCellIndex.Z; z++)
-					{
-						VIntVector voxelIndex = VIntVector(x, y, z);
-
-						if (z < volume->GetSize() && IsTriangleInsideVoxelBounds(volume, voxelIndex, triangle))
-						{
-							intersectionFound = true;
-
-							Voxel::VVoxel v = volume->GetVoxel(voxelIndex);
-
-							if (v.Density > 0)
-							{
-								v.Density = -1;
-								v.Material = 1;
-
-								volume->SetVoxel(voxelIndex, v);
-							}
-						}
-						else if (intersectionFound)
-						{
-							break;
-						}
-					}
-
-					/*VVector relColumnPos = voxelPos - triangleMid;
-					relColumnPos.Z = 0.f;
-
-					relColumnPos = VVector::PlaneProjection(relColumnPos, triangleNormal);
-
-					VVector faceVoxelPos = relColumnPos + triangleMid;
-
-					VVoxelIndex faceVoxelIndex;
-
-					volume->RelativePositionToVoxelIndex(faceVoxelPos, faceVoxelIndex.X, faceVoxelIndex.Y, faceVoxelIndex.Z);
-
-					if (faceVoxelIndex.X >= 0 && faceVoxelIndex.Y >= 0 && faceVoxelIndex.Z >= 0 && volume->IsValidVoxelIndex(faceVoxelIndex.X, faceVoxelIndex.Y, faceVoxelIndex.Z))
-					{
-						Voxel::VVoxel v = volume->GetVoxel(faceVoxelIndex.X, faceVoxelIndex.Y, faceVoxelIndex.Z);
-
-						if (v.Density > 0)
-						{
-							v.Density = -1;
-							v.Material = 1;
-
-							volume->SetVoxel(faceVoxelIndex.X, faceVoxelIndex.Y, faceVoxelIndex.Z, v);
-						}
-					}*/
+					volume->SetVoxel(voxelIndex, voxel);
 				}
 			}
 		}
 	}
 }
 
-void VolumeRaytracer::Voxelizer::VVolumeConverter::VoxelizeTriangle(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v1, const VVertex& v2, const VVertex& v3)
+void VolumeRaytracer::Voxelizer::VVolumeConverter::VoxelizeTriangle(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v1, const VVertex& v2, const VVertex& v3, const float& surfaceThreshold)
 {
-	VoxelizeEdge(volume, v1, v2);
-	VoxelizeEdge(volume, v1, v3);
-	VoxelizeEdge(volume, v2, v3);
+	//VoxelizeEdge(volume, v1, v2);
+	//VoxelizeEdge(volume, v1, v3);
+	//VoxelizeEdge(volume, v2, v3);
 
-	VoxelizeFace(volume, v1, v2, v3);
+	VoxelizeFace(volume, v1, v2, v3, surfaceThreshold);
 }
 
 VolumeRaytracer::VIntVector VolumeRaytracer::Voxelizer::VVolumeConverter::GetCellIndex(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v)
@@ -787,4 +655,106 @@ bool VolumeRaytracer::Voxelizer::VVolumeConverter::ExtractResolutionFromName(con
 	}
 
 	return false;
+}
+
+VolumeRaytracer::VAABB VolumeRaytracer::Voxelizer::VVolumeConverter::GetTriangleBoundingBox(const VTriangle& triangle, const float& threshold)
+{
+	VAABB res;
+
+	VVector min = VVector::Min(triangle.V1, VVector::Min(triangle.V2, triangle.V3)) - VVector::ONE * threshold;
+	VVector max = VVector::Max(triangle.V1, VVector::Max(triangle.V2, triangle.V3)) + VVector::ONE * threshold;
+
+	res.SetCenterPosition((max - min) * 0.5f + min);
+	res.SetExtends((max - min) * 0.5f);
+
+	return res;
+}
+
+void VolumeRaytracer::Voxelizer::VVolumeConverter::GetVoxelizedBoundingBox(std::shared_ptr<Voxel::VVoxelVolume> volume, const VAABB& aabb, VIntVector& outMin, VIntVector& outMax, const float& threshold)
+{
+	VVector min = aabb.GetMin() - VVector::ONE * threshold;
+	VVector max = aabb.GetMax() + VVector::ONE * threshold;
+
+	outMin = volume->RelativePositionToVoxelIndex(min) - VIntVector::ONE;
+	outMax = volume->RelativePositionToVoxelIndex(max) + VIntVector::ONE;
+}
+
+VolumeRaytracer::Voxelizer::VTriangleRegions VolumeRaytracer::Voxelizer::VVolumeConverter::CalculateTriangleRegionVectors(const VTriangle& triangle)
+{
+	VTriangleRegions res;
+
+	res.ANorm = triangle.Normal;
+
+	res.BNorm = triangle.V3 - triangle.V1;
+	res.BLength = res.BNorm.Length();
+	res.BNorm.Normalize();
+
+	res.CNorm = triangle.V2 - triangle.V3;
+	res.CLength = res.CNorm.Length();
+	res.CNorm.Normalize();
+
+	res.DNorm = triangle.V1 - triangle.V2;
+	res.DLength = res.DNorm.Length();
+	res.DNorm.Normalize();
+
+	res.GNorm = VVector::Cross(res.DNorm, res.ANorm).GetNormalized();
+	res.ENorm = VVector::Cross(res.BNorm, res.ANorm).GetNormalized();
+	res.FNorm = VVector::Cross(res.CNorm, res.ANorm).GetNormalized();
+
+	return res;
+}
+
+VolumeRaytracer::Voxelizer::VTriangleRegionalVoxelDistances VolumeRaytracer::Voxelizer::VVolumeConverter::CalculateTriangleRegionDistances(const VTriangleRegions& regions, const VTriangle& triangle, const VVector& point)
+{
+	VTriangleRegionalVoxelDistances res;
+
+	VVector relV1 = point - triangle.V1;
+	VVector relV2 = point - triangle.V2;
+	VVector relV3 = point - triangle.V3;
+
+	res.A = relV1.Dot(regions.ANorm);
+	res.B = relV1.Dot(regions.BNorm);
+	res.C = relV3.Dot(regions.CNorm);
+	res.D = relV2.Dot(regions.DNorm);
+	res.E = relV1.Dot(regions.ENorm);
+	res.F = relV3.Dot(regions.FNorm);
+	res.G = relV2.Dot(regions.GNorm);
+
+	return res;
+}
+
+VolumeRaytracer::Voxelizer::EVTriangleRegion VolumeRaytracer::Voxelizer::VVolumeConverter::GetTriangleRegion(const VTriangleRegions& regions, const VTriangleRegionalVoxelDistances& distances)
+{
+	if (distances.E >= 0.f && distances.F >= 0.f && distances.G >= 0.f)
+	{
+		return EVTriangleRegion::R1;
+	}
+	else if (distances.D >= regions.DLength && distances.B <= 0.f)
+	{
+		return EVTriangleRegion::R5;
+	}
+	else if (distances.B >= regions.BLength && distances.C <= 0.f)
+	{
+		return EVTriangleRegion::R7;
+	}
+	else if (distances.C >= regions.CLength && distances.D <= 0.f)
+	{
+		return EVTriangleRegion::R6;
+	}
+	else if (distances.G <= 0.f && distances.D >= 0.f && distances.D <= regions.DLength)
+	{
+		return EVTriangleRegion::R2;
+	}
+	else if (distances.E <= 0.f && distances.B >= 0.f && distances.B <= regions.BLength)
+	{
+		return EVTriangleRegion::R4;
+	}
+	else if(distances.F <= 0.f && distances.C >= 0.f && distances.C <= regions.CLength)
+	{
+		return EVTriangleRegion::R3;
+	}
+	else
+	{
+		assert(1==2, "This code segment should not be reachable");
+	}
 }
