@@ -306,7 +306,12 @@ void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::UpdateVolumeTexture(std::wea
 		for (int i = 0; i < voxelCount; i++)
 		{
 			Voxel::VVoxel v = Desc.Volume->GetVoxel(i);
-			int pixelIndex = i * 4;
+
+			VIntVector voxelIndex3D = VMathHelpers::Index1DTo3D(i, Desc.Volume->GetSize(), Desc.Volume->GetSize());
+
+			voxelIndex3D = VIntVector(voxelIndex3D.Z, voxelIndex3D.X * 4, voxelIndex3D.Y);
+
+			int pixelIndex = VMathHelpers::Index3DTo1D(voxelIndex3D, Desc.Volume->GetSize() * 4, Desc.Volume->GetSize());
 
 			EncodeVoxel(v, pixels[pixelIndex], pixels[pixelIndex + 1], pixels[pixelIndex + 2]);
 			pixels[pixelIndex + 3] = v.Material;

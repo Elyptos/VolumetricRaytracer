@@ -13,8 +13,16 @@
 */
 
 #define HLSL
+//#define SHADER_DEBUG
 
 #include "RaytracingHlsl.h"
+
+#ifdef SHADER_DEBUG
+#include "Include/Debugging.hlsli"
+
+static const float LINE_THICKNESS = 0.5f;
+
+#endif
 
 RaytracingAccelerationStructure g_scene : register(t0, space0);
 
@@ -939,63 +947,71 @@ float ComputeSpotLightIntensity(in float3 surfacePoint, in float distanceToSurfa
 [shader("closesthit")]
 void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytracer::VPrimitiveAttributes attr)
 {
-	float3 hitPosition = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
-	float3 shadowRayOrigin = hitPosition - WorldRayDirection() * 0.1f;
-
-	//Trace for directional light
-	Ray shadowRay;
-	shadowRay.origin = shadowRayOrigin;
-	shadowRay.direction = g_sceneCB.dirLightDirection;
-
-	bool shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, 600.f);
-	
-	float diffuse = 0.1f;
-	
-	if (!shadowRayHit)
+	if(attr.unlit)
 	{
-		diffuse += (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);
+		rayPayload.color.rgb = attr.normal;
+		rayPayload.color.a = 1.f;		  
 	}
-
-	float distanceToLightSource = 0;
-	float lightIntensity = 0;
-	
-	for (int pi = 0; pi < g_sceneCB.numPointLights; pi++)
+	else
 	{
-		distanceToLightSource = length(g_pointLightsCB[pi].position - shadowRayOrigin);
-		lightIntensity = ComputePointLightIntensity(g_pointLightsCB[pi].lightIntensity, distanceToLightSource, g_pointLightsCB[pi].attLinear, g_pointLightsCB[pi].attExp);
-		
-		if(lightIntensity > 0.f)
+		float3 hitPosition = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
+		float3 shadowRayOrigin = hitPosition - WorldRayDirection() * 0.1f;
+
+		//Trace for directional light
+		Ray shadowRay;
+		shadowRay.origin = shadowRayOrigin;
+		shadowRay.direction = g_sceneCB.dirLightDirection;
+
+		bool shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, 600.f);
+	
+		float diffuse = 0.1f;
+	
+		if (!shadowRayHit)
 		{
-			shadowRay.direction = normalize(g_pointLightsCB[pi].position - shadowRayOrigin);
-			shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, distanceToLightSource);
-		
-			if(!shadowRayHit)
-			{
-				diffuse += lightIntensity;
-			}	 
+			diffuse += (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);
 		}
-	}
+
+		float distanceToLightSource = 0;
+		float lightIntensity = 0;
 	
-	for(int si = 0; si < g_sceneCB.numSpotLights; si++)
-	{
-		distanceToLightSource = length(g_spotLightsCB[si].position - shadowRayOrigin);
-		lightIntensity = ComputeSpotLightIntensity(shadowRayOrigin, distanceToLightSource, g_spotLightsCB[si].position, g_spotLightsCB[si].forward, g_spotLightsCB[si].lightIntensity, g_spotLightsCB[si].attLinear, g_spotLightsCB[si].attExp, g_spotLightsCB[si].cosAngle, g_spotLightsCB[si].cosFalloffAngle);
-		
-		if(lightIntensity > 0.f)
+		for (int pi = 0; pi < g_sceneCB.numPointLights; pi++)
 		{
-			shadowRay.direction = normalize(g_spotLightsCB[si].position - shadowRayOrigin);
-			shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, distanceToLightSource);
+			distanceToLightSource = length(g_pointLightsCB[pi].position - shadowRayOrigin);
+			lightIntensity = ComputePointLightIntensity(g_pointLightsCB[pi].lightIntensity, distanceToLightSource, g_pointLightsCB[pi].attLinear, g_pointLightsCB[pi].attExp);
 		
-			if(!shadowRayHit)
+			if(lightIntensity > 0.f)
 			{
-				diffuse += lightIntensity;
-			}	 
+				shadowRay.direction = normalize(g_pointLightsCB[pi].position - shadowRayOrigin);
+				shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, distanceToLightSource);
+		
+				if(!shadowRayHit)
+				{
+					diffuse += lightIntensity;
+				}	 
+			}
 		}
-	}
 	
-	rayPayload.color.rgb = float3(1.f, 1.f, 1.f) * (diffuse * 0.01f);
-	//rayPayload.color.rgb = attr.normal;
-	rayPayload.color.a = 1.f;
+		for(int si = 0; si < g_sceneCB.numSpotLights; si++)
+		{
+			distanceToLightSource = length(g_spotLightsCB[si].position - shadowRayOrigin);
+			lightIntensity = ComputeSpotLightIntensity(shadowRayOrigin, distanceToLightSource, g_spotLightsCB[si].position, g_spotLightsCB[si].forward, g_spotLightsCB[si].lightIntensity, g_spotLightsCB[si].attLinear, g_spotLightsCB[si].attExp, g_spotLightsCB[si].cosAngle, g_spotLightsCB[si].cosFalloffAngle);
+		
+			if(lightIntensity > 0.f)
+			{
+				shadowRay.direction = normalize(g_spotLightsCB[si].position - shadowRayOrigin);
+				shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, distanceToLightSource);
+		
+				if(!shadowRayHit)
+				{
+					diffuse += lightIntensity;
+				}	 
+			}
+		}
+	
+		rayPayload.color.rgb = float3(1.f, 1.f, 1.f) * (diffuse * 0.01f);
+		//rayPayload.color.rgb = attr.normal;
+		rayPayload.color.a = 1.f;	  
+	}
 }
 
 [shader("intersection")]
@@ -1035,15 +1051,16 @@ void VRIntersection()
 
 			octreeNode = GetOctreeNode(currentVoxelPos);
 			
-			//if(octreeNode.nodePos.x == -100)
-			//{
-			//	VolumeRaytracer::VPrimitiveAttributes attr;
-			//	attr.normal = float3(1, 1, 1);
+			if (octreeNode.size == -10)
+			{
+				VolumeRaytracer::VPrimitiveAttributes attr;
+				attr.normal = float3(1, 1, 1);
+				attr.unlit = true;
+				
+				ReportHit(10, 0, attr);
 
-			//	ReportHit(10, 0, attr);
-
-			//	return;
-			//}
+				return;
+			}
 		}
 		else
 		{
@@ -1097,6 +1114,19 @@ void VRIntersection()
 
 			if (IsValidCell(currentVoxelPos))
 			{
+				#ifdef SHADER_DEBUG
+					if(DoesRayHitOctreeBounds(GetPositionAlongRay(localRay, cellEnter), octreeNode.nodePos, octreeNode.size, LINE_THICKNESS))
+					{
+						VolumeRaytracer::VPrimitiveAttributes attr;
+						attr.normal = float3(1, 0, 0);
+						attr.unlit = true;
+					
+						ReportHit(cellEnter, 0, attr);
+
+						return;
+					}
+				#endif
+				
 				nextVoxelPos = GoToNextVoxel(localRay, octreeNode.nodePos, octreeNode.size, cellExit);
 				
 				//if (cell.v8 == -1.f)
@@ -1122,8 +1152,10 @@ void VRIntersection()
 					{
 						VolumeRaytracer::VPrimitiveAttributes attr;
 						attr.normal = GetNormal(currentVoxelPos, WorldSpaceToBottomLevelCellSpace(currentVoxelPos, octreeNode.size, GetPositionAlongRay(localRay, tHit)));
-
+						
 						ReportHit(tHit, 0, attr);
+						
+						return;
 					}
 					//else
 					//{
@@ -1140,14 +1172,26 @@ void VRIntersection()
 
 				//VolumeRaytracer::VPrimitiveAttributes attr;
 				//attr.normal = float3(0, 1, 0);
-
-				//ReportHit(10, 0, attr);
-
-				//return;
+				//attr.unlit = true;
 				
-				break;
+				//ReportHit(10, 0, attr);
+				
+				return;
 			}
 
+			#ifdef SHADER_DEBUG
+				if(!IsValidCell(nextVoxelPos) && DoesRayHitOctreeBounds(GetPositionAlongRay(localRay, cellExit), octreeNode.nodePos, octreeNode.size, LINE_THICKNESS))
+				{
+					VolumeRaytracer::VPrimitiveAttributes attr;
+					attr.normal = float3(1, 0, 0);
+					attr.unlit = true;
+					
+					ReportHit(cellExit, 0, attr);
+
+					return;
+				}
+			#endif
+			
 			currentVoxelPos = nextVoxelPos;
 			octreeNode = GetOctreeNode(nextVoxelPos);
 		}

@@ -211,7 +211,7 @@ void VolumeRaytracer::Voxel::VVoxelVolume::GenerateGPUOctreeStructure(std::vecto
 {
 	VCellOctree octree(Resolution, Voxels);
 
-	//octree.CollapseTree();
+	octree.CollapseTree();
 	octree.GetGPUOctreeStructure(outNodes, outNodeAxisCount);
 }
 

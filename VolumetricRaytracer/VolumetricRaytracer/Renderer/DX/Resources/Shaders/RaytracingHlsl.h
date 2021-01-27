@@ -36,6 +36,7 @@ namespace VolumeRaytracer
 	struct VPrimitiveAttributes
 	{
 		XMFLOAT3 normal;
+		bool unlit;
 	};
 
 	struct VRayPayload
