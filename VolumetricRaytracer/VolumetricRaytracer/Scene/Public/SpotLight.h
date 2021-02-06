@@ -27,6 +27,10 @@ namespace VolumeRaytracer
 			float AttenuationExp = 0.005f;
 			float FalloffAngle = 20.f;
 			float Angle = 45.f;
+
+		protected:
+			std::shared_ptr<VSerializationArchive> Serialize() const override;
+			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
 		};
 	}
 }

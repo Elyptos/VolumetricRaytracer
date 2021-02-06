@@ -19,6 +19,8 @@
 #include "VolumeConverter.h"
 #include <iostream>
 #include <string>
+#include "PointLight.h"
+#include "../../VolumetricRaytracer/Scene/Public/SpotLight.h"
 
 VolumeRaytracer::VObjectPtr<VolumeRaytracer::Scene::VScene> VolumeRaytracer::Voxelizer::VSceneConverter::ConvertSceneInfoToScene(const VSceneInfo& sceneInfo)
 {
@@ -42,6 +44,45 @@ VolumeRaytracer::VObjectPtr<VolumeRaytracer::Scene::VScene> VolumeRaytracer::Vox
 		VObjectPtr<Scene::VVoxelObject> obj = scene->SpawnObject<Scene::VVoxelObject>(object.Position, object.Rotation, object.Scale);
 
 		obj->SetVoxelVolume(volumes[object.MeshID]);
+	}
+
+	std::cout << "Converting lights" << std::endl;
+
+	for (const auto& light : sceneInfo.Lights)
+	{
+		switch (light.LightType)
+		{
+		case ELightType::POINT:
+		{
+			VObjectPtr<Scene::VPointLight> pointLight = scene->SpawnObject<Scene::VPointLight>(light.Position, light.Rotation, VVector::ONE);
+
+			pointLight->Color = light.Color;
+			pointLight->IlluminationStrength = light.Intensity;
+			pointLight->AttenuationExp = light.AttExp;
+			pointLight->AttenuationLinear = light.AttL;
+		}
+		break;
+		case ELightType::SPOT:
+		{
+			VObjectPtr<Scene::VSpotLight> spotLight = scene->SpawnObject<Scene::VSpotLight>(light.Position, light.Rotation, VVector::ONE);
+
+			spotLight->Color = light.Color;
+			spotLight->IlluminationStrength = light.Intensity;
+			spotLight->AttenuationExp = light.AttExp;
+			spotLight->AttenuationLinear = light.AttL;
+			spotLight->Angle = light.Angle;
+			spotLight->FalloffAngle = light.FalloffAngle;
+		}
+		break;
+		default:
+		{
+			VObjectPtr<Scene::VLight> pointLight = scene->SpawnObject<Scene::VLight>(light.Position, light.Rotation, VVector::ONE);
+
+			pointLight->Color = light.Color;
+			pointLight->IlluminationStrength = light.Intensity;
+		}
+		break;	
+		}
 	}
 
 	std::cout << "Scene conversion finished" << std::endl;

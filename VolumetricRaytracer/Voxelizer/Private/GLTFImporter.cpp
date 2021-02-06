@@ -13,9 +13,9 @@
 */
 
 #include "GLTFImporter.h"
-#include "SceneInfo.h"
 #include <GLTFSDK/Document.h>
 #include <GLTFSDK/GLTFResourceReader.h>
+#include <rapidjson/document.h>
 #include <iostream>
 
 std::shared_ptr<VolumeRaytracer::Voxelizer::VSceneInfo> VolumeRaytracer::Voxelizer::VGLTFImporter::ImportScene(const Microsoft::glTF::Document* document, const Microsoft::glTF::GLTFResourceReader* resourceReader)
@@ -152,7 +152,7 @@ std::shared_ptr<VolumeRaytracer::Voxelizer::VSceneInfo> VolumeRaytracer::Voxeliz
 		sceneInfo->Meshes[mesh.id] = meshInfo;
 	}
 
-	std::cout << "[INFO] Importing objects with meshes" << std::endl;
+	std::cout << "[INFO] Importing objects" << std::endl;
 
 	for (size_t i = 0; i < document->nodes.Size(); i++)
 	{
@@ -171,6 +171,10 @@ std::shared_ptr<VolumeRaytracer::Voxelizer::VSceneInfo> VolumeRaytracer::Voxeliz
 
 			sceneInfo->Objects.push_back(objectInfo);
 		}
+		else if (IsLight(&node))
+		{
+			sceneInfo->Lights.push_back(GetLightInfo(&node));
+		}
 		else
 		{
 			std::cout << "[INFO] Skipping non geometry object." << std::endl;
@@ -178,4 +182,74 @@ std::shared_ptr<VolumeRaytracer::Voxelizer::VSceneInfo> VolumeRaytracer::Voxeliz
 	}
 
 	return sceneInfo;
+}
+
+bool VolumeRaytracer::Voxelizer::VGLTFImporter::IsLight(const Microsoft::glTF::Node* node)
+{
+	return node->name.find("Light") == 0;
+}
+
+VolumeRaytracer::Voxelizer::VLightInfo VolumeRaytracer::Voxelizer::VGLTFImporter::GetLightInfo(const Microsoft::glTF::Node* node)
+{
+	VLightInfo lightInfo;
+	
+	lightInfo.LightType = ELightType::DIRECTIONAL;
+	lightInfo.Position = VVector(node->translation.x, node->translation.y, node->translation.z) * 100.f;
+	lightInfo.Rotation = VQuat(node->rotation.x, node->rotation.y, node->rotation.z, node->rotation.w);
+
+	size_t delimiterIndex = node->name.find('_');
+
+	if (delimiterIndex != std::string::npos)
+	{
+		std::string typeString = node->name.substr(delimiterIndex + 1, delimiterIndex - node->name.size());
+
+		if (typeString.find("Point") == 0)
+		{
+			lightInfo.LightType = ELightType::POINT;
+		}
+		else if (typeString.find("Spot") == 0)
+		{
+			lightInfo.LightType = ELightType::SPOT;
+		}
+	}
+
+	rapidjson::Document document;
+
+	if (!document.Parse(node->extras.c_str()).HasParseError())
+	{
+		if (document.IsObject())
+		{
+			if (document.HasMember("strength") && document["strength"].IsNumber())
+			{
+				lightInfo.Intensity = document["strength"].GetFloat();
+			}
+
+			if (document.HasMember("color_r") && document["color_r"].IsNumber() && document.HasMember("color_g") && document["color_g"].IsNumber() && document.HasMember("color_b") && document["color_b"].IsNumber())
+			{
+				lightInfo.Color = VColor(document["color_r"].GetFloat(), document["color_g"].GetFloat(), document["color_b"].GetFloat(), 1.f);
+			}
+
+			if (document.HasMember("attl") && document["attl"].IsNumber())
+			{
+				lightInfo.AttL = document["attl"].GetFloat();
+			}
+
+			if (document.HasMember("attexp") && document["attexp"].IsNumber())
+			{
+				lightInfo.AttExp = document["attexp"].GetFloat();
+			}
+
+			if (document.HasMember("fangle") && document["fangle"].IsNumber())
+			{
+				lightInfo.FalloffAngle = document["fangle"].GetFloat();
+			}
+
+			if (document.HasMember("angle") && document["angle"].IsNumber())
+			{
+				lightInfo.Angle = document["angle"].GetFloat();
+			}
+		}
+	}
+
+	return lightInfo;
 }

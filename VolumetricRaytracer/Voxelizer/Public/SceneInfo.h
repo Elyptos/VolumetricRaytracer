@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include <boost/unordered_map.hpp>
+#include <Color.h>
 
 namespace VolumeRaytracer
 {
@@ -46,10 +47,32 @@ namespace VolumeRaytracer
 			VQuat Rotation;
 		};
 
+		enum class ELightType
+		{
+			DIRECTIONAL,
+			POINT,
+			SPOT
+		};
+
+		struct VLightInfo
+		{
+		public:
+			VVector Position;
+			VQuat Rotation;
+			ELightType LightType;
+			VColor Color = VColor::WHITE;
+			float Intensity = 0.f;
+			float AttL = 0.f;
+			float AttExp = 0.f;
+			float FalloffAngle = 0.f;
+			float Angle = 0.f;
+		};
+
 		struct VSceneInfo
 		{
 			boost::unordered_map<std::string, VMeshInfo> Meshes;
 			std::vector<VObjectInfo> Objects;
+			std::vector<VLightInfo> Lights;
 		};
 	}
 }

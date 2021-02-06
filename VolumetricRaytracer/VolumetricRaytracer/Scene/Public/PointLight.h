@@ -25,6 +25,9 @@ namespace VolumeRaytracer
 		public:
 			float AttenuationLinear = 0.5f;
 			float AttenuationExp = 0.005f;
+		protected:
+			std::shared_ptr<VSerializationArchive> Serialize() const override;
+			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
 		};
 	}
 }

@@ -33,13 +33,25 @@ ExternalProject_Add(Eigen3
 	LOG_DOWNLOAD ON
 )
 
+ExternalProject_Add(rapidjson
+	PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/ext/rapidjson
+	GIT_REPOSITORY https://github.com/Tencent/rapidjson.git
+	GIT_TAG v1.1.0
+	GIT_PROGRESS 1
+	UPDATE_COMMAND ""
+	INSTALL_COMMAND ""
+	BUILD_COMMAND ""
+	LOG_DOWNLOAD ON
+)
+
 ExternalProject_Get_Property(spdlog source_dir)
 set(spdlogIncludeDir ${source_dir}/include)
 
 ExternalProject_Get_Property(Eigen3 source_dir)
 set(eigenIncludeDir ${source_dir})
 
-
+ExternalProject_Get_Property(rapidjson source_dir)
+set(rapidjsonIncludeDir ${source_dir}/include)
 
 #gltf
 ExternalProject_Add(gltf
