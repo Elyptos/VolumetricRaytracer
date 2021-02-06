@@ -39,6 +39,7 @@ RWTexture2D<float4> g_renderTarget : register(u0);
 ConstantBuffer<VolumeRaytracer::VSceneConstantBuffer> g_sceneCB : register(b0);
 
 static const float PI = 3.141592f;
+static const float SHADOW_BRIGHTNESS = 5.f;
 
 struct Ray
 {
@@ -788,11 +789,6 @@ bool GetSurfaceIntersectionT(in Ray ray, in int3 cellIndex, in float cellSize, i
 
 	GetDensityPolynomial(ray, cellIndex, cellSize, tIn, tOut, A, B, C, D);
 
-	//if (A == 0)
-	//{
-	//	return false;
-	//}
-
 	float dA = 3 * A;
 	float dB = 2 * B;
 
@@ -962,9 +958,9 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 		shadowRay.origin = shadowRayOrigin;
 		shadowRay.direction = g_sceneCB.dirLightDirection;
 
-		bool shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, 600.f);
+		bool shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, 5000.f);
 	
-		float diffuse = 0.1f;
+		float diffuse = SHADOW_BRIGHTNESS;
 	
 		if (!shadowRayHit)
 		{
@@ -1050,17 +1046,6 @@ void VRIntersection()
 			cellExit = tEnter;
 
 			octreeNode = GetOctreeNode(currentVoxelPos);
-			
-			if (octreeNode.size == -10)
-			{
-				VolumeRaytracer::VPrimitiveAttributes attr;
-				attr.normal = float3(1, 1, 1);
-				attr.unlit = true;
-				
-				ReportHit(10, 0, attr);
-
-				return;
-			}
 		}
 		else
 		{
@@ -1075,7 +1060,7 @@ void VRIntersection()
 			cellExit += 0.01;
 		}
 
-		int maxIterations = 3000;
+		int maxIterations = 255;
 
 		if (IsValidCell(currentVoxelPos) && IsSolidCell(currentVoxelPos, instance))
 		{
@@ -1100,7 +1085,8 @@ void VRIntersection()
 			}
 
 			attr.normal = normalize(attr.normal);
-
+			attr.unlit = false;
+			
 			ReportHit(tEnter, 0, attr);
 
 			return;
@@ -1143,7 +1129,8 @@ void VRIntersection()
 				{
 					//VolumeRaytracer::VPrimitiveAttributes attr;
 					//attr.normal = float3(1, 1, 1);
-
+					//attr.unlit = true;
+					
 					//ReportHit(10, 0, attr);
 
 					//return;
@@ -1152,6 +1139,7 @@ void VRIntersection()
 					{
 						VolumeRaytracer::VPrimitiveAttributes attr;
 						attr.normal = GetNormal(currentVoxelPos, WorldSpaceToBottomLevelCellSpace(currentVoxelPos, octreeNode.size, GetPositionAlongRay(localRay, tHit)));
+						attr.unlit = false;
 						
 						ReportHit(tHit, 0, attr);
 						
@@ -1200,7 +1188,8 @@ void VRIntersection()
 		{
 			VolumeRaytracer::VPrimitiveAttributes attr;
 			attr.normal = float3(1, 0, 0);
-
+			attr.unlit = true;
+			
 			ReportHit(10, 0, attr);
 
 			return;
