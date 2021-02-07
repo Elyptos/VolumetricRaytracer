@@ -379,6 +379,14 @@ void VolumeRaytracer::App::RendererEngineInstance::InitCube()
 		}
 	}
 
+	VMaterial material = voxelVolume->GetMaterial();
+
+	material.AlbedoColor = VColor::BLUE;
+	material.Roughness = 0.1f;
+	material.Metallic = 0.f;
+
+	voxelVolume->SetMaterial(material);
+
 	Cube->SetVoxelVolume(voxelVolume);
 }
 

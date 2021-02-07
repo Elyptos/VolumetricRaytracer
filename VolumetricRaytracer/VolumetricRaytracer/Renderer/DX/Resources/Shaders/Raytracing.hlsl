@@ -970,6 +970,19 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 		float roughness = g_geometryCB[InstanceID()].roughness;
 		float metallness = g_geometryCB[InstanceID()].metallness;
 		
+		float3 reflactanceColor = float3(0,0,0);
+		
+		if(roughness < 0.5f)
+		{
+			Ray reflectionRay;
+			reflectionRay.origin = shadowRayOrigin;
+			reflectionRay.direction = normalize(WorldRayDirection() - 2 * dot(WorldRayDirection(), attr.normal) * attr.normal);
+			
+			reflactanceColor = TraceRadianceRay(reflectionRay, rayPayload.depth).rgb;
+			
+			diffuse += Radiance(reflactanceColor, reflectionRay.direction, -WorldRayDirection(), attr.normal, albedo, roughness, metallness, k);
+		}
+		
 		if (!shadowRayHit)
 		{
 			diffuse += Radiance(Li, -g_sceneCB.dirLightDirection, -WorldRayDirection(), attr.normal, albedo, roughness, metallness, k);
