@@ -86,6 +86,9 @@ namespace VolumeRaytracer
 	struct VGeometryConstantBuffer
 	{
 		XMFLOAT4 tint;
+		float roughness;
+		float metallness;
+		float k;
 		UINT voxelAxisCount;
 		float volumeExtend;
 		float distanceBtwVoxels;

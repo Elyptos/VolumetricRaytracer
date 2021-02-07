@@ -16,6 +16,7 @@
 //#define SHADER_DEBUG
 
 #include "RaytracingHlsl.h"
+#include "Include/Lighting.hlsli"
 
 #ifdef SHADER_DEBUG
 #include "Include/Debugging.hlsli"
@@ -37,9 +38,6 @@ SamplerState g_envMapSampler : register(s0);
 
 RWTexture2D<float4> g_renderTarget : register(u0);
 ConstantBuffer<VolumeRaytracer::VSceneConstantBuffer> g_sceneCB : register(b0);
-
-static const float PI = 3.141592f;
-static const float SHADOW_BRIGHTNESS = 5.f;
 
 struct Ray
 {
@@ -903,8 +901,12 @@ void VRRaygen()
 
 	uint currentRecursionDepth = 0;
 	float4 color = TraceRadianceRay(ray, currentRecursionDepth);
-
-	g_renderTarget[DispatchRaysIndex().xy] = color;
+	
+	float3 colorRGB = color.rgb;
+	colorRGB = colorRGB / (colorRGB + 1.0f);
+	colorRGB = pow(colorRGB, 1.0f / 2.2);
+	
+	g_renderTarget[DispatchRaysIndex().xy] = float4(colorRGB, 1.0f);
 }
 
 float ComputePointLightIntensity(in float intensity, in float distance, in float attL, in float attExp)
@@ -960,11 +962,19 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 
 		bool shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, 5000.f);
 	
-		float diffuse = SHADOW_BRIGHTNESS;
-	
+		float3 diffuse = float3(SHADOW_BRIGHTNESS, SHADOW_BRIGHTNESS, SHADOW_BRIGHTNESS);
+		float3 Li = float3(g_sceneCB.dirLightStrength, g_sceneCB.dirLightStrength, g_sceneCB.dirLightStrength);
+		
+		float3 albedo = g_geometryCB[InstanceID()].tint.rgb;
+		float k = g_geometryCB[InstanceID()].k;
+		float roughness = g_geometryCB[InstanceID()].roughness;
+		float metallness = g_geometryCB[InstanceID()].metallness;
+		
 		if (!shadowRayHit)
 		{
-			diffuse += (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);
+			diffuse += Radiance(Li, -g_sceneCB.dirLightDirection, -WorldRayDirection(), attr.normal, albedo, roughness, metallness, k);
+			
+			//diffuse += (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);
 		}
 
 		float distanceToLightSource = 0;
@@ -975,36 +985,40 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 			distanceToLightSource = length(g_pointLightsCB[pi].position - shadowRayOrigin);
 			lightIntensity = ComputePointLightIntensity(g_pointLightsCB[pi].lightIntensity, distanceToLightSource, g_pointLightsCB[pi].attLinear, g_pointLightsCB[pi].attExp);
 		
-			if (lightIntensity > 0.f)
+			Li = g_pointLightsCB[pi].color.rgb * lightIntensity;
+			
+			if (lightIntensity > 0.01f)
 			{
 				shadowRay.direction = normalize(g_pointLightsCB[pi].position - shadowRayOrigin);
 				shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, distanceToLightSource);
 		
 				if (!shadowRayHit)
 				{
-					diffuse += lightIntensity;
+					diffuse += Radiance(Li, shadowRay.direction, -WorldRayDirection(), attr.normal, albedo, roughness, metallness, k);
+					
+					//diffuse = float3(1.f, 1.f, 1.f);
 				}
 			}
 		}
 	
-		for (int si = 0; si < g_sceneCB.numSpotLights; si++)
-		{
-			distanceToLightSource = length(g_spotLightsCB[si].position - shadowRayOrigin);
-			lightIntensity = ComputeSpotLightIntensity(shadowRayOrigin, distanceToLightSource, g_spotLightsCB[si].position, g_spotLightsCB[si].forward, g_spotLightsCB[si].lightIntensity, g_spotLightsCB[si].attLinear, g_spotLightsCB[si].attExp, g_spotLightsCB[si].cosAngle, g_spotLightsCB[si].cosFalloffAngle);
+		//for (int si = 0; si < g_sceneCB.numSpotLights; si++)
+		//{
+		//	distanceToLightSource = length(g_spotLightsCB[si].position - shadowRayOrigin);
+		//	lightIntensity = ComputeSpotLightIntensity(shadowRayOrigin, distanceToLightSource, g_spotLightsCB[si].position, g_spotLightsCB[si].forward, g_spotLightsCB[si].lightIntensity, g_spotLightsCB[si].attLinear, g_spotLightsCB[si].attExp, g_spotLightsCB[si].cosAngle, g_spotLightsCB[si].cosFalloffAngle);
 		
-			if (lightIntensity > 0.f)
-			{
-				shadowRay.direction = normalize(g_spotLightsCB[si].position - shadowRayOrigin);
-				shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, distanceToLightSource);
+		//	if (lightIntensity > 0.f)
+		//	{
+		//		shadowRay.direction = normalize(g_spotLightsCB[si].position - shadowRayOrigin);
+		//		shadowRayHit = TraceShadowRay(shadowRay, rayPayload.depth, distanceToLightSource);
 		
-				if (!shadowRayHit)
-				{
-					diffuse += lightIntensity;
-				}
-			}
-		}
-	
-		rayPayload.color.rgb = float3(1.f, 1.f, 1.f) * (diffuse * 0.01f);
+		//		if (!shadowRayHit)
+		//		{
+		//			diffuse += lightIntensity;
+		//		}
+		//	}
+		//}
+		
+		rayPayload.color.rgb = diffuse;
 		//rayPayload.color.rgb = attr.normal;
 		rayPayload.color.a = 1.f;
 	}

@@ -20,8 +20,8 @@ namespace VolumeRaytracer
 	struct VMaterial
 	{
 	public:
-		VColor AlbedoColor;
-		float Roughness;
-		float Metallic;
+		VColor AlbedoColor = VColor(0.8f, 0.8f, 0.8f, 1.f);
+		float Roughness = 0.8f;
+		float Metallic = 0.f;
 	};
 }

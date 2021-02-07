@@ -373,6 +373,9 @@ void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::UpdateGeometryConstantBuffer
 		VMaterial volumeMaterial = Desc.Volume->GetMaterial();
 
 		constantBufferData.tint = DirectX::XMFLOAT4(volumeMaterial.AlbedoColor.R, volumeMaterial.AlbedoColor.G, volumeMaterial.AlbedoColor.B, volumeMaterial.AlbedoColor.A);
+		constantBufferData.roughness = volumeMaterial.Roughness;
+		constantBufferData.metallness = volumeMaterial.Metallic;
+		constantBufferData.k = std::pow(volumeMaterial.Roughness + 1, 2) / 8.f;
 		constantBufferData.voxelAxisCount = Desc.Volume->GetSize();
 		constantBufferData.volumeExtend = Desc.Volume->GetVolumeExtends();
 		constantBufferData.distanceBtwVoxels = (constantBufferData.volumeExtend * 2) / (constantBufferData.voxelAxisCount - 1);

@@ -153,21 +153,21 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
 	Scene = VObject::CreateObject<Scene::VScene>();
 
-	LoadSceneFromFile("../Voxelizer/Church.vox");
+	//LoadSceneFromFile("../Voxelizer/Church.vox");
 	Camera = Scene->SpawnObject<Scene::VCamera>(VVector(300.f, 0.f, 100.f), VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f)), VVector::ONE);
 
 	DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
 		* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, -135.f * (M_PI / 180.f)), VVector::ONE);
-	DirectionalLight->IlluminationStrength = 100.f;
+	DirectionalLight->IlluminationStrength = 0.f;
 
 	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
 	Scene->SetActiveSceneCamera(Camera);
-	//Scene->SetActiveDirectionalLight(DirectionalLight);
+	Scene->SetActiveDirectionalLight(DirectionalLight);
 
-	///*VObjectPtr<Scene::VPointLight> pointLight = Scene->SpawnObject<Scene::VPointLight>(VVector(0.f, 0.f, 100.f), VQuat::IDENTITY, VVector::ZERO);
-	//pointLight->IlluminationStrength = 100.f;
-	//pointLight->AttenuationLinear = 0.5f;
-	//pointLight->AttenuationExp = 0.005f;*/
+	VObjectPtr<Scene::VPointLight> pointLight = Scene->SpawnObject<Scene::VPointLight>(VVector(50.f, 50.f, 100.f), VQuat::IDENTITY, VVector::ZERO);
+	pointLight->IlluminationStrength = 10.f;
+	pointLight->AttenuationLinear = 0.5f;
+	pointLight->AttenuationExp = 0.005f;
 
 	//VObjectPtr<Scene::VSpotLight> spotLight = Scene->SpawnObject<Scene::VSpotLight>(VVector(-100.f, 0.f, 100.f), VQuat::FromEulerAnglesDegrees(0.f, 0.f, 45.f), VVector::ZERO);
 	//spotLight->Angle = 120.f;
@@ -176,14 +176,14 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 	//spotLight->AttenuationLinear = 0.f;
 
 	//Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-	//Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
-	//Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-	//Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);
+	Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
+	Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+	Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);
 
 	////InitSnowmanObject();
-	//InitFloor();
-	//InitSphere();
-	//InitCube();
+	InitFloor();
+	InitSphere();
+	InitCube();
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
@@ -278,13 +278,13 @@ void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 {
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(2, 100.f);
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(6, 100.f);
 
 	Voxel::VVoxel voxel;
 	voxel.Material = 1;
 	voxel.Density = -10;
 
-	voxelVolume->SetVoxel(VIntVector(0,3,0), voxel);
+	//voxelVolume->SetVoxel(VIntVector(0,3,0), voxel);
 
 	//VIntVector offset = VIntVector(1,1,1) * 14;
 
@@ -298,7 +298,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 	//voxelVolume->SetVoxel(VIntVector(2, 2, 2) + offset, voxel);
 
 
-	/*VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
+	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
 
 	std::shared_ptr<Scene::VSphere> sphere = std::make_shared<Scene::VSphere>();
 
@@ -331,7 +331,15 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 				voxelVolume->SetVoxel(voxelIndex, voxel);
 			}
 		}
-	}*/
+	}
+
+	VMaterial material = voxelVolume->GetMaterial();
+
+	material.AlbedoColor = VColor::RED;
+	material.Roughness = 0.1f;
+	material.Metallic = 0.6f;
+
+	voxelVolume->SetMaterial(material);
 
 	Sphere->SetVoxelVolume(voxelVolume);
 }

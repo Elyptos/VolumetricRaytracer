@@ -26,7 +26,7 @@ namespace VolumeRaytracer
 		{
 		public:
 			float IlluminationStrength = 1.f;
-			VColor Color;
+			VColor Color = VColor::WHITE;
 
 		protected:
 			void Initialize() override;
