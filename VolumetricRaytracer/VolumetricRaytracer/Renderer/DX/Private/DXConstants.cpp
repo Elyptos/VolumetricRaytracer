@@ -32,6 +32,8 @@ const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_CLOS
 
 const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_INTERSECTION(L"VRIntersection");
 
+const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_INTERSECTION_SHADOW(L"VRIntersectionShadowRay");
+
 const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_MISS(L"VRMiss");
 
 const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_MISS_SHADOW(L"VRMissShadowRay");

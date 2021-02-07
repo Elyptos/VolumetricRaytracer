@@ -689,7 +689,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::CreateHitGroups(CD3DX12_STATE_O
 	//Shadow rays
 	CD3DX12_HIT_GROUP_SUBOBJECT* shadowHitGroup = pipelineDesc->CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
 
-	shadowHitGroup->SetIntersectionShaderImport(VDXConstants::SHADER_NAME_INTERSECTION.c_str());
+	shadowHitGroup->SetIntersectionShaderImport(VDXConstants::SHADER_NAME_INTERSECTION_SHADOW.c_str());
 	shadowHitGroup->SetHitGroupExport(VDXConstants::SHADOW_HIT_GROUP.c_str());
 	shadowHitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE);
 }

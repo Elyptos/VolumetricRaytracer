@@ -37,6 +37,7 @@ namespace VolumeRaytracer
 				static const std::wstring SHADER_NAME_RAYGEN;
 				static const std::wstring SHADER_NAME_CLOSEST_HIT;
 				static const std::wstring SHADER_NAME_INTERSECTION;
+				static const std::wstring SHADER_NAME_INTERSECTION_SHADOW;
 				static const std::wstring SHADER_NAME_MISS;
 				static const std::wstring SHADER_NAME_MISS_SHADOW;
 			};

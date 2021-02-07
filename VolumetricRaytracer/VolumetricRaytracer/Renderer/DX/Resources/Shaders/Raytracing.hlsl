@@ -1211,6 +1211,108 @@ void VRIntersection()
 	}
 }
 
+[shader("intersection")]
+void VRIntersectionShadowRay()
+{
+	uint instance = InstanceID();
+	
+	Ray ray;
+
+	ray.origin = WorldRayOrigin();
+	ray.direction = WorldRayDirection();
+
+	Ray localRay = GetLocalRay();
+
+	//Check if we intersect voxel volume
+	float3 volumeAABB[2] = {float3(-g_geometryCB[instance].volumeExtend, -g_geometryCB[instance].volumeExtend, -g_geometryCB[instance].volumeExtend), float3(g_geometryCB[instance].volumeExtend, g_geometryCB[instance].volumeExtend, g_geometryCB[instance].volumeExtend)};
+	float tEnter, tExit;
+
+	float tMax = RayTCurrent();
+
+	if (DetermineRayAABBIntersection(localRay, volumeAABB, tEnter, tExit))
+	{
+		int3 nextVoxelPos;
+		int3 currentVoxelPos;
+		float cellExit;
+		float cellEnter;
+		float tHit;
+		
+		VoxelOctreeNode octreeNode;
+
+		if (tEnter >= 0)
+		{
+			tEnter += 0.01;
+
+			currentVoxelPos = WorldSpaceToVoxelSpace(GetPositionAlongRay(localRay, tEnter));
+			cellExit = tEnter;
+
+			octreeNode = GetOctreeNode(currentVoxelPos);
+		}
+		else
+		{
+			currentVoxelPos = WorldSpaceToVoxelSpace(localRay.origin);
+
+			octreeNode = GetOctreeNode(currentVoxelPos);
+
+			//Cell exit is behind the ray origin, to calculate it we traverse in the opposite direction.
+			cellExit = CalculateCellExit(ReverseRay(localRay), octreeNode.nodePos, octreeNode.size);
+
+			cellExit = -cellExit;
+			cellExit += 0.01;
+		}
+
+		int maxIterations = 255;
+
+		if (IsValidCell(currentVoxelPos) && IsSolidCell(currentVoxelPos, instance))
+		{
+			float3 rayPos = GetPositionAlongRay(localRay, tEnter - 0.1);
+
+			VolumeRaytracer::VPrimitiveAttributes attr = { float3(0,0,0), true };
+			ReportHit(tEnter, 0, attr);
+
+			return;
+		}
+
+		while (cellExit <= tExit && maxIterations > 0)
+		{
+			maxIterations--;
+
+			cellEnter = cellExit;
+
+			if (IsValidCell(currentVoxelPos))
+			{
+				nextVoxelPos = GoToNextVoxel(localRay, octreeNode.nodePos, octreeNode.size, cellExit);
+
+				if (HasIsoSurfaceInsideCell(instance, currentVoxelPos))
+				{
+					if (GetSurfaceIntersectionT(localRay, currentVoxelPos, octreeNode.size, cellEnter, cellExit, tHit))
+					{
+						VolumeRaytracer::VPrimitiveAttributes attr = { float3(0,0,0), true };
+						ReportHit(tHit, 0, attr);
+						
+						return;
+					}
+				}
+			}
+			else
+			{
+				return;
+			}
+
+			currentVoxelPos = nextVoxelPos;
+			octreeNode = GetOctreeNode(nextVoxelPos);
+		}
+		
+		if (maxIterations <= 0)
+		{
+			VolumeRaytracer::VPrimitiveAttributes attr = { float3(0,0,0), true };
+			ReportHit(10, 0, attr);
+
+			return;
+		}
+	}   
+}
+
 [shader("miss")]
 void VRMiss(inout VolumeRaytracer::VRayPayload rayPayload)
 {
