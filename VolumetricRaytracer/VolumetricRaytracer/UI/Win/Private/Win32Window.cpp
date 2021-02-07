@@ -212,8 +212,8 @@ void VolumeRaytracer::UI::Win32::VWin32Window::InitializeWindow()
 
 	HInstance = GetModuleHandleW(NULL);
 
-	Width = 896;
-	Height = 504;
+	Width = 1024;
+	Height = 576;
 
 	wcex.style = CS_HREDRAW | CS_VREDRAW;
 	wcex.lpfnWndProc = WndProc;

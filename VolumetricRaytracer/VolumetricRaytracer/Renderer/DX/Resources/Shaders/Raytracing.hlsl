@@ -13,7 +13,7 @@
 */
 
 #define HLSL
-#define SHADER_DEBUG
+//#define SHADER_DEBUG
 
 #include "RaytracingHlsl.h"
 #include "Include/Lighting.hlsli"
