@@ -17,6 +17,7 @@
 
 #include "RaytracingHlsl.h"
 #include "Include/Lighting.hlsli"
+#include "Include/Quaternion.hlsli"
 
 #ifdef SHADER_DEBUG
 #include "Include/Debugging.hlsli"
@@ -27,14 +28,17 @@ static const float LINE_THICKNESS = 0.5f;
 
 RaytracingAccelerationStructure g_scene : register(t0, space0);
 
-Texture3D<uint4> g_voxelVolume[VolumeRaytracer::MaxAllowedObjectData] : register(t2, space0);
-Texture3D<uint4> g_traversalVolume[VolumeRaytracer::MaxAllowedObjectData] : register(t22, space0);
+Texture3D<uint4> g_voxelVolume[VolumeRaytracer::MaxAllowedObjectData] : register(t65, space0);
+Texture3D<uint4> g_traversalVolume[VolumeRaytracer::MaxAllowedObjectData] : register(t85, space0);
 ConstantBuffer<VolumeRaytracer::VPointLightBuffer> g_pointLightsCB[VolumeRaytracer::MaxAllowedPointLights] : register(b1);
 ConstantBuffer<VolumeRaytracer::VSpotLightBuffer> g_spotLightsCB[VolumeRaytracer::MaxAllowedSpotLights] : register(b6);
 ConstantBuffer<VolumeRaytracer::VGeometryConstantBuffer> g_geometryCB[VolumeRaytracer::MaxAllowedObjectData] : register(b11);
 
 TextureCube g_envMap : register(t1, space0);
 SamplerState g_envMapSampler : register(s0);
+
+Texture2D<float4> g_geometryTextures[63] : register(t2);
+SamplerState g_geometrySampler : register(s1);
 
 RWTexture2D<float4> g_renderTarget : register(u0);
 ConstantBuffer<VolumeRaytracer::VSceneConstantBuffer> g_sceneCB : register(b0);
@@ -50,6 +54,43 @@ struct VoxelOctreeNode
 	float size;
 	float3 nodePos;
 };
+
+float3 TriSampleTexture(in uint textureID, in float2 scale, in float3 worldPos, in float3 normal)
+{
+	float2 uvX = worldPos.zy / scale;
+	float2 uvY = worldPos.xz / scale;
+	float2 uvZ = worldPos.xy / scale;
+	
+	float3 tX = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvX, 0.f).rgb;
+	float3 tY = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvY, 0.f).rgb;
+	float3 tZ = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvZ, 0.f).rgb;
+	
+	float3 blend = abs(normal);
+	blend = blend / (blend.x + blend.y + blend.z);
+	
+	return tX * blend.x + tY * blend.y + tZ * blend.z;
+}
+
+float3 TriSampleNormal(in uint textureID, in float2 scale, in float3 worldPos, in float3 normal)
+{
+	float2 uvX = worldPos.zy / scale;
+	float2 uvY = worldPos.xz / scale;
+	float2 uvZ = worldPos.xy / scale;
+	
+	float3 tX = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvX, 0.f).rgb * 2.0f - 1.0f;
+	float3 tY = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvY, 0.f).rgb * 2.0f - 1.0f;
+	float3 tZ = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvZ, 0.f).rgb * 2.0f - 1.0f;
+		
+	float3 blend = abs(normal);
+	blend = blend / (blend.x + blend.y + blend.z);
+	
+	float3 tNormal = normalize(tX * blend.x + tY * blend.y + tZ * blend.z);
+	tNormal = tNormal.zyx;
+	
+	float4 quat = fromX(normal);
+	
+	return rotate_vector(tNormal, quat);
+}
 
 inline Ray GetLocalRay()
 {
@@ -965,10 +1006,16 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 		float3 diffuse = float3(SHADOW_BRIGHTNESS, SHADOW_BRIGHTNESS, SHADOW_BRIGHTNESS);
 		float3 Li = float3(g_sceneCB.dirLightStrength, g_sceneCB.dirLightStrength, g_sceneCB.dirLightStrength);
 		
-		float3 albedo = g_geometryCB[InstanceID()].tint.rgb;
+		float3 albedo = g_geometryCB[InstanceID()].tint.rgb * TriSampleTexture(g_geometryCB[InstanceID()].albedoTexture, g_geometryCB[InstanceID()].textureScale, hitPosition, attr.normal);
 		float k = g_geometryCB[InstanceID()].k;
-		float roughness = g_geometryCB[InstanceID()].roughness;
-		float metallness = g_geometryCB[InstanceID()].metallness;
+		
+		float3 rmInfluence = TriSampleTexture(g_geometryCB[InstanceID()].rmTexture, g_geometryCB[InstanceID()].textureScale, hitPosition, attr.normal);
+		
+		float roughness = clamp(g_geometryCB[InstanceID()].roughness * rmInfluence.r, 0.0f, 1.0f);
+		float metallness = clamp(g_geometryCB[InstanceID()].metallness * rmInfluence.g, 0.0f, 1.0f);
+		float3 normal = TriSampleNormal(g_geometryCB[InstanceID()].normalTexture, g_geometryCB[InstanceID()].textureScale, hitPosition, attr.normal);
+		
+		//float3 normal = attr.normal;
 		
 		float3 reflactanceColor = float3(0,0,0);
 		
@@ -976,16 +1023,17 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 		{
 			Ray reflectionRay;
 			reflectionRay.origin = shadowRayOrigin;
-			reflectionRay.direction = normalize(WorldRayDirection() - 2 * dot(WorldRayDirection(), attr.normal) * attr.normal);
+			reflectionRay.direction = normalize(WorldRayDirection() - 2 * dot(WorldRayDirection(), normal) * normal);
 			
 			reflactanceColor = TraceRadianceRay(reflectionRay, rayPayload.depth).rgb;
+			reflactanceColor = max(float3(0,0,0), lerp(reflactanceColor, float3(0,0,0), roughness * 2.2f));
 			
-			diffuse += Radiance(reflactanceColor, reflectionRay.direction, -WorldRayDirection(), attr.normal, albedo, roughness, metallness, k);
+			diffuse += Radiance(reflactanceColor, reflectionRay.direction, -WorldRayDirection(), normal, albedo, roughness, metallness, k);
 		}
 		
 		if (!shadowRayHit)
 		{
-			diffuse += Radiance(Li, -g_sceneCB.dirLightDirection, -WorldRayDirection(), attr.normal, albedo, roughness, metallness, k);
+			diffuse += Radiance(Li, -g_sceneCB.dirLightDirection, -WorldRayDirection(), normal, albedo, roughness, metallness, k);
 			
 			//diffuse += (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);
 		}
@@ -1007,7 +1055,7 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 		
 				if (!shadowRayHit)
 				{
-					diffuse += Radiance(Li, shadowRay.direction, -WorldRayDirection(), attr.normal, albedo, roughness, metallness, k);
+					diffuse += Radiance(Li, shadowRay.direction, -WorldRayDirection(), normal, albedo, roughness, metallness, k);
 				}
 			}
 		}
@@ -1026,7 +1074,7 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 		
 				if (!shadowRayHit)
 				{
-					diffuse += Radiance(Li, shadowRay.direction, -WorldRayDirection(), attr.normal, albedo, roughness, metallness, k);
+					diffuse += Radiance(Li, shadowRay.direction, -WorldRayDirection(), normal, albedo, roughness, metallness, k);
 				}
 			}
 		}

@@ -601,16 +601,18 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeGlobalRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE outputViewDescRange = {};
 	outputViewDescRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
 
+	size_t scenerySRVCount = VDXConstants::STATIC_SCENERY_SRV_CV_UAV_COUNT + MaxAllowedObjectData * 3;
+
 	CD3DX12_DESCRIPTOR_RANGE sceneDescTable[4];
-	sceneDescTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
-	sceneDescTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 1, 0);
+	sceneDescTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, scenerySRVCount, 1);
+	sceneDescTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, VDXConstants::STATIC_SCENERY_SAMPLER_COUNT, 0);
 	sceneDescTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, VolumeRaytracer::MaxAllowedPointLights, 1);
 	sceneDescTable[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, VolumeRaytracer::MaxAllowedSpotLights, 1 + MaxAllowedPointLights);
 
 	CD3DX12_DESCRIPTOR_RANGE geometryDescTable[3];
-	geometryDescTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, VolumeRaytracer::MaxAllowedObjectData, 2);
+	geometryDescTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, VolumeRaytracer::MaxAllowedObjectData, scenerySRVCount + 1);
 	geometryDescTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, VolumeRaytracer::MaxAllowedObjectData, 1 + MaxAllowedPointLights + MaxAllowedSpotLights);
-	geometryDescTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, VolumeRaytracer::MaxAllowedObjectData, 2 + VolumeRaytracer::MaxAllowedObjectData);
+	geometryDescTable[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, VolumeRaytracer::MaxAllowedObjectData, scenerySRVCount + 1 + VolumeRaytracer::MaxAllowedObjectData);
 
 	CD3DX12_ROOT_PARAMETER rootParameters[EGlobalRootSignature::Max];
 	rootParameters[EGlobalRootSignature::OutputView].InitAsDescriptorTable(1, &outputViewDescRange);
@@ -918,20 +920,20 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::FillDescriptorHeap(boost::unord
 	Device->CopyDescriptorsSimple(1, RendererDescriptorHeap->GetCPUHandle(rangeIndex), WindowRenderTarget->GetOutputTextureCPUHandle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 
-	RendererDescriptorHeap->AllocateDescriptorRange(1, rangeIndex);
+	RendererDescriptorHeap->AllocateDescriptorRange(VDXConstants::STATIC_SCENERY_SRV_CV_UAV_COUNT + MaxAllowedObjectData * 3, rangeIndex);
 	bindingPayload.BindingGPUHandle = RendererDescriptorHeap->GetGPUHandle(rangeIndex);
 
 	outResourceBindings[EGlobalRootSignature::SceneTextures] = bindingPayload;
 
-	Device->CopyDescriptorsSimple(1, RendererDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetSceneDescriptorHeap()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	Device->CopyDescriptorsSimple(VDXConstants::STATIC_SCENERY_SRV_CV_UAV_COUNT + MaxAllowedObjectData * 3, RendererDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetSceneDescriptorHeap()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 
-	RendererSamplerDescriptorHeap->AllocateDescriptorRange(1, rangeIndex);
+	RendererSamplerDescriptorHeap->AllocateDescriptorRange(VDXConstants::STATIC_SCENERY_SAMPLER_COUNT, rangeIndex);
 	bindingPayload.BindingGPUHandle = RendererSamplerDescriptorHeap->GetGPUHandle(rangeIndex);
 
 	outResourceBindings[EGlobalRootSignature::SceneSamplers] = bindingPayload;
 
-	Device->CopyDescriptorsSimple(1, RendererSamplerDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetSceneDescriptorHeapSamplers()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+	Device->CopyDescriptorsSimple(VDXConstants::STATIC_SCENERY_SAMPLER_COUNT, RendererSamplerDescriptorHeap->GetCPUHandle(rangeIndex), SceneToRender->GetSceneDescriptorHeapSamplers()->GetCPUHandle(0), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 
 
 	RendererDescriptorHeap->AllocateDescriptorRange(MaxAllowedPointLights + MaxAllowedSpotLights, rangeIndex);

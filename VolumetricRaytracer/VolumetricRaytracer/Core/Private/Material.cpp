@@ -13,3 +13,18 @@
 */
 
 #include "Material.h"
+
+bool VolumeRaytracer::VMaterial::HasAlbedoTexture() const
+{
+	return AlbedoTexturePath != L"";
+}
+
+bool VolumeRaytracer::VMaterial::HasNormalTexture() const
+{
+	return NormalTexturePath != L"";
+}
+
+bool VolumeRaytracer::VMaterial::HasRMTexture() const
+{
+	return RMTexturePath != L"";
+}

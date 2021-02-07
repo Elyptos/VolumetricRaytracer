@@ -14,6 +14,7 @@
 
 #pragma once
 #include "Color.h"
+#include <string>
 
 namespace VolumeRaytracer
 {
@@ -23,5 +24,16 @@ namespace VolumeRaytracer
 		VColor AlbedoColor = VColor(0.8f, 0.8f, 0.8f, 1.f);
 		float Roughness = 0.8f;
 		float Metallic = 0.f;
+
+		std::wstring AlbedoTexturePath = L"";
+		std::wstring NormalTexturePath = L"";
+		std::wstring RMTexturePath = L"";
+
+		VVector2D TextureScale = VVector2D(100.f, 100.f);
+
+	public:
+		bool HasAlbedoTexture() const;
+		bool HasNormalTexture() const;
+		bool HasRMTexture() const;
 	};
 }
