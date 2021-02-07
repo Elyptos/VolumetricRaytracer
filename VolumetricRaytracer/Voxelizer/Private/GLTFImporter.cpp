@@ -149,6 +149,21 @@ std::shared_ptr<VolumeRaytracer::Voxelizer::VSceneInfo> VolumeRaytracer::Voxeliz
 			continue;
 		}
 
+		std::string matID = mesh.primitives[0].materialId;
+
+		if (document->materials.Has(matID))
+		{
+			const Microsoft::glTF::Material& gltfMat = document->materials.Get(matID);
+
+			meshInfo.Material.AlbedoColor = VColor(gltfMat.metallicRoughness.baseColorFactor.r, gltfMat.metallicRoughness.baseColorFactor.g, gltfMat.metallicRoughness.baseColorFactor.b, gltfMat.metallicRoughness.baseColorFactor.a);
+			meshInfo.Material.Metallic = gltfMat.metallicRoughness.metallicFactor;
+			meshInfo.Material.Roughness = gltfMat.metallicRoughness.roughnessFactor;
+		}
+		else
+		{
+			std::cout << "[WARNING] Mesh has no assigned material." << std::endl;
+		}
+
 		sceneInfo->Meshes[mesh.id] = meshInfo;
 	}
 

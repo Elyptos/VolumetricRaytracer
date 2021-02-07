@@ -20,6 +20,7 @@
 #include <vector>
 #include <boost/unordered_map.hpp>
 #include <Color.h>
+#include "Material.h"
 
 namespace VolumeRaytracer
 {
@@ -37,6 +38,7 @@ namespace VolumeRaytracer
 			std::vector<VVertex> Vertices;
 			std::vector<size_t> Indices;
 			VAABB Bounds;
+			VMaterial Material;
 		};
 
 		struct VObjectInfo

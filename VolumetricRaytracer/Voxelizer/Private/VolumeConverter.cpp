@@ -59,6 +59,8 @@ VolumeRaytracer::VObjectPtr<VolumeRaytracer::Voxel::VVoxelVolume> VolumeRaytrace
 		VoxelizeTriangle(volume, v1, v2, v3, extractionThreshold);
 	}
 
+	volume->SetMaterial(meshInfo.Material);
+
 	return volume;
 }
 
