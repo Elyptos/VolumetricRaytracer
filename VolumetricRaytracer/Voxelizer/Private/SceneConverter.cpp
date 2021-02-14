@@ -22,7 +22,7 @@
 #include "PointLight.h"
 #include "../../VolumetricRaytracer/Scene/Public/SpotLight.h"
 
-VolumeRaytracer::VObjectPtr<VolumeRaytracer::Scene::VScene> VolumeRaytracer::Voxelizer::VSceneConverter::ConvertSceneInfoToScene(const VSceneInfo& sceneInfo)
+VolumeRaytracer::VObjectPtr<VolumeRaytracer::Scene::VScene> VolumeRaytracer::Voxelizer::VSceneConverter::ConvertSceneInfoToScene(const VSceneInfo& sceneInfo, const VTextureLibrary& textureLib)
 {
 	VObjectPtr<Scene::VScene> scene = VObject::CreateObject<Scene::VScene>();
 
@@ -34,7 +34,7 @@ VolumeRaytracer::VObjectPtr<VolumeRaytracer::Scene::VScene> VolumeRaytracer::Vox
 
 	for (const auto& mesh : sceneInfo.Meshes)
 	{
-		volumes[mesh.first] = VVolumeConverter::ConvertMeshInfoToVoxelVolume(mesh.second);
+		volumes[mesh.first] = VVolumeConverter::ConvertMeshInfoToVoxelVolume(mesh.second, textureLib);
 	}
 
 	std::cout << "Converting scene objects" << std::endl;

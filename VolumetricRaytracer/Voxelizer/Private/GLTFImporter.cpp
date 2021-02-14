@@ -158,6 +158,7 @@ std::shared_ptr<VolumeRaytracer::Voxelizer::VSceneInfo> VolumeRaytracer::Voxeliz
 			meshInfo.Material.AlbedoColor = VColor(gltfMat.metallicRoughness.baseColorFactor.r, gltfMat.metallicRoughness.baseColorFactor.g, gltfMat.metallicRoughness.baseColorFactor.b, gltfMat.metallicRoughness.baseColorFactor.a);
 			meshInfo.Material.Metallic = gltfMat.metallicRoughness.metallicFactor;
 			meshInfo.Material.Roughness = gltfMat.metallicRoughness.roughnessFactor;
+			meshInfo.MaterialName = gltfMat.name;
 		}
 		else
 		{

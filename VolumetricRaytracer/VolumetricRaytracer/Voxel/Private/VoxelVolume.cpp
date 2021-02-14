@@ -191,7 +191,8 @@ std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Voxel::
 
 	VMaterial material = GetMaterial();
 
-	res->Properties["Material"] = VSerializationArchive::From<VMaterial>(&material);
+	//res->Properties["Material"] = VSerializationArchive::From<VMaterial>(&material);
+	res->Properties["Material"] = material.Serialize();
 
 	return res;
 }
@@ -200,7 +201,12 @@ void VolumeRaytracer::Voxel::VVoxelVolume::Deserialize(std::shared_ptr<VSerializ
 {
 	Resolution = archive->Properties["Resolution"]->To<uint8_t>();
 	VolumeExtends = archive->Properties["Extends"]->To<float>();
-	SetMaterial(archive->Properties["Material"]->To<VMaterial>());
+	//SetMaterial(archive->Properties["Material"]->To<VMaterial>());
+
+	VMaterial mat;
+	mat.Deserialize(archive->Properties["Material"]);
+
+	SetMaterial(mat);
 
 	VoxelCountAlongAxis = 2 + (std::pow(2, Resolution) - 1);
 	CellSize = (VolumeExtends * 2) / (VoxelCountAlongAxis - 1.f);

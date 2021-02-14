@@ -64,5 +64,5 @@ float3 BRDF(in float3 wi, in float3 wo, in float3 surfaceN, in float3 albedo, in
 
 float3 Radiance(in float3 Li, in float3 wi, in float3 wo, in float3 surfaceN, in float3 albedo, in float roughness, in float metallic, in float k)
 {
-	return BRDF(wi, wo, surfaceN, albedo, roughness, metallic, k) * Li /** dot(surfaceN, wi)*/;
+	return BRDF(wi, wo, surfaceN, albedo, roughness, metallic, k) * Li * dot(surfaceN, wi);
 }

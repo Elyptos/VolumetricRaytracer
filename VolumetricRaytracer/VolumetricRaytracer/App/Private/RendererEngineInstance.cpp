@@ -153,21 +153,21 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
 	Scene = VObject::CreateObject<Scene::VScene>();
 
-	//LoadSceneFromFile("../Voxelizer/Church.vox");
+	LoadSceneFromFile("../Voxelizer/Church.vox");
 	Camera = Scene->SpawnObject<Scene::VCamera>(VVector(300.f, 0.f, 100.f), VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f)), VVector::ONE);
 
-	DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
-		* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, -135.f * (M_PI / 180.f)), VVector::ONE);
-	DirectionalLight->IlluminationStrength = 0.f;
+	//DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
+	//	* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, -135.f * (M_PI / 180.f)), VVector::ONE);
+	//DirectionalLight->IlluminationStrength = 6.f;
 
 	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
 	Scene->SetActiveSceneCamera(Camera);
-	Scene->SetActiveDirectionalLight(DirectionalLight);
+	//Scene->SetActiveDirectionalLight(DirectionalLight);
 
-	VObjectPtr<Scene::VPointLight> pointLight = Scene->SpawnObject<Scene::VPointLight>(VVector(50.f, 50.f, 100.f), VQuat::IDENTITY, VVector::ZERO);
+	/*VObjectPtr<Scene::VPointLight> pointLight = Scene->SpawnObject<Scene::VPointLight>(VVector(50.f, 50.f, 100.f), VQuat::IDENTITY, VVector::ZERO);
 	pointLight->IlluminationStrength = 10.f;
 	pointLight->AttenuationLinear = 0.5f;
-	pointLight->AttenuationExp = 0.005f;
+	pointLight->AttenuationExp = 0.005f;*/
 
 	//VObjectPtr<Scene::VSpotLight> spotLight = Scene->SpawnObject<Scene::VSpotLight>(VVector(-100.f, 0.f, 100.f), VQuat::FromEulerAnglesDegrees(0.f, 0.f, 45.f), VVector::ZERO);
 	//spotLight->Angle = 120.f;
@@ -176,14 +176,14 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 	//spotLight->AttenuationLinear = 0.f;
 
 	//Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-	Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
+	/*Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
 	Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-	Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);
+	Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);*/
 
 	//InitSnowmanObject();
-	InitFloor();
+	/*InitFloor();
 	InitSphere();
-	InitCube();
+	InitCube();*/
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()

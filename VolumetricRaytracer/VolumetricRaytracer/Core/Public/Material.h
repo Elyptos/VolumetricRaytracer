@@ -15,10 +15,11 @@
 #pragma once
 #include "Color.h"
 #include <string>
+#include "ISerializable.h"
 
 namespace VolumeRaytracer
 {
-	struct VMaterial
+	struct VMaterial : IVSerializable
 	{
 	public:
 		VColor AlbedoColor = VColor(0.8f, 0.8f, 0.8f, 1.f);
@@ -32,6 +33,9 @@ namespace VolumeRaytracer
 		VVector2D TextureScale = VVector2D(100.f, 100.f);
 
 	public:
+		std::shared_ptr<VSerializationArchive> Serialize() const override;
+		void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
+
 		bool HasAlbedoTexture() const;
 		bool HasNormalTexture() const;
 		bool HasRMTexture() const;

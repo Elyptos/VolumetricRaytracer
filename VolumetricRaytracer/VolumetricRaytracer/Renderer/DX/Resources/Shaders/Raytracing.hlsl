@@ -85,7 +85,7 @@ float3 TriSampleNormal(in uint textureID, in float2 scale, in float3 worldPos, i
 	blend = blend / (blend.x + blend.y + blend.z);
 	
 	float3 tNormal = normalize(tX * blend.x + tY * blend.y + tZ * blend.z);
-	tNormal = tNormal.zyx;
+	tNormal = tNormal.zxy;
 	
 	float4 quat = fromX(normal);
 	
@@ -1033,7 +1033,7 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 		
 		if (!shadowRayHit)
 		{
-			diffuse += Radiance(Li, -g_sceneCB.dirLightDirection, -WorldRayDirection(), normal, albedo, roughness, metallness, k);
+			diffuse += Radiance(Li, g_sceneCB.dirLightDirection, -WorldRayDirection(), normal, albedo, roughness, metallness, k);
 			
 			//diffuse += (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);
 		}
