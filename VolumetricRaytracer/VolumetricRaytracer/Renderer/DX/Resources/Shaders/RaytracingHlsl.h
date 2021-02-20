@@ -89,6 +89,10 @@ namespace VolumeRaytracer
 		float roughness;
 		float metallness;
 		float k;
+		UINT albedoTexture;
+		XMFLOAT2 textureScale;
+		UINT normalTexture;
+		UINT rmTexture;
 		UINT voxelAxisCount;
 		float volumeExtend;
 		float distanceBtwVoxels;

@@ -180,6 +180,76 @@ void VolumeRaytracer::Scene::VScene::RemoveVoxelVolumeReference(std::weak_ptr<Vo
 	}
 }
 
+void VolumeRaytracer::Scene::VScene::UpdateMaterialOfVolume(std::weak_ptr<Voxel::VVoxelVolume> volume, const VMaterial& materialBefore, const VMaterial& newMaterial)
+{
+	std::shared_ptr<Voxel::VVoxelVolume> volumePtr = volume.lock();
+
+	if (ReferencedVolumes.find(volumePtr) != ReferencedVolumes.end())
+	{
+		if (materialBefore.HasAlbedoTexture() && ReferencedTextures.find(materialBefore.AlbedoTexturePath) != ReferencedTextures.end())
+		{
+			ReferencedTextures[materialBefore.AlbedoTexturePath].Volumes.erase(volumePtr);
+
+			if (ReferencedTextures[materialBefore.AlbedoTexturePath].Volumes.size() == 0)
+			{
+				ReferencedTextures.erase(materialBefore.AlbedoTexturePath);
+			}
+		}
+
+		if (newMaterial.HasAlbedoTexture())
+		{
+			if (ReferencedTextures.find(newMaterial.AlbedoTexturePath) == ReferencedTextures.end())
+			{
+				ReferencedTextures[newMaterial.AlbedoTexturePath] = VTextureReference();
+			}
+
+			ReferencedTextures[newMaterial.AlbedoTexturePath].Volumes.insert(volumePtr);
+		}
+
+
+		if (materialBefore.HasNormalTexture() && ReferencedTextures.find(materialBefore.NormalTexturePath) != ReferencedTextures.end())
+		{
+			ReferencedTextures[materialBefore.NormalTexturePath].Volumes.erase(volumePtr);
+
+			if (ReferencedTextures[materialBefore.NormalTexturePath].Volumes.size() == 0)
+			{
+				ReferencedTextures.erase(materialBefore.NormalTexturePath);
+			}
+		}
+
+		if (newMaterial.HasNormalTexture())
+		{
+			if (ReferencedTextures.find(newMaterial.NormalTexturePath) == ReferencedTextures.end())
+			{
+				ReferencedTextures[newMaterial.NormalTexturePath] = VTextureReference();
+			}
+
+			ReferencedTextures[newMaterial.NormalTexturePath].Volumes.insert(volumePtr);
+		}
+
+
+		if (materialBefore.HasRMTexture() && ReferencedTextures.find(materialBefore.RMTexturePath) != ReferencedTextures.end())
+		{
+			ReferencedTextures[materialBefore.RMTexturePath].Volumes.erase(volumePtr);
+
+			if (ReferencedTextures[materialBefore.RMTexturePath].Volumes.size() == 0)
+			{
+				ReferencedTextures.erase(materialBefore.RMTexturePath);
+			}
+		}
+
+		if (newMaterial.HasRMTexture())
+		{
+			if (ReferencedTextures.find(newMaterial.RMTexturePath) == ReferencedTextures.end())
+			{
+				ReferencedTextures[newMaterial.RMTexturePath] = VTextureReference();
+			}
+
+			ReferencedTextures[newMaterial.RMTexturePath].Volumes.insert(volumePtr);
+		}
+	}
+}
+
 std::vector<std::weak_ptr<VolumeRaytracer::Scene::VLevelObject>> VolumeRaytracer::Scene::VScene::GetAllPlacedObjects() const
 {
 	std::vector<std::weak_ptr<VLevelObject>> res;
@@ -227,6 +297,18 @@ boost::unordered_set<VolumeRaytracer::Voxel::VVoxelVolume*> VolumeRaytracer::Sce
 boost::unordered_set<VolumeRaytracer::Voxel::VVoxelVolume*> VolumeRaytracer::Scene::VScene::GetVolumesRemovedDuringFrame() const
 {
 	return FrameRemovedVolumes;
+}
+
+boost::unordered_set<std::wstring> VolumeRaytracer::Scene::VScene::GetAllReferencedGeometryTextures() const
+{
+	boost::unordered_set<std::wstring> texturePaths;
+
+	for (auto& elem : ReferencedTextures)
+	{
+		texturePaths.insert(elem.first);
+	}
+
+	return texturePaths;
 }
 
 std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Scene::VScene::Serialize() const
@@ -504,6 +586,8 @@ void VolumeRaytracer::Scene::VScene::AddVolumeReference_Internal(std::weak_ptr<I
 
 		FrameRemovedVolumes.erase(volumePtr.get());
 		FrameAddedVolumes.insert(volumePtr.get());
+
+		UpdateMaterialOfVolume(volume, VMaterial(), volumePtr->GetMaterial());
 	}
 }
 
@@ -522,6 +606,8 @@ void VolumeRaytracer::Scene::VScene::RemoveVolumeReference_Internal(std::weak_pt
 
 			if (objects.size() == 0)
 			{
+				UpdateMaterialOfVolume(volume, volumePtr->GetMaterial(), VMaterial());
+
 				FrameRemovedVolumes.insert(volumePtr.get());
 				FrameAddedVolumes.erase(volumePtr.get());
 			}

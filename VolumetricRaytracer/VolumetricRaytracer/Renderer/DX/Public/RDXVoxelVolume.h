@@ -43,6 +43,14 @@ namespace VolumeRaytracer
 				size_t InstanceIndex;
 			};
 
+			struct VDXVoxelVolumeTextureIndices
+			{
+			public:
+				size_t AlbedoIndex = 0;
+				size_t NormalIndex = 1;
+				size_t RMIndex = 2;
+			};
+
 			class VDXVoxelVolume
 			{
 			public:
@@ -50,6 +58,7 @@ namespace VolumeRaytracer
 				~VDXVoxelVolume();
 
 				void UpdateFromVoxelVolume(std::weak_ptr<VDXRenderer> renderer);
+				void SetTextures(const VDXVoxelVolumeTextureIndices& textureIndices);
 				bool NeedsUpdate() const;
 
 				const VDXVoxelVolumeDesc& GetDesc() const;
@@ -84,6 +93,7 @@ namespace VolumeRaytracer
 				VDXAccelerationStructureBuffers BLAS;
 
 				VDXVoxelVolumeDesc Desc;
+				VDXVoxelVolumeTextureIndices TextureIndices;
 				size_t LastVoxelCount;
 				size_t LastTraversalNodeCount;
 				float LastCellSize;

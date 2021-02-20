@@ -23,6 +23,7 @@
 #include "DXConstants.h"
 #include "TextureFactory.h"
 #include "DXTexture3DFloat.h"
+#include "DXTexture2D.h"
 #include "RDXVoxelVolume.h"
 #include "RDXLevelObject.h"
 #include "RenderableObject.h"
@@ -31,6 +32,8 @@
 #include "../../Scene/Public/SpotLight.h"
 #include "DXLightFactory.h"
 #include "../../Core/Public/MathHelpers.h"
+#include "Material.h"
+#include "VoxelVolume.h"
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::InitFromScene(std::weak_ptr<VRenderer> renderer, std::weak_ptr<Scene::VScene> scene)
 {
@@ -38,7 +41,7 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::InitFromScene(std::weak_ptr<VRend
 	EnvironmentMap = std::static_pointer_cast<VDXTextureCube>(scene.lock()->GetEnvironmentTexture());
 
 	VObjectPtr<VDXRenderer> dxRenderer = std::static_pointer_cast<VDXRenderer>(renderer.lock());
-	BuildStaticResources(dxRenderer.get());
+	BuildStaticResources(dxRenderer);
 
 	InitSceneGeometry(dxRenderer, scene);
 	InitSceneObjects(dxRenderer, scene);
@@ -50,20 +53,21 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::Cleanup()
 	CleanupStaticResources();
 }
 
-void VolumeRaytracer::Renderer::DX::VRDXScene::BuildStaticResources(VDXRenderer* renderer)
+void VolumeRaytracer::Renderer::DX::VRDXScene::BuildStaticResources(VObjectPtr<VDXRenderer> renderer)
 {
 	CleanupStaticResources();
 
 	FillInstanceIDPool();
+	FillTextureInstanceIDPool();
 
 	if (DXSceneDescriptorHeap == nullptr)
 	{
-		DXSceneDescriptorHeap = new VDXDescriptorHeap(renderer->GetDXDevice(), 2, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+		DXSceneDescriptorHeap = new VDXDescriptorHeap(renderer->GetDXDevice(), VDXConstants::STATIC_SCENERY_SRV_CV_UAV_COUNT + MaxAllowedObjectData * 3, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
 	}
 
 	if (DXSceneDescriptorHeapSamplers == nullptr)
 	{
-		DXSceneDescriptorHeapSamplers = new VDXDescriptorHeap(renderer->GetDXDevice(), 1, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+		DXSceneDescriptorHeapSamplers = new VDXDescriptorHeap(renderer->GetDXDevice(), VDXConstants::STATIC_SCENERY_SAMPLER_COUNT, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
 	}
 
 	if (DXSceneLightsDescriptorHeap == nullptr)
@@ -76,9 +80,10 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::BuildStaticResources(VDXRenderer*
 		ObjectResourcePool = new VRDXSceneObjectResourcePool(renderer->GetDXDevice(), MaxAllowedObjectData);
 	}
 
-	AllocSceneConstantBuffer(renderer);
-	AllocLightConstantBuffers(renderer);
-	InitEnvironmentMap(renderer);
+	AllocateDefaultTextures(renderer);
+	AllocSceneConstantBuffer(renderer.get());
+	AllocLightConstantBuffers(renderer.get());
+	InitEnvironmentMap(renderer.get());
 }
 
 D3D12_GPU_VIRTUAL_ADDRESS VolumeRaytracer::Renderer::DX::VRDXScene::CopySceneConstantBufferToGPU(const UINT& backBufferIndex)
@@ -177,17 +182,8 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::InitEnvironmentMap(VDXRenderer* r
 {
 	if (EnvironmentMap != nullptr)
 	{
-		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle;
-		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle;
-		UINT descIndex = 0;
-
-		DXSceneDescriptorHeap->AllocateDescriptor(&cpuHandle, &gpuHandle, descIndex);
-
-		renderer->CreateSRVDescriptor(EnvironmentMap, cpuHandle);
-
+		renderer->CreateSRVDescriptor(EnvironmentMap, DXSceneDescriptorHeap->GetCPUHandle(0));
 		renderer->UploadToGPU(EnvironmentMap);
-		
-		DXSceneDescriptorHeapSamplers->AllocateDescriptor(&cpuHandle, &gpuHandle, descIndex);
 
 		D3D12_SAMPLER_DESC samplerDesc = {};
 
@@ -198,7 +194,7 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::InitEnvironmentMap(VDXRenderer* r
 		samplerDesc.MaxAnisotropy = 1;
 		samplerDesc.Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
 
-		renderer->GetDXDevice()->CreateSampler(&samplerDesc, cpuHandle);
+		renderer->GetDXDevice()->CreateSampler(&samplerDesc, DXSceneDescriptorHeapSamplers->GetCPUHandle(0));
 	}
 }
 
@@ -240,6 +236,39 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::InitSceneObjects(std::weak_ptr<VD
 
 		AddLevelObject(renderer, elem.lock().get());
 	}
+}
+
+void VolumeRaytracer::Renderer::DX::VRDXScene::AllocateDefaultTextures(std::weak_ptr<VDXRenderer> renderer)
+{
+	DefaultAlbedoTexture = std::dynamic_pointer_cast<VDXTexture2D>(Renderer::VTextureFactory::CreateTexture2D(renderer, 1, 1, 1));
+	DefaultAlbedoTexture->SetPixel(0, 0, 0, VColor::WHITE);
+
+	DefaultNormalTexture = std::dynamic_pointer_cast<VDXTexture2D>(Renderer::VTextureFactory::CreateTexture2D(renderer, 1, 1, 1));
+	DefaultNormalTexture->SetPixel(0, 0, 0, VColor(0.5f, 0.5f, 1.f, 1.f));
+
+	DefaultRMTexture = std::dynamic_pointer_cast<VDXTexture2D>(Renderer::VTextureFactory::CreateTexture2D(renderer, 1, 1, 1));
+	DefaultRMTexture->SetPixel(0, 0, 0, VColor(1.f, 1.f, 0.f, 1.f));
+
+	std::shared_ptr<VDXRenderer> rendererPtr = renderer.lock();
+
+	rendererPtr->CreateSRVDescriptor(DefaultAlbedoTexture, DXSceneDescriptorHeap->GetCPUHandle(1));
+	rendererPtr->CreateSRVDescriptor(DefaultNormalTexture, DXSceneDescriptorHeap->GetCPUHandle(2));
+	rendererPtr->CreateSRVDescriptor(DefaultRMTexture, DXSceneDescriptorHeap->GetCPUHandle(3));
+
+	rendererPtr->UploadToGPU(DefaultAlbedoTexture);
+	rendererPtr->UploadToGPU(DefaultNormalTexture);
+	rendererPtr->UploadToGPU(DefaultRMTexture);
+
+	D3D12_SAMPLER_DESC samplerDesc = {};
+
+	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.MipLODBias = 0;
+	samplerDesc.MaxAnisotropy = 1;
+	samplerDesc.Filter = D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
+
+	rendererPtr->GetDXDevice()->CreateSampler(&samplerDesc, DXSceneDescriptorHeapSamplers->GetCPUHandle(1));
 }
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::AllocLightConstantBuffers(VDXRenderer* renderer)
@@ -387,6 +416,8 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::CleanupStaticResources()
 		}
 	}
 
+	GeometryTextures.clear();
+
 	SceneConstantBuffers.clear();
 	SceneConstantBufferDataPtrs.clear();
 
@@ -412,7 +443,12 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::CleanupStaticResources()
 
 	UpdateBLAS = false;
 
+	DefaultAlbedoTexture = nullptr;
+	DefaultNormalTexture = nullptr;
+	DefaultRMTexture = nullptr;
+
 	ClearInstanceIDPool();
+	ClearTextureInstanceIDPool();
 }
 
 void VolumeRaytracer::Renderer::DX::VRDXScene::BuildTopLevelAccelerationStructures(VDXRenderer* renderer, const unsigned int& backBufferIndex)
@@ -644,6 +680,26 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::FillInstanceIDPool()
 	}
 }
 
+void VolumeRaytracer::Renderer::DX::VRDXScene::ClearTextureInstanceIDPool()
+{
+	size_t elem = 0;
+
+	while (GeometryTextureInstancePool.pop(elem)) {}
+}
+
+void VolumeRaytracer::Renderer::DX::VRDXScene::FillTextureInstanceIDPool()
+{
+	if (!GeometryTextureInstancePool.empty())
+	{
+		ClearTextureInstanceIDPool();
+	}
+
+	for (size_t i = VDXConstants::STATIC_SCENERY_SRV_CV_UAV_COUNT; i < (MaxAllowedObjectData * 3 + VDXConstants::STATIC_SCENERY_SRV_CV_UAV_COUNT); i++)
+	{
+		GeometryTextureInstancePool.push(i);
+	}
+}
+
 void VolumeRaytracer::Renderer::DX::VRDXScene::UpdateSceneConstantBuffer(std::weak_ptr<Scene::VScene> scene)
 {
 	VObjectPtr<Scene::VScene> scenePtr = scene.lock();
@@ -705,6 +761,8 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::UpdateSceneGeometry(std::weak_ptr
 	boost::unordered_set<Voxel::VVoxelVolume*> volumesAdded =  scenePtr->GetVolumesAddedDuringFrame();
 	boost::unordered_set<Voxel::VVoxelVolume*> volumesRemoved = scenePtr->GetVolumesRemovedDuringFrame();
 
+	SyncGeometryTextures(renderer, scene);
+
 	for (auto& elem : volumesRemoved)
 	{
 		RemoveVoxelVolume(elem);
@@ -721,6 +779,38 @@ void VolumeRaytracer::Renderer::DX::VRDXScene::UpdateSceneGeometry(std::weak_ptr
 	{
 		if (elem.second->NeedsUpdate())
 		{
+			VDXVoxelVolumeTextureIndices textureIndices;
+
+			VMaterial material = elem.first->GetMaterial();
+
+			if (GeometryTextures.find(material.AlbedoTexturePath) != GeometryTextures.end())
+			{
+				textureIndices.AlbedoIndex = GeometryTextures[material.AlbedoTexturePath].DescriptorIndex - VDXConstants::STATIC_SCENERY_SRV_CV_UAV_COUNT + 3;
+			}
+			else
+			{
+				textureIndices.AlbedoIndex = 0;
+			}
+
+			if (GeometryTextures.find(material.NormalTexturePath) != GeometryTextures.end())
+			{
+				textureIndices.NormalIndex = GeometryTextures[material.NormalTexturePath].DescriptorIndex - VDXConstants::STATIC_SCENERY_SRV_CV_UAV_COUNT + 3;
+			}
+			else
+			{
+				textureIndices.NormalIndex = 1;
+			}
+
+			if (GeometryTextures.find(material.RMTexturePath) != GeometryTextures.end())
+			{
+				textureIndices.RMIndex = GeometryTextures[material.RMTexturePath].DescriptorIndex - VDXConstants::STATIC_SCENERY_SRV_CV_UAV_COUNT + 3;
+			}
+			else
+			{
+				textureIndices.RMIndex = 2;
+			}
+
+			elem.second->SetTextures(textureIndices);
 			elem.second->UpdateFromVoxelVolume(renderer);
 			UpdateBLAS = true;
 		}
@@ -782,6 +872,57 @@ bool VolumeRaytracer::Renderer::DX::VRDXScene::ContainsLevelObject(Scene::VLevel
 	};
 
 	return std::any_of(ObjectsInScene.begin(), ObjectsInScene.end(), comparision);
+}
+
+void VolumeRaytracer::Renderer::DX::VRDXScene::SyncGeometryTextures(std::weak_ptr<VDXRenderer> renderer, std::weak_ptr<Scene::VScene> scene)
+{
+	VObjectPtr<Scene::VScene> scenePtr = scene.lock();
+
+	boost::unordered_set<std::wstring> usedTextures = scenePtr->GetAllReferencedGeometryTextures();
+
+	std::vector<std::wstring> texturesToRemove;
+	
+	for (const auto& elem : GeometryTextures)
+	{
+		if (usedTextures.find(elem.first) == usedTextures.end())
+		{
+			texturesToRemove.push_back(elem.first);
+		}
+	}
+
+	for (const auto& elem : texturesToRemove)
+	{
+		if (GeometryTextures[elem].Texture != nullptr)
+		{
+			GeometryTextureInstancePool.push(GeometryTextures[elem].DescriptorIndex);
+			GeometryTextures.erase(elem);
+		}
+	}
+
+	for (const auto& elem : usedTextures)
+	{
+		if (GeometryTextures.find(elem) == GeometryTextures.end())
+		{
+			VDRXGeometryTextureReference textureRef;
+			textureRef.DescriptorIndex = 0;
+			textureRef.Texture = nullptr;
+
+			if (!GeometryTextureInstancePool.empty())
+			{
+				textureRef.Texture = std::dynamic_pointer_cast<VDXTexture2D>(Renderer::VTextureFactory::LoadTexture2DFromFile(renderer, elem));
+
+				if (textureRef.Texture != nullptr)
+				{
+					GeometryTextureInstancePool.pop(textureRef.DescriptorIndex);
+
+					renderer.lock()->CreateSRVDescriptor(textureRef.Texture, DXSceneDescriptorHeap->GetCPUHandle(textureRef.DescriptorIndex));
+					renderer.lock()->UploadToGPU(textureRef.Texture);
+				}
+
+				GeometryTextures[elem] = textureRef;
+			}
+		}
+	}
 }
 
 VolumeRaytracer::Renderer::DX::VRDXSceneObjectResourcePool::VRDXSceneObjectResourcePool(CPtr<ID3D12Device5> dxDevice, const size_t& maxObjects)

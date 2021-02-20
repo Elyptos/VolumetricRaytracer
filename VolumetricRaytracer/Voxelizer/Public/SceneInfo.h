@@ -26,6 +26,21 @@ namespace VolumeRaytracer
 {
 	namespace Voxelizer
 	{
+		struct VMaterialTextures
+		{
+		public:
+			VVector2D TextureTiling = VVector2D(100.f, 100.f);
+
+			std::wstring Albedo;
+			std::wstring Normal;
+			std::wstring RM;
+		};
+
+		struct VTextureLibrary
+		{
+			boost::unordered_map<std::string, VMaterialTextures> Materials;
+		};
+
 		struct VVertex
 		{
 			VVector Position;
@@ -38,6 +53,7 @@ namespace VolumeRaytracer
 			std::vector<VVertex> Vertices;
 			std::vector<size_t> Indices;
 			VAABB Bounds;
+			std::string MaterialName;
 			VMaterial Material;
 		};
 

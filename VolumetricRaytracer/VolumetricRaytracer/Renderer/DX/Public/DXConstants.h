@@ -34,6 +34,9 @@ namespace VolumeRaytracer
 				static const size_t SRV_CV_UAV_HEAP_SIZE_PER_FRAME;
 				static const size_t SAMPLER_HEAP_SIZE_PER_FRAME;
 
+				static const size_t STATIC_SCENERY_SRV_CV_UAV_COUNT;
+				static const size_t STATIC_SCENERY_SAMPLER_COUNT;
+
 				static const std::wstring SHADER_NAME_RAYGEN;
 				static const std::wstring SHADER_NAME_CLOSEST_HIT;
 				static const std::wstring SHADER_NAME_INTERSECTION;

@@ -28,7 +28,7 @@ namespace VolumeRaytracer
 		class VSceneConverter
 		{
 		public:
-			static VObjectPtr<Scene::VScene> ConvertSceneInfoToScene(const VSceneInfo& sceneInfo);
+			static VObjectPtr<Scene::VScene> ConvertSceneInfoToScene(const VSceneInfo& sceneInfo, const VTextureLibrary& textureLib);
 		};
 	}
 }

@@ -27,7 +27,7 @@ namespace VolumeRaytracer
 	}
 }
 
-VolumeRaytracer::VObjectPtr<VolumeRaytracer::Voxel::VVoxelVolume> VolumeRaytracer::Voxelizer::VVolumeConverter::ConvertMeshInfoToVoxelVolume(const VMeshInfo& meshInfo)
+VolumeRaytracer::VObjectPtr<VolumeRaytracer::Voxel::VVoxelVolume> VolumeRaytracer::Voxelizer::VVolumeConverter::ConvertMeshInfoToVoxelVolume(const VMeshInfo& meshInfo, const VTextureLibrary& textureLib)
 {
 	float extends = VMathHelpers::Max(meshInfo.Bounds.GetExtends().X, VMathHelpers::Max(meshInfo.Bounds.GetExtends().Y, meshInfo.Bounds.GetExtends().Z));
 	extends += extends * 0.25f;
@@ -59,7 +59,20 @@ VolumeRaytracer::VObjectPtr<VolumeRaytracer::Voxel::VVoxelVolume> VolumeRaytrace
 		VoxelizeTriangle(volume, v1, v2, v3, extractionThreshold);
 	}
 
-	volume->SetMaterial(meshInfo.Material);
+	VMaterial material = meshInfo.Material;
+	std::string matName = meshInfo.MaterialName;
+
+	if (textureLib.Materials.find(meshInfo.MaterialName) != textureLib.Materials.end())
+	{
+		const VMaterialTextures& tex = textureLib.Materials.at(matName);
+
+		material.AlbedoTexturePath = tex.Albedo;
+		material.NormalTexturePath = tex.Normal;
+		material.RMTexturePath = tex.RM;
+		material.TextureScale = tex.TextureTiling;
+	}
+
+	volume->SetMaterial(material);
 
 	return volume;
 }

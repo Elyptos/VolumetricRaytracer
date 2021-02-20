@@ -59,6 +59,11 @@ void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::UpdateFromVoxelVolume(std::w
 	}
 }
 
+void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::SetTextures(const VDXVoxelVolumeTextureIndices& textureIndices)
+{
+	TextureIndices = textureIndices;
+}
+
 bool VolumeRaytracer::Renderer::DX::VDXVoxelVolume::NeedsUpdate() const
 {
 	return Desc.Volume->IsDirty();
@@ -380,6 +385,10 @@ void VolumeRaytracer::Renderer::DX::VDXVoxelVolume::UpdateGeometryConstantBuffer
 		constantBufferData.volumeExtend = Desc.Volume->GetVolumeExtends();
 		constantBufferData.distanceBtwVoxels = (constantBufferData.volumeExtend * 2) / (constantBufferData.voxelAxisCount - 1);
 		constantBufferData.octreeDepth = Desc.Volume->GetResolution();
+		constantBufferData.albedoTexture = TextureIndices.AlbedoIndex;
+		constantBufferData.normalTexture = TextureIndices.NormalIndex;
+		constantBufferData.rmTexture = TextureIndices.RMIndex;
+		constantBufferData.textureScale = DirectX::XMFLOAT2(volumeMaterial.TextureScale.X, volumeMaterial.TextureScale.Y);
 
 		memcpy(dataPtr, &constantBufferData, sizeof(VGeometryConstantBuffer));
 

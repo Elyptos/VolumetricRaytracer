@@ -17,6 +17,7 @@
 
 #include "RaytracingHlsl.h"
 #include "Include/Lighting.hlsli"
+#include "Include/Quaternion.hlsli"
 
 #ifdef SHADER_DEBUG
 #include "Include/Debugging.hlsli"
@@ -27,14 +28,17 @@ static const float LINE_THICKNESS = 0.5f;
 
 RaytracingAccelerationStructure g_scene : register(t0, space0);
 
-Texture3D<uint4> g_voxelVolume[VolumeRaytracer::MaxAllowedObjectData] : register(t2, space0);
-Texture3D<uint4> g_traversalVolume[VolumeRaytracer::MaxAllowedObjectData] : register(t22, space0);
+Texture3D<uint4> g_voxelVolume[VolumeRaytracer::MaxAllowedObjectData] : register(t65, space0);
+Texture3D<uint4> g_traversalVolume[VolumeRaytracer::MaxAllowedObjectData] : register(t85, space0);
 ConstantBuffer<VolumeRaytracer::VPointLightBuffer> g_pointLightsCB[VolumeRaytracer::MaxAllowedPointLights] : register(b1);
 ConstantBuffer<VolumeRaytracer::VSpotLightBuffer> g_spotLightsCB[VolumeRaytracer::MaxAllowedSpotLights] : register(b6);
 ConstantBuffer<VolumeRaytracer::VGeometryConstantBuffer> g_geometryCB[VolumeRaytracer::MaxAllowedObjectData] : register(b11);
 
 TextureCube g_envMap : register(t1, space0);
 SamplerState g_envMapSampler : register(s0);
+
+Texture2D<float4> g_geometryTextures[63] : register(t2);
+SamplerState g_geometrySampler : register(s1);
 
 RWTexture2D<float4> g_renderTarget : register(u0);
 ConstantBuffer<VolumeRaytracer::VSceneConstantBuffer> g_sceneCB : register(b0);
@@ -50,6 +54,43 @@ struct VoxelOctreeNode
 	float size;
 	float3 nodePos;
 };
+
+float3 TriSampleTexture(in uint textureID, in float2 scale, in float3 worldPos, in float3 normal)
+{
+	float2 uvX = worldPos.zy / scale;
+	float2 uvY = worldPos.xz / scale;
+	float2 uvZ = worldPos.xy / scale;
+	
+	float3 tX = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvX, 0.f).rgb;
+	float3 tY = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvY, 0.f).rgb;
+	float3 tZ = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvZ, 0.f).rgb;
+	
+	float3 blend = abs(normal);
+	blend = blend / (blend.x + blend.y + blend.z);
+	
+	return tX * blend.x + tY * blend.y + tZ * blend.z;
+}
+
+float3 TriSampleNormal(in uint textureID, in float2 scale, in float3 worldPos, in float3 normal)
+{
+	float2 uvX = worldPos.zy / scale;
+	float2 uvY = worldPos.xz / scale;
+	float2 uvZ = worldPos.xy / scale;
+	
+	float3 tX = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvX, 0.f).rgb * 2.0f - 1.0f;
+	float3 tY = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvY, 0.f).rgb * 2.0f - 1.0f;
+	float3 tZ = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvZ, 0.f).rgb * 2.0f - 1.0f;
+		
+	float3 blend = abs(normal);
+	blend = blend / (blend.x + blend.y + blend.z);
+	
+	float3 tNormal = normalize(tX * blend.x + tY * blend.y + tZ * blend.z);
+	tNormal = tNormal.zxy;
+	
+	float4 quat = fromX(normal);
+	
+	return rotate_vector(tNormal, quat);
+}
 
 inline Ray GetLocalRay()
 {
@@ -328,13 +369,8 @@ bool IsValidVoxelIndex(in int3 index)
 	return index.x >= 0 && index.x < g_geometryCB[instance].voxelAxisCount && index.y >= 0 && index.y < g_geometryCB[instance].voxelAxisCount && index.z >= 0 && index.z < g_geometryCB[instance].voxelAxisCount;
 }
 
-int3 GetOctreeNodeIndex(in int3 parentIndex, in int3 relativeIndex, in int currentDepth)
+int3 GetOctreeNodeIndex(in int3 parentIndex, in int3 relativeIndex, in int nodeCount)
 {
-	uint instance = InstanceID();
-
-	int depthDiff = g_geometryCB[instance].octreeDepth - currentDepth;
-	
-	int nodeCount = pow(2, g_geometryCB[instance].octreeDepth - currentDepth);
 	int3 nodeCountVec = int3(nodeCount, nodeCount, nodeCount);
 
 	return parentIndex + nodeCountVec - (nodeCountVec / (relativeIndex + 1));
@@ -370,17 +406,15 @@ inline int3 GetChildNodePtr(in uint instanceID, in int3 parentNodePtr, in int3 c
 	return g_voxelVolume[instanceID][parentNodePtr + childIndex].rgb;
 }
 
-inline bool IsCellIndexInsideOctreeNode(in int3 parentIndex, in int3 relOctreeNode, in int3 cellIndex, in int depth, in int maxDepth)
+inline bool IsCellIndexInsideOctreeNode(in int3 parentIndex, in int3 minNodeIndex, in int3 cellIndex, in int depth, in int maxDepth, in int nodeCount)
 {
-	int3 minNodeIndex = GetOctreeNodeIndex(parentIndex, relOctreeNode, depth);
-	
 	if(maxDepth == depth)
 	{
 		return minNodeIndex.x == cellIndex.x && minNodeIndex.y == cellIndex.y && minNodeIndex.z == cellIndex.z;		  
 	}
 	else
 	{
-		int3 maxNodeIndex = minNodeIndex + int3(1,1,1) * pow(2, maxDepth - (depth + 1));
+		int3 maxNodeIndex = minNodeIndex + /*int3(1,1,1) * pow(2, maxDepth - (depth + 1))*/ nodeCount / 2;
 
 		bool3 b = cellIndex >= minNodeIndex && cellIndex < maxNodeIndex;
 
@@ -400,7 +434,6 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 	{
 		uint instanceID = InstanceID();
 
-		int currentDepth = -1;
 		int maxDepth = g_geometryCB[instanceID].octreeDepth;
 		int3 currentNodeIndex = int3(0,0,0);
 		int3 currentNodePtr = int3(0,0,0);
@@ -412,7 +445,7 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 			return res;
 		}
 		
-		while (currentDepth <= maxDepth)
+		for(int currentDepth = 0; currentDepth <= 8; currentDepth++)
 		{
 			uint4 n1 = g_traversalVolume[instanceID][currentNodePtr].rgba;
 			uint4 n2 = g_traversalVolume[instanceID][currentNodePtr + int3(1,0,0)].rgba;
@@ -423,11 +456,12 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 			uint4 n7 = g_traversalVolume[instanceID][currentNodePtr + int3(0,1,1)].rgba;
 			uint4 n8 = g_traversalVolume[instanceID][currentNodePtr + int3(1,1,1)].rgba;
 			
-			currentDepth += 1;
-			
 			int3 childNodeIndex = int3(0, 0, 0);
+			int nodeCount = pow(2, maxDepth - currentDepth);
 			
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			int3 minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n1.a == 1)
 				{
@@ -439,14 +473,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n1.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(1, 0, 0);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n2.a == 1)
 				{
@@ -458,14 +493,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n2.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(0, 1, 0);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n3.a == 1)
 				{
@@ -477,14 +513,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n3.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(1, 1, 0);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n4.a == 1)
 				{
@@ -496,14 +533,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n4.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(0, 0, 1);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n5.a == 1)
 				{
@@ -515,14 +553,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n5.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(1, 0, 1);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n6.a == 1)
 				{
@@ -534,14 +573,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n6.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(0, 1, 1);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n7.a == 1)
 				{
@@ -553,14 +593,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n7.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(1, 1, 1);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n8.a == 1)
 				{
@@ -572,7 +613,7 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n8.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
@@ -945,10 +986,10 @@ float ComputeSpotLightIntensity(in float3 surfacePoint, in float distanceToSurfa
 [shader("closesthit")]
 void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytracer::VPrimitiveAttributes attr)
 {
-	if(attr.unlit)
+	if (attr.unlit)
 	{
 		rayPayload.color.rgb = attr.normal;
-		rayPayload.color.a = 1.f;		  
+		rayPayload.color.a = 1.f;
 	}
 	else
 	{
@@ -965,27 +1006,34 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 		float3 diffuse = float3(SHADOW_BRIGHTNESS, SHADOW_BRIGHTNESS, SHADOW_BRIGHTNESS);
 		float3 Li = float3(g_sceneCB.dirLightStrength, g_sceneCB.dirLightStrength, g_sceneCB.dirLightStrength);
 		
-		float3 albedo = g_geometryCB[InstanceID()].tint.rgb;
+		float3 albedo = g_geometryCB[InstanceID()].tint.rgb * TriSampleTexture(g_geometryCB[InstanceID()].albedoTexture, g_geometryCB[InstanceID()].textureScale, hitPosition, attr.normal);
 		float k = g_geometryCB[InstanceID()].k;
-		float roughness = g_geometryCB[InstanceID()].roughness;
-		float metallness = g_geometryCB[InstanceID()].metallness;
 		
-		float3 reflactanceColor = float3(0,0,0);
+		float3 rmInfluence = TriSampleTexture(g_geometryCB[InstanceID()].rmTexture, g_geometryCB[InstanceID()].textureScale, hitPosition, attr.normal);
 		
-		if(roughness < 0.5f)
+		float roughness = clamp(g_geometryCB[InstanceID()].roughness * rmInfluence.r, 0.0f, 1.0f);
+		float metallness = clamp(g_geometryCB[InstanceID()].metallness * rmInfluence.g, 0.0f, 1.0f);
+		float3 normal = TriSampleNormal(g_geometryCB[InstanceID()].normalTexture, g_geometryCB[InstanceID()].textureScale, hitPosition, attr.normal);
+		
+		//float3 normal = attr.normal;
+		
+		float3 reflactanceColor = float3(0, 0, 0);
+		
+		if (roughness < 0.3f)
 		{
 			Ray reflectionRay;
 			reflectionRay.origin = shadowRayOrigin;
-			reflectionRay.direction = normalize(WorldRayDirection() - 2 * dot(WorldRayDirection(), attr.normal) * attr.normal);
+			reflectionRay.direction = normalize(WorldRayDirection() - 2 * dot(WorldRayDirection(), normal) * normal);
 			
 			reflactanceColor = TraceRadianceRay(reflectionRay, rayPayload.depth).rgb;
+			reflactanceColor = max(float3(0, 0, 0), lerp(reflactanceColor, float3(0, 0, 0), roughness * 2.2f));
 			
-			diffuse += Radiance(reflactanceColor, reflectionRay.direction, -WorldRayDirection(), attr.normal, albedo, roughness, metallness, k);
+			diffuse += Radiance(reflactanceColor, reflectionRay.direction, -WorldRayDirection(), normal, albedo, roughness, metallness, k);
 		}
 		
 		if (!shadowRayHit)
 		{
-			diffuse += Radiance(Li, -g_sceneCB.dirLightDirection, -WorldRayDirection(), attr.normal, albedo, roughness, metallness, k);
+			diffuse += Radiance(Li, g_sceneCB.dirLightDirection, -WorldRayDirection(), normal, albedo, roughness, metallness, k);
 			
 			//diffuse += (0.5 / PI) * g_sceneCB.dirLightStrength * dot(attr.normal, g_sceneCB.dirLightDirection);
 		}
@@ -1007,7 +1055,7 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 		
 				if (!shadowRayHit)
 				{
-					diffuse += Radiance(Li, shadowRay.direction, -WorldRayDirection(), attr.normal, albedo, roughness, metallness, k);
+					diffuse += Radiance(Li, shadowRay.direction, -WorldRayDirection(), normal, albedo, roughness, metallness, k);
 				}
 			}
 		}
@@ -1026,7 +1074,7 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 		
 				if (!shadowRayHit)
 				{
-					diffuse += Radiance(Li, shadowRay.direction, -WorldRayDirection(), attr.normal, albedo, roughness, metallness, k);
+					diffuse += Radiance(Li, shadowRay.direction, -WorldRayDirection(), normal, albedo, roughness, metallness, k);
 				}
 			}
 		}
@@ -1065,6 +1113,7 @@ void VRIntersection()
 		
 		VoxelOctreeNode octreeNode;
 
+		[branch]
 		if (tEnter >= 0)
 		{
 			tEnter += 0.01;
@@ -1086,8 +1135,6 @@ void VRIntersection()
 			cellExit = -cellExit;
 			cellExit += 0.01;
 		}
-
-		int maxIterations = 255;
 
 		if (IsValidCell(currentVoxelPos) && IsSolidCell(currentVoxelPos, instance))
 		{
@@ -1118,13 +1165,18 @@ void VRIntersection()
 
 			return;
 		}
-
-		while (cellExit <= tExit && maxIterations > 0)
+		
+		[loop]
+		for(int maxIterations = 255; maxIterations > 0; maxIterations--)
 		{
-			maxIterations--;
+			if(cellExit > tExit)
+			{
+				break;				
+			}
 
 			cellEnter = cellExit;
 
+			[branch]
 			if (IsValidCell(currentVoxelPos))
 			{
 				#ifdef SHADER_DEBUG
@@ -1252,6 +1304,7 @@ void VRIntersectionShadowRay()
 		
 		VoxelOctreeNode octreeNode;
 
+		[branch]
 		if (tEnter >= 0)
 		{
 			tEnter += 0.01;
@@ -1274,8 +1327,6 @@ void VRIntersectionShadowRay()
 			cellExit += 0.01;
 		}
 
-		int maxIterations = 255;
-
 		if (IsValidCell(currentVoxelPos) && IsSolidCell(currentVoxelPos, instance))
 		{
 			float3 rayPos = GetPositionAlongRay(localRay, tEnter - 0.1);
@@ -1286,12 +1337,17 @@ void VRIntersectionShadowRay()
 			return;
 		}
 
-		while (cellExit <= tExit && maxIterations > 0)
+		[loop]
+		for(int maxIterations = 255; maxIterations > 0; maxIterations--)
 		{
-			maxIterations--;
+			if(cellExit > tExit)
+			{
+				break;				
+			}
 
 			cellEnter = cellExit;
 
+			[branch]
 			if (IsValidCell(currentVoxelPos))
 			{
 				nextVoxelPos = GoToNextVoxel(localRay, octreeNode.nodePos, octreeNode.size, cellExit);

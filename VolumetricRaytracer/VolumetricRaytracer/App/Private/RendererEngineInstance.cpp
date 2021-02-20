@@ -158,16 +158,16 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 
 	//DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
 	//	* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, -135.f * (M_PI / 180.f)), VVector::ONE);
-	//DirectionalLight->IlluminationStrength = 0.f;
+	//DirectionalLight->IlluminationStrength = 6.f;
 
 	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
 	Scene->SetActiveSceneCamera(Camera);
 	//Scene->SetActiveDirectionalLight(DirectionalLight);
 
-	//VObjectPtr<Scene::VPointLight> pointLight = Scene->SpawnObject<Scene::VPointLight>(VVector(50.f, 50.f, 100.f), VQuat::IDENTITY, VVector::ZERO);
-	//pointLight->IlluminationStrength = 10.f;
-	//pointLight->AttenuationLinear = 0.5f;
-	//pointLight->AttenuationExp = 0.005f;
+	/*VObjectPtr<Scene::VPointLight> pointLight = Scene->SpawnObject<Scene::VPointLight>(VVector(50.f, 50.f, 100.f), VQuat::IDENTITY, VVector::ZERO);
+	pointLight->IlluminationStrength = 10.f;
+	pointLight->AttenuationLinear = 0.5f;
+	pointLight->AttenuationExp = 0.005f;*/
 
 	//VObjectPtr<Scene::VSpotLight> spotLight = Scene->SpawnObject<Scene::VSpotLight>(VVector(-100.f, 0.f, 100.f), VQuat::FromEulerAnglesDegrees(0.f, 0.f, 45.f), VVector::ZERO);
 	//spotLight->Angle = 120.f;
@@ -381,9 +381,12 @@ void VolumeRaytracer::App::RendererEngineInstance::InitCube()
 
 	VMaterial material = voxelVolume->GetMaterial();
 
-	material.AlbedoColor = VColor::BLUE;
-	material.Roughness = 0.1f;
+	material.AlbedoColor = VColor::WHITE;
+	material.Roughness = 0.7f;
 	material.Metallic = 0.f;
+	material.AlbedoTexturePath = L"PavingStones070_1K_Color.png";
+	material.NormalTexturePath = L"PavingStones070_1K_Normal.png";
+	material.RMTexturePath = L"PavingStones070_1K_Roughness.png";
 
 	voxelVolume->SetMaterial(material);
 

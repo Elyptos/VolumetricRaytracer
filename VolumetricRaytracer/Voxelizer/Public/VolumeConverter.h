@@ -83,7 +83,7 @@ namespace VolumeRaytracer
 		class VVolumeConverter
 		{
 		public:
-			static VObjectPtr<Voxel::VVoxelVolume> ConvertMeshInfoToVoxelVolume(const VMeshInfo& meshInfo);
+			static VObjectPtr<Voxel::VVoxelVolume> ConvertMeshInfoToVoxelVolume(const VMeshInfo& meshInfo, const VTextureLibrary& textureLib);
 
 		private:
 			static void VoxelizeVertex(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v);
