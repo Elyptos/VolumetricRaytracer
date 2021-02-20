@@ -369,13 +369,8 @@ bool IsValidVoxelIndex(in int3 index)
 	return index.x >= 0 && index.x < g_geometryCB[instance].voxelAxisCount && index.y >= 0 && index.y < g_geometryCB[instance].voxelAxisCount && index.z >= 0 && index.z < g_geometryCB[instance].voxelAxisCount;
 }
 
-int3 GetOctreeNodeIndex(in int3 parentIndex, in int3 relativeIndex, in int currentDepth)
+int3 GetOctreeNodeIndex(in int3 parentIndex, in int3 relativeIndex, in int nodeCount)
 {
-	uint instance = InstanceID();
-
-	int depthDiff = g_geometryCB[instance].octreeDepth - currentDepth;
-	
-	int nodeCount = pow(2, g_geometryCB[instance].octreeDepth - currentDepth);
 	int3 nodeCountVec = int3(nodeCount, nodeCount, nodeCount);
 
 	return parentIndex + nodeCountVec - (nodeCountVec / (relativeIndex + 1));
@@ -411,17 +406,15 @@ inline int3 GetChildNodePtr(in uint instanceID, in int3 parentNodePtr, in int3 c
 	return g_voxelVolume[instanceID][parentNodePtr + childIndex].rgb;
 }
 
-inline bool IsCellIndexInsideOctreeNode(in int3 parentIndex, in int3 relOctreeNode, in int3 cellIndex, in int depth, in int maxDepth)
+inline bool IsCellIndexInsideOctreeNode(in int3 parentIndex, in int3 minNodeIndex, in int3 cellIndex, in int depth, in int maxDepth, in int nodeCount)
 {
-	int3 minNodeIndex = GetOctreeNodeIndex(parentIndex, relOctreeNode, depth);
-	
 	if(maxDepth == depth)
 	{
 		return minNodeIndex.x == cellIndex.x && minNodeIndex.y == cellIndex.y && minNodeIndex.z == cellIndex.z;		  
 	}
 	else
 	{
-		int3 maxNodeIndex = minNodeIndex + int3(1,1,1) * pow(2, maxDepth - (depth + 1));
+		int3 maxNodeIndex = minNodeIndex + /*int3(1,1,1) * pow(2, maxDepth - (depth + 1))*/ nodeCount / 2;
 
 		bool3 b = cellIndex >= minNodeIndex && cellIndex < maxNodeIndex;
 
@@ -467,8 +460,11 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 			currentDepth += 1;
 			
 			int3 childNodeIndex = int3(0, 0, 0);
+			int nodeCount = pow(2, maxDepth - currentDepth);
 			
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			int3 minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n1.a == 1)
 				{
@@ -480,14 +476,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n1.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(1, 0, 0);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n2.a == 1)
 				{
@@ -499,14 +496,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n2.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(0, 1, 0);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n3.a == 1)
 				{
@@ -518,14 +516,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n3.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(1, 1, 0);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n4.a == 1)
 				{
@@ -537,14 +536,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n4.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(0, 0, 1);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n5.a == 1)
 				{
@@ -556,14 +556,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n5.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(1, 0, 1);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n6.a == 1)
 				{
@@ -575,14 +576,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n6.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(0, 1, 1);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n7.a == 1)
 				{
@@ -594,14 +596,15 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n7.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
 
 			childNodeIndex = int3(1, 1, 1);
-
-			if (IsCellIndexInsideOctreeNode(currentNodeIndex, childNodeIndex, cellIndex, currentDepth, maxDepth))
+			minNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, nodeCount);
+			
+			if (IsCellIndexInsideOctreeNode(currentNodeIndex, minNodeIndex, cellIndex, currentDepth, maxDepth, nodeCount))
 			{
 				if (n8.a == 1)
 				{
@@ -613,7 +616,7 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 				else
 				{
 					currentNodePtr = n8.rgb;
-					currentNodeIndex = GetOctreeNodeIndex(currentNodeIndex, childNodeIndex, currentDepth);
+					currentNodeIndex = minNodeIndex;
 					continue;
 				}
 			}
