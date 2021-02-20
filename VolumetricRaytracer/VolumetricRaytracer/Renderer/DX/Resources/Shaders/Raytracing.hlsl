@@ -434,7 +434,6 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 	{
 		uint instanceID = InstanceID();
 
-		int currentDepth = -1;
 		int maxDepth = g_geometryCB[instanceID].octreeDepth;
 		int3 currentNodeIndex = int3(0,0,0);
 		int3 currentNodePtr = int3(0,0,0);
@@ -446,7 +445,7 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 			return res;
 		}
 		
-		while (currentDepth <= maxDepth)
+		for(int currentDepth = 0; currentDepth <= 8; currentDepth++)
 		{
 			uint4 n1 = g_traversalVolume[instanceID][currentNodePtr].rgba;
 			uint4 n2 = g_traversalVolume[instanceID][currentNodePtr + int3(1,0,0)].rgba;
@@ -456,8 +455,6 @@ VoxelOctreeNode GetOctreeNode(in int3 cellIndex)
 			uint4 n6 = g_traversalVolume[instanceID][currentNodePtr + int3(1,0,1)].rgba;
 			uint4 n7 = g_traversalVolume[instanceID][currentNodePtr + int3(0,1,1)].rgba;
 			uint4 n8 = g_traversalVolume[instanceID][currentNodePtr + int3(1,1,1)].rgba;
-			
-			currentDepth += 1;
 			
 			int3 childNodeIndex = int3(0, 0, 0);
 			int nodeCount = pow(2, maxDepth - currentDepth);
@@ -989,10 +986,10 @@ float ComputeSpotLightIntensity(in float3 surfacePoint, in float distanceToSurfa
 [shader("closesthit")]
 void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytracer::VPrimitiveAttributes attr)
 {
-	if(attr.unlit)
+	if (attr.unlit)
 	{
 		rayPayload.color.rgb = attr.normal;
-		rayPayload.color.a = 1.f;		  
+		rayPayload.color.a = 1.f;
 	}
 	else
 	{
@@ -1020,16 +1017,16 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 		
 		//float3 normal = attr.normal;
 		
-		float3 reflactanceColor = float3(0,0,0);
+		float3 reflactanceColor = float3(0, 0, 0);
 		
-		if(roughness < 0.5f)
+		if (roughness < 0.3f)
 		{
 			Ray reflectionRay;
 			reflectionRay.origin = shadowRayOrigin;
 			reflectionRay.direction = normalize(WorldRayDirection() - 2 * dot(WorldRayDirection(), normal) * normal);
 			
 			reflactanceColor = TraceRadianceRay(reflectionRay, rayPayload.depth).rgb;
-			reflactanceColor = max(float3(0,0,0), lerp(reflactanceColor, float3(0,0,0), roughness * 2.2f));
+			reflactanceColor = max(float3(0, 0, 0), lerp(reflactanceColor, float3(0, 0, 0), roughness * 2.2f));
 			
 			diffuse += Radiance(reflactanceColor, reflectionRay.direction, -WorldRayDirection(), normal, albedo, roughness, metallness, k);
 		}
@@ -1116,6 +1113,7 @@ void VRIntersection()
 		
 		VoxelOctreeNode octreeNode;
 
+		[branch]
 		if (tEnter >= 0)
 		{
 			tEnter += 0.01;
@@ -1137,8 +1135,6 @@ void VRIntersection()
 			cellExit = -cellExit;
 			cellExit += 0.01;
 		}
-
-		int maxIterations = 255;
 
 		if (IsValidCell(currentVoxelPos) && IsSolidCell(currentVoxelPos, instance))
 		{
@@ -1169,13 +1165,18 @@ void VRIntersection()
 
 			return;
 		}
-
-		while (cellExit <= tExit && maxIterations > 0)
+		
+		[loop]
+		for(int maxIterations = 255; maxIterations > 0; maxIterations--)
 		{
-			maxIterations--;
+			if(cellExit > tExit)
+			{
+				break;				
+			}
 
 			cellEnter = cellExit;
 
+			[branch]
 			if (IsValidCell(currentVoxelPos))
 			{
 				#ifdef SHADER_DEBUG
@@ -1303,6 +1304,7 @@ void VRIntersectionShadowRay()
 		
 		VoxelOctreeNode octreeNode;
 
+		[branch]
 		if (tEnter >= 0)
 		{
 			tEnter += 0.01;
@@ -1325,8 +1327,6 @@ void VRIntersectionShadowRay()
 			cellExit += 0.01;
 		}
 
-		int maxIterations = 255;
-
 		if (IsValidCell(currentVoxelPos) && IsSolidCell(currentVoxelPos, instance))
 		{
 			float3 rayPos = GetPositionAlongRay(localRay, tEnter - 0.1);
@@ -1337,12 +1337,17 @@ void VRIntersectionShadowRay()
 			return;
 		}
 
-		while (cellExit <= tExit && maxIterations > 0)
+		[loop]
+		for(int maxIterations = 255; maxIterations > 0; maxIterations--)
 		{
-			maxIterations--;
+			if(cellExit > tExit)
+			{
+				break;				
+			}
 
 			cellEnter = cellExit;
 
+			[branch]
 			if (IsValidCell(currentVoxelPos))
 			{
 				nextVoxelPos = GoToNextVoxel(localRay, octreeNode.nodePos, octreeNode.size, cellExit);
