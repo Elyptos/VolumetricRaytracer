@@ -15,3 +15,10 @@
 static const float PI = 3.141592f;
 static const float SHADOW_BRIGHTNESS = 0.0f;
 static const float3 F0_DIEL = float3(0.04, 0.04, 0.04);
+
+#ifdef SHADER_DEBUG
+#include "Include/Debugging.hlsli"
+
+static const float LINE_THICKNESS = 0.5f;
+
+#endif

@@ -63,6 +63,8 @@ namespace VolumeRaytracer
 			boost::signals2::connection OnWindowClosed_Bind(const WindowDelegate::slot_type& del);
 
 			boost::signals2::connection OnKeyDown_Bind(const KeyInputDelegate::slot_type& del);
+			boost::signals2::connection OnKeyPressed_Bind(const KeyInputDelegate::slot_type& del);
+			boost::signals2::connection OnKeyReleased_Bind(const KeyInputDelegate::slot_type& del);
 			boost::signals2::connection OnAxisInput_Bind(const AxisDelegate::slot_type& del);
 
 		protected:
@@ -94,7 +96,9 @@ namespace VolumeRaytracer
 			WindowDelegate OnWindowOpened;
 			WindowDelegate OnWindowClosed;
 
+			KeyInputDelegate OnKeyDownEvent;
 			KeyInputDelegate OnKeyPressedEvent;
+			KeyInputDelegate OnKeyReleasedEvent;
 			AxisDelegate OnAxisInputEvent;
 
 			boost::unordered_set<EVKeyType> PressedKeys;

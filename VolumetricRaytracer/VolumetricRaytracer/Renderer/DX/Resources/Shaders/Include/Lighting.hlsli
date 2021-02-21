@@ -14,6 +14,39 @@
 
 #include "Constants.hlsli"
 
+float ComputePointLightIntensity(in float intensity, in float distance, in float attL, in float attExp)
+{
+	return intensity / (1 + attL * distance + attExp * distance * distance);
+}
+
+float CalculateConeFalloff(in float cosSurface, in float cosAngle, in float cosFalloffAngle)
+{
+	float delta = (cosSurface - cosAngle) / (cosFalloffAngle - cosAngle);
+	
+	return min(delta, 1.f);
+}
+
+float ComputeSpotLightIntensity(in float3 surfacePoint, in float distanceToSurface, in float3 lightPosition, in float3 lightDirection, in float intensity, in float attL, in float attExp, in float cosAngle, in float cosFalloffAngle)
+{
+	float3 surfaceDir = normalize(surfacePoint - lightPosition);
+	float cosSurface = dot(lightDirection, surfaceDir);
+	
+	float calculatedIntensity = 0.f;
+	
+	if(cosSurface >= 0.f && cosSurface > cosAngle)
+	{
+		calculatedIntensity = intensity * CalculateConeFalloff(cosSurface, cosAngle, cosFalloffAngle);
+		calculatedIntensity = ComputePointLightIntensity(calculatedIntensity, distanceToSurface, attL, attExp);
+		
+		return calculatedIntensity;
+		//return 100.f;
+	}
+	else
+	{
+		return 0.f;		  
+	}
+}
+
 float D(in float3 surfaceN, in float3 h, in float roughness)
 {
 	float a2 = roughness * roughness;

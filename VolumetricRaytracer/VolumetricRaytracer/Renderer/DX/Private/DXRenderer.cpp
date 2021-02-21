@@ -21,6 +21,13 @@
 #include "Camera.h"
 #include "DXTextureCube.h"
 #include "Compiled/Raytracing.hlsl.h"
+#include "Compiled/Raytracing_Unlit.hlsl.h"
+#include "Compiled/Raytracing_NoTex.hlsl.h"
+#include "Compiled/Raytracing_NoTex_Unlit.hlsl.h"
+#include "Compiled/Raytracing_Cube.hlsl.h"
+#include "Compiled/Raytracing_Cube_Unlit.hlsl.h"
+#include "Compiled/Raytracing_Cube_NoTex.hlsl.h"
+#include "Compiled/Raytracing_Cube_NoTex_Unlit.hlsl.h"
 #include <string>
 #include <sstream>
 #include <vector>
@@ -488,23 +495,39 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::ReleaseInternalVariables()
 		RendererDescriptorHeap = nullptr;
 	}
 
-	if (ShaderTableRayGen != nullptr)
+	for(auto& elem : ShaderTableMiss)
 	{
-		ShaderTableRayGen.Reset();
-		ShaderTableRayGen = nullptr;
+		if (elem != nullptr)
+		{
+			elem.Reset();
+			elem = nullptr;
+		}
 	}
 
-	if (ShaderTableMiss != nullptr)
+	ShaderTableMiss.clear();
+
+	for (auto& elem : ShaderTableHitGroups)
 	{
-		ShaderTableMiss.Reset();
-		ShaderTableMiss = nullptr;
+		if (elem != nullptr)
+		{
+			elem.Reset();
+			elem = nullptr;
+		}
 	}
 
-	if (ShaderTableHitGroups != nullptr)
+	ShaderTableHitGroups.clear();
+
+	for (auto& elem : ShaderTableRayGen)
 	{
-		ShaderTableHitGroups.Reset();
-		ShaderTableHitGroups = nullptr;
+		if (elem != nullptr)
+		{
+			elem.Reset();
+			elem = nullptr;
+		}
 	}
+
+	ShaderTableRayGen.clear();
+	DXRStateObjects.clear();
 
 	if (Fence != nullptr)
 	{
@@ -647,35 +670,91 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::InitializeGlobalRootSignature()
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::InitRaytracingPipeline()
 {
-	CD3DX12_STATE_OBJECT_DESC pipelineDesc { D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
+	DXRStateObjects.clear();
+	DXRStateObjects.resize(8);
 
-	InitShaders(&pipelineDesc);
-	CreateHitGroups(&pipelineDesc);
-
-	CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT* shaderConfig = pipelineDesc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-	UINT payloadSize = max(sizeof(VRayPayload), sizeof(VShadowRayPayload));
-	UINT attributeSize = sizeof(VPrimitiveAttributes);
-
-	shaderConfig->Config(payloadSize, attributeSize);
-
-	CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* globalRootSig = pipelineDesc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
-	globalRootSig->SetRootSignature(GlobalRootSignature.Get());
-
-	CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT* pipelineConfig = pipelineDesc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
-	pipelineConfig->Config(MAX_RAY_RECURSION_DEPTH);
-
-	if (FAILED(Device->CreateStateObject(pipelineDesc, IID_PPV_ARGS(&DXRStateObject))))
+	for (int i = 0; i < 8; i++)
 	{
-		V_LOG_ERROR("Failed to initialize raytracing pipeline!");
+		CD3DX12_STATE_OBJECT_DESC pipelineDesc{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
+
+		InitShaders(&pipelineDesc, static_cast<EVRenderMode>(i));
+		CreateHitGroups(&pipelineDesc);
+
+		CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT* shaderConfig = pipelineDesc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
+		UINT payloadSize = max(sizeof(VRayPayload), sizeof(VShadowRayPayload));
+		UINT attributeSize = sizeof(VPrimitiveAttributes);
+
+		shaderConfig->Config(payloadSize, attributeSize);
+
+		CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* globalRootSig = pipelineDesc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+		globalRootSig->SetRootSignature(GlobalRootSignature.Get());
+
+		CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT* pipelineConfig = pipelineDesc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
+		pipelineConfig->Config(MAX_RAY_RECURSION_DEPTH);
+
+		if (FAILED(Device->CreateStateObject(pipelineDesc, IID_PPV_ARGS(&DXRStateObjects[i]))))
+		{
+			V_LOG_ERROR("Failed to initialize raytracing pipeline!");
+			return;
+		}
 	}
 }
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::InitShaders(CD3DX12_STATE_OBJECT_DESC* pipelineDesc)
+void VolumeRaytracer::Renderer::DX::VDXRenderer::InitShaders(CD3DX12_STATE_OBJECT_DESC* pipelineDesc, const EVRenderMode& renderMode)
 {
 	CD3DX12_DXIL_LIBRARY_SUBOBJECT* dxilLib = pipelineDesc->CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
 
-	D3D12_SHADER_BYTECODE shaderByteCode = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing, ARRAYSIZE(g_pRaytracing));
-	dxilLib->SetDXILLibrary(&shaderByteCode);
+	switch (renderMode)
+	{
+	case EVRenderMode::Interp:
+	{
+		D3D12_SHADER_BYTECODE shaderByteCode = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing, ARRAYSIZE(g_pRaytracing));
+		dxilLib->SetDXILLibrary(&shaderByteCode);
+	}
+		break;
+	case EVRenderMode::Interp_Unlit:
+	{
+		D3D12_SHADER_BYTECODE shaderByteCode = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing_unlit, ARRAYSIZE(g_pRaytracing_unlit));
+		dxilLib->SetDXILLibrary(&shaderByteCode);
+	}
+		break;
+	case EVRenderMode::Interp_NoTex:
+	{
+		D3D12_SHADER_BYTECODE shaderByteCode = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing_noTex, ARRAYSIZE(g_pRaytracing_noTex));
+		dxilLib->SetDXILLibrary(&shaderByteCode);
+	}
+		break;
+	case EVRenderMode::Interp_NoTex_Unlit:
+	{
+		D3D12_SHADER_BYTECODE shaderByteCode = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing_noTex_unlit, ARRAYSIZE(g_pRaytracing_noTex_unlit));
+		dxilLib->SetDXILLibrary(&shaderByteCode);
+	}
+		break;
+	case EVRenderMode::Cube:
+	{
+		D3D12_SHADER_BYTECODE shaderByteCode = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing_cube, ARRAYSIZE(g_pRaytracing_cube));
+		dxilLib->SetDXILLibrary(&shaderByteCode);
+	}
+		break;
+	case EVRenderMode::Cube_Unlit:
+	{
+		D3D12_SHADER_BYTECODE shaderByteCode = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing_cube_unlit, ARRAYSIZE(g_pRaytracing_cube_unlit));
+		dxilLib->SetDXILLibrary(&shaderByteCode);
+	}
+		break;
+	case EVRenderMode::Cube_NoTex:
+	{
+		D3D12_SHADER_BYTECODE shaderByteCode = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing_cube_noTex, ARRAYSIZE(g_pRaytracing_cube_noTex));
+		dxilLib->SetDXILLibrary(&shaderByteCode);
+	}
+		break;
+	case EVRenderMode::Cube_NoTex_Unlit:
+	{
+		D3D12_SHADER_BYTECODE shaderByteCode = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing_cube_noTex_unlit, ARRAYSIZE(g_pRaytracing_cube_noTex_unlit));
+		dxilLib->SetDXILLibrary(&shaderByteCode);
+	}
+		break;
+	}
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::CreateHitGroups(CD3DX12_STATE_OBJECT_DESC* pipelineDesc)
@@ -698,20 +777,29 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::CreateHitGroups(CD3DX12_STATE_O
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::CreateShaderTables()
 {
-	CPtr<ID3D12StateObjectProperties> stateObjectProps;
-	DXRStateObject.As(&stateObjectProps);
+	ShaderTableRayGen.resize(DXRStateObjects.size());
+	ShaderTableMiss.resize(DXRStateObjects.size());
+	ShaderTableHitGroups.resize(DXRStateObjects.size());
+	StrideShaderTableHitGroups.resize(DXRStateObjects.size());
+	StrideShaderTableMiss.resize(DXRStateObjects.size());
 
-	void* rayGenShaderID = stateObjectProps->GetShaderIdentifier(VDXConstants::SHADER_NAME_RAYGEN.c_str());
-	void* missShaderID = stateObjectProps->GetShaderIdentifier(VDXConstants::SHADER_NAME_MISS.c_str());
-	void* missShaderShadowID = stateObjectProps->GetShaderIdentifier(VDXConstants::SHADER_NAME_MISS_SHADOW.c_str());
-	void* rayHitGroupID = stateObjectProps->GetShaderIdentifier(VDXConstants::HIT_GROUP.c_str());
-	void* rayHitGroupShadowID = stateObjectProps->GetShaderIdentifier(VDXConstants::SHADOW_HIT_GROUP.c_str());
+	for (int i = 0; i < DXRStateObjects.size(); i++)
+	{
+		CPtr<ID3D12StateObjectProperties> stateObjectProps;
+		DXRStateObjects[i].As(&stateObjectProps);
 
-	UINT strideRayGen = 0;
+		void* rayGenShaderID = stateObjectProps->GetShaderIdentifier(VDXConstants::SHADER_NAME_RAYGEN.c_str());
+		void* missShaderID = stateObjectProps->GetShaderIdentifier(VDXConstants::SHADER_NAME_MISS.c_str());
+		void* missShaderShadowID = stateObjectProps->GetShaderIdentifier(VDXConstants::SHADER_NAME_MISS_SHADOW.c_str());
+		void* rayHitGroupID = stateObjectProps->GetShaderIdentifier(VDXConstants::HIT_GROUP.c_str());
+		void* rayHitGroupShadowID = stateObjectProps->GetShaderIdentifier(VDXConstants::SHADOW_HIT_GROUP.c_str());
 
-	ShaderTableRayGen = CreateShaderTable(std::vector<void*>{rayGenShaderID}, strideRayGen);
-	ShaderTableMiss = CreateShaderTable(std::vector<void*>{missShaderID, missShaderShadowID}, StrideShaderTableMiss);
-	ShaderTableHitGroups = CreateShaderTable(std::vector<void*>{rayHitGroupID, rayHitGroupShadowID}, StrideShaderTableHitGroups);
+		UINT strideRayGen = 0;
+
+		ShaderTableRayGen[i] = CreateShaderTable(std::vector<void*>{rayGenShaderID}, strideRayGen);
+		ShaderTableMiss[i] = CreateShaderTable(std::vector<void*>{missShaderID, missShaderShadowID}, StrideShaderTableMiss[i]);
+		ShaderTableHitGroups[i] = CreateShaderTable(std::vector<void*>{rayHitGroupID, rayHitGroupShadowID}, StrideShaderTableHitGroups[i]);
+	}
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::PrepareForRendering()
@@ -755,20 +843,22 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::DoRendering()
 		CommandList->SetComputeRootDescriptorTable(binding.first, binding.second.BindingGPUHandle);
 	}
 
+	int renderMode = static_cast<int>(RenderMode);
+
 	D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
-	dispatchDesc.HitGroupTable.StartAddress = ShaderTableHitGroups->GetGPUVirtualAddress();
-	dispatchDesc.HitGroupTable.SizeInBytes = ShaderTableHitGroups->GetDesc().Width;
-	dispatchDesc.HitGroupTable.StrideInBytes = StrideShaderTableHitGroups;
-	dispatchDesc.MissShaderTable.StartAddress = ShaderTableMiss->GetGPUVirtualAddress();
-	dispatchDesc.MissShaderTable.SizeInBytes = ShaderTableMiss->GetDesc().Width;
-	dispatchDesc.MissShaderTable.StrideInBytes = StrideShaderTableMiss;
-	dispatchDesc.RayGenerationShaderRecord.StartAddress = ShaderTableRayGen->GetGPUVirtualAddress();
-	dispatchDesc.RayGenerationShaderRecord.SizeInBytes = ShaderTableRayGen->GetDesc().Width;
+	dispatchDesc.HitGroupTable.StartAddress = ShaderTableHitGroups[renderMode]->GetGPUVirtualAddress();
+	dispatchDesc.HitGroupTable.SizeInBytes = ShaderTableHitGroups[renderMode]->GetDesc().Width;
+	dispatchDesc.HitGroupTable.StrideInBytes = StrideShaderTableHitGroups[renderMode];
+	dispatchDesc.MissShaderTable.StartAddress = ShaderTableMiss[renderMode]->GetGPUVirtualAddress();
+	dispatchDesc.MissShaderTable.SizeInBytes = ShaderTableMiss[renderMode]->GetDesc().Width;
+	dispatchDesc.MissShaderTable.StrideInBytes = StrideShaderTableMiss[renderMode];
+	dispatchDesc.RayGenerationShaderRecord.StartAddress = ShaderTableRayGen[renderMode]->GetGPUVirtualAddress();
+	dispatchDesc.RayGenerationShaderRecord.SizeInBytes = ShaderTableRayGen[renderMode]->GetDesc().Width;
 	dispatchDesc.Width = WindowRenderTarget->GetWidth();
 	dispatchDesc.Height = WindowRenderTarget->GetHeight();
 	dispatchDesc.Depth = 1;
 	
-	CommandList->SetPipelineState1(DXRStateObject.Get());
+	CommandList->SetPipelineState1(DXRStateObjects[renderMode].Get());
 	CommandList->DispatchRays(&dispatchDesc);
 }
 

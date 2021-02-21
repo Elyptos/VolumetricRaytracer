@@ -93,7 +93,17 @@ boost::signals2::connection VolumeRaytracer::UI::VWindow::OnWindowClosed_Bind(co
 
 boost::signals2::connection VolumeRaytracer::UI::VWindow::OnKeyDown_Bind(const KeyInputDelegate::slot_type& del)
 {
+	return OnKeyDownEvent.connect(del);
+}
+
+boost::signals2::connection VolumeRaytracer::UI::VWindow::OnKeyPressed_Bind(const KeyInputDelegate::slot_type& del)
+{
 	return OnKeyPressedEvent.connect(del);
+}
+
+boost::signals2::connection VolumeRaytracer::UI::VWindow::OnKeyReleased_Bind(const KeyInputDelegate::slot_type& del)
+{
+	return OnKeyReleasedEvent.connect(del);
 }
 
 boost::signals2::connection VolumeRaytracer::UI::VWindow::OnAxisInput_Bind(const AxisDelegate::slot_type& del)
@@ -119,12 +129,21 @@ void VolumeRaytracer::UI::VWindow::CloseWindow()
 
 void VolumeRaytracer::UI::VWindow::OnKeyPressed(const EVKeyType& key)
 {
-	PressedKeys.insert(key);
+	if (PressedKeys.find(key) == PressedKeys.end())
+	{
+		PressedKeys.insert(key);
+
+		OnKeyPressedEvent(key);
+	}
 }
 
 void VolumeRaytracer::UI::VWindow::OnKeyReleased(const EVKeyType& key)
 {
-	PressedKeys.erase(key);
+	if (PressedKeys.find(key) != PressedKeys.end())
+	{
+		PressedKeys.erase(key);
+		OnKeyReleasedEvent(key);
+	}
 }
 
 void VolumeRaytracer::UI::VWindow::OnAxisInput(const EVAxisType& axis, const float& delta)
@@ -162,7 +181,7 @@ void VolumeRaytracer::UI::VWindow::ProcessKeyboardStates()
 {
 	for (const auto& keyState : PressedKeys)
 	{
-		OnKeyPressedEvent(keyState);
+		OnKeyDownEvent(keyState);
 	}
 }
 
