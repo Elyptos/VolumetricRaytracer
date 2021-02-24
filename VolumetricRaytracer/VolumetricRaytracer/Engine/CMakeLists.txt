@@ -22,5 +22,6 @@ add_library (VEngine ${engine_public} ${engine_private})
 target_link_libraries(VEngine VCore)
 target_link_libraries(VEngine ${Boost_LIBRARIES})
 target_link_libraries(VEngine VRenderer)
+target_link_libraries(VEngine VUI)
 
 target_include_directories(VEngine PUBLIC "Public")

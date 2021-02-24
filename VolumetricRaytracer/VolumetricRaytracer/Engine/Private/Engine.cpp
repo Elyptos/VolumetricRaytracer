@@ -29,6 +29,8 @@
 #include <sstream>
 #include <algorithm>
 
+#include "MessageBox.h"
+
 
 VolumeRaytracer::Engine::VEngine::~VEngine()
 {
@@ -41,9 +43,17 @@ void VolumeRaytracer::Engine::VEngine::Start()
 	{
 		InitFPSCounter();
 		InitializeLogger();
-		InitializeRenderer();
-		InitializeEngineInstance();
-		StartEngineLoop();
+
+		if (InitializeRenderer())
+		{
+			InitializeEngineInstance();
+			StartEngineLoop();
+		}
+		else
+		{
+			UI::VMessageBox::ShowOk(L"Renderer Initialization Error", L"Renderer failed to initialize!\nPlease make sure your system meets the required system specifications:\n\nGPU: NVIDIA RTX 20xx or newer", UI::EVMessageBoxType::Error);
+			Shutdown();
+		}
 	}
 }
 
@@ -88,10 +98,10 @@ void VolumeRaytracer::Engine::VEngine::InitializeEngineInstance()
 	}
 }
 
-void VolumeRaytracer::Engine::VEngine::InitializeRenderer()
+bool VolumeRaytracer::Engine::VEngine::InitializeRenderer()
 {
 	Renderer = Renderer::VRendererFactory::NewRenderer();
-	Renderer->Start();
+	return Renderer->Start();
 }
 
 void VolumeRaytracer::Engine::VEngine::InitFPSCounter()

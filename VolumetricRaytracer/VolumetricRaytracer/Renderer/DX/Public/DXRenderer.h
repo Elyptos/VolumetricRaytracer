@@ -146,7 +146,7 @@ namespace VolumeRaytracer
 				~VDXRenderer();
 
 				void Render() override;
-				void Start() override;
+				bool Start() override;
 				void Stop() override;
 
 				bool IsActive() const override { return IsInitialized; }
@@ -173,7 +173,7 @@ namespace VolumeRaytracer
 				bool HasValidWindow() const;
 
 			private:
-				void SetupRenderer();
+				bool SetupRenderer();
 				void DestroyRenderer();
 
 				void SetupDebugLayer();

@@ -13,19 +13,22 @@
 */
 
 #include <string>
-#include <vector>
 
 namespace VolumeRaytracer
 {
 	namespace UI
 	{
-		class VOpenFileDialog
+		enum EVMessageBoxType
+		{
+			Info = 0,
+			Warning = 1,
+			Error = 2,
+		};
+
+		class VMessageBox
 		{
 		public:
-			static bool Open(const std::wstring& filter, std::wstring& outPath);
-
-		private:
-			static void SplitFilter(const std::wstring& filter, std::vector<std::wstring>& outfilterNames, std::vector<std::wstring>& outFilter);
+			static void ShowOk(const std::wstring& title, const std::wstring& message, const EVMessageBoxType& type = EVMessageBoxType::Info);
 		};
 	}
 }

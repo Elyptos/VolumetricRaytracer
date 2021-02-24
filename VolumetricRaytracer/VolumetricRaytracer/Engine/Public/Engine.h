@@ -49,7 +49,7 @@ namespace VolumeRaytracer
 		private:
 			void InitializeLogger();
 			void InitializeEngineInstance();
-			void InitializeRenderer();
+			bool InitializeRenderer();
 			void InitFPSCounter();
 
 			std::string GetCurrentDateTimeAsString() const;

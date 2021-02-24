@@ -66,9 +66,9 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::Render()
 }
 
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::Start()
+bool VolumeRaytracer::Renderer::DX::VDXRenderer::Start()
 {
-	SetupRenderer();
+	return SetupRenderer();
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::Stop()
@@ -201,7 +201,7 @@ bool VolumeRaytracer::Renderer::DX::VDXRenderer::HasValidWindow() const
 	return WindowRenderTarget != nullptr;
 }
 
-void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
+bool VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 {
 	if (!IsActive())
 	{
@@ -221,7 +221,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 		{
 			V_LOG_FATAL("DXGI initialization failed!");
 			ReleaseInternalVariables();
-			return;
+			return false;
 		}
 
 		CPtr<IDXGIAdapter3> adapter = SelectGPU();
@@ -230,14 +230,14 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 		{
 			V_LOG_FATAL("No suitable DirectX device found on this system!");
 			ReleaseInternalVariables();
-			return;
+			return false;
 		}
 
 		if (FAILED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&Device))))
 		{
 			V_LOG_FATAL("DirectX device creation failed!");
 			ReleaseInternalVariables();
-			return;
+			return false;
 		}
 
 #ifdef _DEBUG
@@ -256,7 +256,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 		{
 			V_LOG_FATAL("Command queue creation failed!");
 			ReleaseInternalVariables();
-			return;
+			return false;
 		}
 
 		SetDXDebugName<ID3D12CommandQueue>(RenderCommandQueue, "VR Command Queue");
@@ -269,7 +269,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 			{
 				V_LOG_FATAL("Command allocator creation failed!");
 				ReleaseInternalVariables();
-				return;
+				return false;
 			}
 
 			SetDXDebugName<ID3D12CommandAllocator>(WindowCommandAllocators[i], "VR Command Allocator " + i);
@@ -279,7 +279,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 		{
 			V_LOG_FATAL("Command list creation failed!");
 			ReleaseInternalVariables();
-			return;
+			return false;
 		}
 
 		SetDXDebugName<ID3D12CommandList>(CommandList, "VR Command List");
@@ -298,7 +298,7 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 		{
 			V_LOG_FATAL("DX Fence creation failed!");
 			ReleaseInternalVariables();
-			return;
+			return false;
 		}
 
 		SetDXDebugName<ID3D12Fence>(Fence, "Volume Raytracer Fence");
@@ -308,7 +308,11 @@ void VolumeRaytracer::Renderer::DX::VDXRenderer::SetupRenderer()
 		IsInitialized = true;
 
 		V_LOG("DirectX 12 renderer initialized!");
+
+		return true;
 	}
+
+	return false;
 }
 
 void VolumeRaytracer::Renderer::DX::VDXRenderer::DestroyRenderer()

@@ -47,7 +47,7 @@ namespace VolumeRaytracer
 			virtual ~VRenderer() = default;
 
 			virtual void Render() = 0;
-			virtual void Start() = 0;
+			virtual bool Start() = 0;
 			virtual void Stop() = 0;
 
 			virtual bool IsActive() const = 0;

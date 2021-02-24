@@ -12,20 +12,30 @@
 	copies or substantial portions of the Software.
 */
 
-#include <string>
-#include <vector>
+#include "MessageBox.h"
 
-namespace VolumeRaytracer
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+void VolumeRaytracer::UI::VMessageBox::ShowOk(const std::wstring& title, const std::wstring& message, const EVMessageBoxType& type /*= EVMessageBoxType::Info*/)
 {
-	namespace UI
-	{
-		class VOpenFileDialog
-		{
-		public:
-			static bool Open(const std::wstring& filter, std::wstring& outPath);
+#ifdef _WIN32
+	UINT icon = 0;
 
-		private:
-			static void SplitFilter(const std::wstring& filter, std::vector<std::wstring>& outfilterNames, std::vector<std::wstring>& outFilter);
-		};
+	switch (type)
+	{
+		case EVMessageBoxType::Warning:
+		icon = MB_ICONWARNING;
+		break;
+		case EVMessageBoxType::Error:
+		icon = MB_ICONERROR;
+		break;
+		default:
+		icon = MB_ICONINFORMATION;
+		break;
 	}
+
+	MessageBoxW(NULL, message.c_str(), title.c_str(), MB_OK | icon);
+#endif
 }
