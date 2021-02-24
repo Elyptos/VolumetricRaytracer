@@ -100,7 +100,7 @@ namespace VolumeRaytracer
 	}
 }
 
-bool VolumeRaytracer::VSerializationManager::LoadObjectFromFile(std::shared_ptr<IVSerializable> obj, const std::string& filePath)
+bool VolumeRaytracer::VSerializationManager::LoadObjectFromFile(std::shared_ptr<IVSerializable> obj, const std::wstring& filePath)
 {
 	if (boost::filesystem::exists(filePath))
 	{
