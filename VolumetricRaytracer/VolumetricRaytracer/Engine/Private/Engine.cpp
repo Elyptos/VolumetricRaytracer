@@ -51,7 +51,7 @@ void VolumeRaytracer::Engine::VEngine::Start()
 		}
 		else
 		{
-			UI::VMessageBox::ShowOk(L"Renderer Initialization Error", L"Renderer failed to initialize!\nPlease make sure your system meets the required system specifications:\n\nGPU: NVIDIA RTX 20xx or newer", UI::EVMessageBoxType::Error);
+			UI::VMessageBox::ShowOk(L"Renderer Initialization Error", L"Renderer failed to initialize!\nPlease make sure your system meets the required system specifications:\n\nGPU: NVIDIA RTX 20xx or newer\nOS: Windows 10", UI::EVMessageBoxType::Error);
 			Shutdown();
 		}
 	}
