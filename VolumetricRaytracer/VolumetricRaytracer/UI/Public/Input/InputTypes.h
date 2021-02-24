@@ -24,7 +24,10 @@ namespace VolumeRaytracer
 			W,
 			A,
 			S,
-			D
+			D,
+			N1,
+			N2,
+			N3
 		};
 
 		enum class EVAxisType

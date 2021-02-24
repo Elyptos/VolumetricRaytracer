@@ -59,6 +59,7 @@ void VolumeRaytracer::App::RendererEngineInstance::OnEngineShutdown()
 
 		OnWindowClosedHandle.disconnect();
 		OnKeyDownHandle.disconnect();
+		OnKeyPressedHandle.disconnect();
 		OnAxisInpuHandle.disconnect();
 		Window = nullptr;
 	}
@@ -71,6 +72,41 @@ void VolumeRaytracer::App::RendererEngineInstance::OnEngineUpdate(const float& d
 	windowTitle << L"Volume Raytracer | FPS: " << Engine->GetFPS();
 	
 	Window->SetTitle(windowTitle.str());
+	
+	std::shared_ptr<Renderer::VRenderer> renderer = Engine->GetRenderer().lock();
+
+	if (!CubeMode && !Unlit && ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Interp);
+	}
+	else if (!CubeMode && Unlit && ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Interp_Unlit);
+	}
+	else if (!CubeMode && Unlit && !ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Interp_NoTex_Unlit);
+	}
+	else if (!CubeMode && !Unlit && !ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Interp_NoTex);
+	}
+	else if (CubeMode && !Unlit && ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Cube);
+	}
+	else if (CubeMode && Unlit && ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Cube_Unlit);
+	}
+	else if (CubeMode && Unlit && !ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Cube_NoTex_Unlit);
+	}
+	else if (CubeMode && !Unlit && !ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Cube_NoTex);
+	}
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::CreateRendererWindow()
@@ -79,6 +115,7 @@ void VolumeRaytracer::App::RendererEngineInstance::CreateRendererWindow()
 	OnWindowClosedHandle = Window->OnWindowClosed_Bind(boost::bind(&RendererEngineInstance::OnWindowClosed, this));
 
 	OnKeyDownHandle = Window->OnKeyDown_Bind(boost::bind(&RendererEngineInstance::OnKeyDown, this, boost::placeholders::_1));
+	OnKeyPressedHandle = Window->OnKeyPressed_Bind(boost::bind(&RendererEngineInstance::OnKeyPressed, this, boost::placeholders::_1));
 	OnAxisInpuHandle = Window->OnAxisInput_Bind(boost::bind(&RendererEngineInstance::OnAxisInput, this, boost::placeholders::_1, boost::placeholders::_2));
 }
 
@@ -126,6 +163,28 @@ void VolumeRaytracer::App::RendererEngineInstance::OnKeyDown(const VolumeRaytrac
 	}
 
 	Camera->Position = Camera->Position + velocity;
+}
+
+void VolumeRaytracer::App::RendererEngineInstance::OnKeyPressed(const VolumeRaytracer::UI::EVKeyType& key)
+{
+	switch (key)
+	{
+		case UI::EVKeyType::N1:
+		{
+			CubeMode = !CubeMode;
+		}
+		break;
+		case UI::EVKeyType::N2:
+		{
+			ShowTextures = !ShowTextures;
+		}
+		break;
+		case UI::EVKeyType::N3:
+		{
+			Unlit = !Unlit;
+		}
+		break;
+	}
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::OnAxisInput(const VolumeRaytracer::UI::EVAxisType& axis, const float& delta)

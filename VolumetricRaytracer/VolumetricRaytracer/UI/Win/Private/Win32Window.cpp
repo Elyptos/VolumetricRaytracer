@@ -49,6 +49,9 @@ namespace VolumeRaytracer
 				D = 0x44,
 				S = 0x53,
 				W = 0x57,
+				N1 = 0x31,
+				N2 = 0x32,
+				N3 = 0x33
 			};
 		}
 	}
@@ -349,6 +352,21 @@ void VolumeRaytracer::UI::Win32::VWin32Window::ProcessKeyDown(WPARAM key)
 			OnKeyPressed(EVKeyType::D);
 		}
 		break;
+		case EVWin32KeyCode::N1:
+		{
+			OnKeyPressed(EVKeyType::N1);
+		}
+		break;
+		case EVWin32KeyCode::N2:
+		{
+			OnKeyPressed(EVKeyType::N2);
+		}
+		break;
+		case EVWin32KeyCode::N3:
+		{
+			OnKeyPressed(EVKeyType::N3);
+		}
+		break;
 	}
 }
 
@@ -375,6 +393,19 @@ void VolumeRaytracer::UI::Win32::VWin32Window::ProcessKeyUp(WPARAM key)
 	case EVWin32KeyCode::D:
 	{
 		OnKeyReleased(EVKeyType::D);
+	}
+	break;
+	case EVWin32KeyCode::N1:
+	{
+		OnKeyReleased(EVKeyType::N1);
+	}
+	case EVWin32KeyCode::N2:
+	{
+		OnKeyReleased(EVKeyType::N2);
+	}
+	case EVWin32KeyCode::N3:
+	{
+		OnKeyReleased(EVKeyType::N3);
 	}
 	break;
 	}

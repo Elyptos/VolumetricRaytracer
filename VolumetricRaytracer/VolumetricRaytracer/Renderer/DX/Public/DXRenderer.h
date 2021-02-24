@@ -191,7 +191,7 @@ namespace VolumeRaytracer
 				void InitRendererDescriptorHeap();
 				void InitializeGlobalRootSignature();
 				void InitRaytracingPipeline();
-				void InitShaders(CD3DX12_STATE_OBJECT_DESC* pipelineDesc);
+				void InitShaders(CD3DX12_STATE_OBJECT_DESC* pipelineDesc, const EVRenderMode& renderMode);
 				void CreateHitGroups(CD3DX12_STATE_OBJECT_DESC* pipelineDesc);
 
 				void CreateShaderTables();
@@ -229,17 +229,18 @@ namespace VolumeRaytracer
 
 				CPtr<IDXGIFactory4> DXGIFactory;
 				CPtr<ID3D12GraphicsCommandList5> CommandList;
-				CPtr<ID3D12StateObject> DXRStateObject;
+
+				std::vector<CPtr<ID3D12StateObject>> DXRStateObjects;
 				CPtr<ID3D12PipelineState> PipelineState;
 
 				CPtr<ID3D12Fence> Fence = nullptr;
 				HANDLE FenceEvent;
 
-				CPtr<ID3D12Resource> ShaderTableRayGen;
-				CPtr<ID3D12Resource> ShaderTableHitGroups;
-				UINT StrideShaderTableHitGroups;
-				CPtr<ID3D12Resource> ShaderTableMiss;
-				UINT StrideShaderTableMiss;
+				std::vector<CPtr<ID3D12Resource>> ShaderTableRayGen;
+				std::vector<CPtr<ID3D12Resource>> ShaderTableHitGroups;
+				std::vector<UINT> StrideShaderTableHitGroups;
+				std::vector<CPtr<ID3D12Resource>> ShaderTableMiss;
+				std::vector<UINT> StrideShaderTableMiss;
 
 				VDXDescriptorHeapRingBuffer* RendererDescriptorHeap = nullptr;
 				VDXDescriptorHeapRingBuffer* RendererSamplerDescriptorHeap = nullptr;

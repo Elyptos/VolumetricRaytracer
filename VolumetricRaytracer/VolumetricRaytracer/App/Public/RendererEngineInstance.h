@@ -51,6 +51,7 @@ namespace VolumeRaytracer
 
 			void OnWindowClosed();
 			void OnKeyDown(const VolumeRaytracer::UI::EVKeyType& key);
+			void OnKeyPressed(const VolumeRaytracer::UI::EVKeyType& key);
 			void OnAxisInput(const VolumeRaytracer::UI::EVAxisType& axis, const float& delta);
 
 			void InitScene();
@@ -77,7 +78,12 @@ namespace VolumeRaytracer
 
 			boost::signals2::connection OnWindowClosedHandle;
 			boost::signals2::connection OnKeyDownHandle;
+			boost::signals2::connection OnKeyPressedHandle;
 			boost::signals2::connection OnAxisInpuHandle;
+
+			bool CubeMode = false; 
+			bool ShowTextures = true;
+			bool Unlit = false;
 		};
 	}
 }
