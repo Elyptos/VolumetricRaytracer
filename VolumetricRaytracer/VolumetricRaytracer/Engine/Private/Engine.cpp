@@ -39,8 +39,10 @@ VolumeRaytracer::Engine::VEngine::~VEngine()
 
 void VolumeRaytracer::Engine::VEngine::Start()
 {
-	if (IsEngineActive() == false)
+	if (IsEngineActive() == false && !IsPendingStart)
 	{
+		IsPendingStart = true;
+
 		InitFPSCounter();
 		InitializeLogger();
 
@@ -59,7 +61,7 @@ void VolumeRaytracer::Engine::VEngine::Start()
 
 void VolumeRaytracer::Engine::VEngine::Shutdown()
 {
-	if (IsEngineActive())
+	if (IsEngineActive() || IsPendingStart)
 	{
 		StopEngineLoop();
 	}
@@ -167,11 +169,16 @@ void VolumeRaytracer::Engine::VEngine::ExecuteRenderCommand()
 
 void VolumeRaytracer::Engine::VEngine::StartEngineLoop()
 {
-	IsRunning = true;
+	if (IsPendingStart == true)
+	{
+		IsRunning = true;
 
-	V_LOG("Starting engine");
+		IsPendingStart = false;
 
-	EngineLoop();
+		V_LOG("Starting engine");
+
+		EngineLoop();
+	}
 }
 
 void VolumeRaytracer::Engine::VEngine::StopEngineLoop()
@@ -179,6 +186,7 @@ void VolumeRaytracer::Engine::VEngine::StopEngineLoop()
 	V_LOG("Stopping engine");
 
 	IsRunning = false;
+	IsPendingStart = false;
 }
 
 void VolumeRaytracer::Engine::VEngine::StopRenderer()

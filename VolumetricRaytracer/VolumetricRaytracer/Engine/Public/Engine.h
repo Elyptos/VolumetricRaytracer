@@ -71,6 +71,7 @@ namespace VolumeRaytracer
 
 		private:
 			bool IsRunning = false;
+			bool IsPendingStart = false;
 			float EngineDeltaTime = 0.f;
 
 			unsigned int FPS = 0;
