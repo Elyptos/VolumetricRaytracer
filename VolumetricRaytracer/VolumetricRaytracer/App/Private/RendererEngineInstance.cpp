@@ -212,7 +212,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
 	Scene = VObject::CreateObject<Scene::VScene>();
 
-	LoadSceneFromFile("../Voxelizer/Church.vox");
+	LoadSceneFromFile(L"../Voxelizer/Church.vox");
 	Camera = Scene->SpawnObject<Scene::VCamera>(VVector(300.f, 0.f, 100.f), VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f)), VVector::ONE);
 
 	//DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
@@ -452,7 +452,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitCube()
 	Cube->SetVoxelVolume(voxelVolume);
 }
 
-void VolumeRaytracer::App::RendererEngineInstance::LoadSceneFromFile(const std::string& filePath)
+void VolumeRaytracer::App::RendererEngineInstance::LoadSceneFromFile(const std::wstring& filePath)
 {
 	Scene = VSerializationManager::LoadFromFile<Scene::VScene>(filePath);
 }
