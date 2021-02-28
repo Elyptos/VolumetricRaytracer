@@ -107,7 +107,7 @@ bool VolumeRaytracer::VSerializationManager::LoadObjectFromFile(std::shared_ptr<
 		std::ifstream stream = std::ifstream(filePath, std::ios::binary);
 
 		std::shared_ptr<VSerializationArchive> archive = Internal::DeserializeArchive(stream);
-		obj->Deserialize(archive);
+		obj->Deserialize(filePath, archive);
 
 		stream.close();
 

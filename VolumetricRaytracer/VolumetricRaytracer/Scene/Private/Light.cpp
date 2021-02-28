@@ -47,7 +47,7 @@ std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Scene::
 	return res;
 }
 
-void VolumeRaytracer::Scene::VLight::Deserialize(std::shared_ptr<VSerializationArchive> archive)
+void VolumeRaytracer::Scene::VLight::Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive)
 {
 	Position = archive->Properties["Position"]->To<VVector>();
 	Scale = archive->Properties["Scale"]->To<VVector>();

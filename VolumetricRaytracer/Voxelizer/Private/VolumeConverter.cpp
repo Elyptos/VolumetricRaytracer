@@ -40,6 +40,12 @@ VolumeRaytracer::VObjectPtr<VolumeRaytracer::Voxel::VVoxelVolume> VolumeRaytrace
 		std::cout << "[WARNING] Mesh with name " << meshInfo.MeshName << " has no or invalid resolution specifier. Correct syntax is meshName_resolution (cubeMesh_6). Using default resolution of 5!" << std::endl;
 	}
 
+	if (desiredResolution > 8)
+	{
+		std::cout << "[WARNING] Mesh with name " << meshInfo.MeshName << " has invalid resolution. Resolution needs to be between or equal than 0 and 8.";
+		desiredResolution = 5;
+	}
+
 	VObjectPtr<Voxel::VVoxelVolume> volume = VObject::CreateObject<Voxel::VVoxelVolume>(desiredResolution, extends);
 
 	Voxel::VVoxel defaultVoxel;

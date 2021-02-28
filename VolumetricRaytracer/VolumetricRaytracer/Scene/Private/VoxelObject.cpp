@@ -63,7 +63,7 @@ std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Scene::
 	return res;
 }
 
-void VolumeRaytracer::Scene::VVoxelObject::Deserialize(std::shared_ptr<VSerializationArchive> archive)
+void VolumeRaytracer::Scene::VVoxelObject::Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive)
 {
 	memcpy(&Position, archive->Properties["Position"]->Buffer, sizeof(VVector));
 	memcpy(&Scale, archive->Properties["Scale"]->Buffer, sizeof(VVector));

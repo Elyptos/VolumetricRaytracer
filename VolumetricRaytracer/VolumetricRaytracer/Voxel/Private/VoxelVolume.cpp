@@ -197,14 +197,14 @@ std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Voxel::
 	return res;
 }
 
-void VolumeRaytracer::Voxel::VVoxelVolume::Deserialize(std::shared_ptr<VSerializationArchive> archive)
+void VolumeRaytracer::Voxel::VVoxelVolume::Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive)
 {
 	Resolution = archive->Properties["Resolution"]->To<uint8_t>();
 	VolumeExtends = archive->Properties["Extends"]->To<float>();
 	//SetMaterial(archive->Properties["Material"]->To<VMaterial>());
 
 	VMaterial mat;
-	mat.Deserialize(archive->Properties["Material"]);
+	mat.Deserialize(sourcePath, archive->Properties["Material"]);
 
 	SetMaterial(mat);
 
