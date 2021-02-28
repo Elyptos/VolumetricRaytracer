@@ -84,7 +84,7 @@ void VolumeRaytracer::VMaterial::Deserialize(const std::wstring& sourcePath, std
 	boost::filesystem::path normalBoostPath(NormalTexturePath);
 	boost::filesystem::path rmTextureBoostPath(RMTexturePath);
 
-	boost::filesystem::path sourceFolder = boost::filesystem::path(sourcePath).root_directory();
+	boost::filesystem::path sourceFolder = boost::filesystem::path(sourcePath).parent_path();
 
 	if (HasAlbedoTexture() && !albedoBoostPath.is_absolute())
 	{

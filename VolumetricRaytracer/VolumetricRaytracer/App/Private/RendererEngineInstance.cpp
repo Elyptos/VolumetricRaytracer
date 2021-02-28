@@ -212,7 +212,7 @@ void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
 	Scene = VObject::CreateObject<Scene::VScene>();
 
-	LoadSceneFromFile(L"../Voxelizer/Church.vox");
+	LoadSceneFromFile(L"Resources/Model/Church.vox");
 	Camera = Scene->SpawnObject<Scene::VCamera>(VVector(300.f, 0.f, 100.f), VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f)), VVector::ONE);
 
 	//DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
