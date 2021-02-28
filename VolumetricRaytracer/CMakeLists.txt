@@ -66,8 +66,8 @@ ExternalProject_Add(gltf
 ExternalProject_Get_Property(gltf source_dir)
 set(gltfIncludeDir ${source_dir}/GLTFSDK/Inc)
 
-ExternalProject_Get_Property(gltf source_dir)
-set(gltfLibDir ${source_dir}/Built/Out/windows_/Debug/GLTFSDK)
+ExternalProject_Get_Property(gltf binary_dir)
+set(gltfLibDir ${binary_dir}/GLTFSDK/)
 
 #file(DOWNLOAD https://raw.githubusercontent.com/microsoft/DirectX-Graphics-Samples/v1.5-dxr/Libraries/D3DX12/d3dx12.h ${CMAKE_CURRENT_SOURCE_DIR}/ext/d3dx12/include/d3dx12.h)
 file(DOWNLOAD https://raw.githubusercontent.com/microsoft/DirectX-Graphics-Samples/225977/Libraries/D3DX12/d3dx12.h ${CMAKE_CURRENT_SOURCE_DIR}/ext/d3dx12/include/d3dx12.h)
