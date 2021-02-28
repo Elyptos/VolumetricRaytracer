@@ -70,6 +70,10 @@ void VRClosestHit(inout VolumeRaytracer::VRayPayload rayPayload, in VolumeRaytra
 		float metallness = clamp(g_geometryCB[InstanceID()].metallness * rmInfluence.g, 0.0f, 1.0f);
 		float3 normal = TriSampleNormal(g_geometryCB[InstanceID()].normalTexture, g_geometryCB[InstanceID()].textureScale, hitPosition, attr.normal);
 		
+		float4 norm4 = float4(normal, 0.f);
+		
+		normal = mul(norm4, ObjectToWorld4x3()).xyz;
+		
 		float3 reflactanceColor = float3(0, 0, 0);
 		
 		if (roughness < 0.3f)

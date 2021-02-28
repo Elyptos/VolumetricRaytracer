@@ -786,9 +786,9 @@ float3 GetNormal(in int3 cellIndex, in float3 normPos)
 
 	float distanceBtwVoxel = g_geometryCB[instance].distanceBtwVoxels;
 
-	float x = (GetDensity(instance, cellIndex + int3(1,0,0), normPos) - GetDensity(instance, cellIndex - int3(1,0,0), normPos)) / (2 * distanceBtwVoxel);
-	float y = (GetDensity(instance, cellIndex + int3(0,1,0), normPos) - GetDensity(instance, cellIndex - int3(0,1,0), normPos)) / (2 * distanceBtwVoxel);
-	float z = (GetDensity(instance, cellIndex + int3(0,0,1), normPos) - GetDensity(instance, cellIndex - int3(0,0,1), normPos)) / (2 * distanceBtwVoxel);
+	float x = (GetDensity(instance, cellIndex + int3(1,0,0), normPos) - GetDensity(instance, cellIndex - int3(1,0,0), normPos));// / (/*2 **/ distanceBtwVoxel);
+	float y = (GetDensity(instance, cellIndex + int3(0,1,0), normPos) - GetDensity(instance, cellIndex - int3(0,1,0), normPos));// / (/*2 **/ distanceBtwVoxel);
+	float z = (GetDensity(instance, cellIndex + int3(0,0,1), normPos) - GetDensity(instance, cellIndex - int3(0,0,1), normPos));// / (/*2 **/ distanceBtwVoxel);
 
 	float3 norm = float3(x,y,z);
 	bool3 nan = isnan(norm);

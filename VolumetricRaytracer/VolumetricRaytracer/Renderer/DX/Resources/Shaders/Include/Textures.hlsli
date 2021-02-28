@@ -15,9 +15,13 @@
 
 float3 TriSampleTexture(in uint textureID, in float2 scale, in float3 worldPos, in float3 normal)
 {
-	float2 uvX = worldPos.zy / scale;
-	float2 uvY = worldPos.xz / scale;
-	float2 uvZ = worldPos.xy / scale;
+	float4 objPos = float4(worldPos.xyz, 1.f);
+	
+	objPos = float4(mul(objPos, WorldToObject4x3()).xyz, 0.f);
+	
+	float2 uvX = objPos.zy / scale;
+	float2 uvY = objPos.xz / scale;
+	float2 uvZ = objPos.xy / scale;
 	
 	float3 tX = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvX, 0.f).rgb;
 	float3 tY = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvY, 0.f).rgb;
@@ -31,9 +35,13 @@ float3 TriSampleTexture(in uint textureID, in float2 scale, in float3 worldPos, 
 
 float3 TriSampleNormal(in uint textureID, in float2 scale, in float3 worldPos, in float3 normal)
 {
-	float2 uvX = worldPos.zy / scale;
-	float2 uvY = worldPos.xz / scale;
-	float2 uvZ = worldPos.xy / scale;
+	float4 objPos = float4(worldPos.xyz, 1.f);
+	
+	objPos = float4(mul(objPos, WorldToObject4x3()).xyz, 0.f);
+	
+	float2 uvX = objPos.zy / scale;
+	float2 uvY = objPos.xz / scale;
+	float2 uvZ = objPos.xy / scale;
 	
 	float3 tX = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvX, 0.f).rgb * 2.0f - 1.0f;
 	float3 tY = g_geometryTextures[textureID].SampleLevel(g_geometrySampler, uvY, 0.f).rgb * 2.0f - 1.0f;
