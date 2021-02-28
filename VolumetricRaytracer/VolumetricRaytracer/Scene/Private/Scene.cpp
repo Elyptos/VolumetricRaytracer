@@ -460,7 +460,7 @@ std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Scene::
 	return res;
 }
 
-void VolumeRaytracer::Scene::VScene::Deserialize(std::shared_ptr<VSerializationArchive> archive)
+void VolumeRaytracer::Scene::VScene::Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive)
 {
 	size_t volumesCount = archive->Properties["VCount"]->To<size_t>();
 	size_t objectsCount = archive->Properties["OCount"]->To<size_t>();
@@ -491,7 +491,7 @@ void VolumeRaytracer::Scene::VScene::Deserialize(std::shared_ptr<VSerializationA
 		ss << "V_" << i;
 
 		VObjectPtr<Voxel::VVoxelVolume> volume = VObject::CreateObject<Voxel::VVoxelVolume>(1, 1);
-		std::static_pointer_cast<IVSerializable>(volume)->Deserialize(archive->Properties[ss.str()]);
+		std::static_pointer_cast<IVSerializable>(volume)->Deserialize(sourcePath, archive->Properties[ss.str()]);
 
 		volumes.push_back(volume);
 	}
@@ -508,7 +508,7 @@ void VolumeRaytracer::Scene::VScene::Deserialize(std::shared_ptr<VSerializationA
 		ss << "O_" << i;
 
 		VObjectPtr<VVoxelObject> obj = SpawnObject<VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(archive->Properties[ss.str()]);
+		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(sourcePath, archive->Properties[ss.str()]);
 
 		obj->SetVoxelVolume(volumes[volumeIndex]);
 	}
@@ -519,7 +519,7 @@ void VolumeRaytracer::Scene::VScene::Deserialize(std::shared_ptr<VSerializationA
 		ss << "LD_" << i;
 
 		VObjectPtr<VLight> obj = SpawnObject<VLight>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(archive->Properties[ss.str()]);
+		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(sourcePath, archive->Properties[ss.str()]);
 
 		SetActiveDirectionalLight(obj);
 	}
@@ -530,7 +530,7 @@ void VolumeRaytracer::Scene::VScene::Deserialize(std::shared_ptr<VSerializationA
 		ss << "LP_" << i;
 
 		VObjectPtr<VPointLight> obj = SpawnObject<VPointLight>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(archive->Properties[ss.str()]);
+		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(sourcePath, archive->Properties[ss.str()]);
 	}
 
 	for (size_t i = 0; i < spotLightCount; i++)
@@ -539,7 +539,7 @@ void VolumeRaytracer::Scene::VScene::Deserialize(std::shared_ptr<VSerializationA
 		ss << "LS_" << i;
 
 		VObjectPtr<VSpotLight> obj = SpawnObject<VSpotLight>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(archive->Properties[ss.str()]);
+		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(sourcePath, archive->Properties[ss.str()]);
 	}
 }
 

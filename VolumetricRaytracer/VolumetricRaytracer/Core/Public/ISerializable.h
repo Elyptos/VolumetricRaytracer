@@ -68,6 +68,6 @@ namespace VolumeRaytracer
 	{
 	public:
 		virtual std::shared_ptr<VSerializationArchive> Serialize() const = 0;
-		virtual void Deserialize(std::shared_ptr<VSerializationArchive> archive) = 0;
+		virtual void Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive) = 0;
 	};
 }

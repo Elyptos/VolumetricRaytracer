@@ -30,7 +30,7 @@ namespace VolumeRaytracer
 
 		protected:
 			std::shared_ptr<VSerializationArchive> Serialize() const override;
-			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
+			void Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive) override;
 		};
 	}
 }

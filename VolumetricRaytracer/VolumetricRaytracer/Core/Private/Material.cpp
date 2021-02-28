@@ -14,6 +14,7 @@
 
 #include "Material.h"
 #include "StringHelpers.h"
+#include <boost/filesystem.hpp>
 
 std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::VMaterial::Serialize() const
 {
@@ -68,7 +69,7 @@ std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::VMateri
 	return res;
 }
 
-void VolumeRaytracer::VMaterial::Deserialize(std::shared_ptr<VSerializationArchive> archive)
+void VolumeRaytracer::VMaterial::Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive)
 {
 	AlbedoColor = archive->Properties["Color"]->To<VColor>();
 	Roughness = archive->Properties["Roughness"]->To<float>();
@@ -78,6 +79,27 @@ void VolumeRaytracer::VMaterial::Deserialize(std::shared_ptr<VSerializationArchi
 	AlbedoTexturePath = VStringHelpers::StringToWString(std::string(archive->Properties["AlbedoTexture"]->Buffer));
 	NormalTexturePath = VStringHelpers::StringToWString(std::string(archive->Properties["NormalTexture"]->Buffer));
 	RMTexturePath = VStringHelpers::StringToWString(std::string(archive->Properties["RMTexture"]->Buffer));
+
+	boost::filesystem::path albedoBoostPath(AlbedoTexturePath);
+	boost::filesystem::path normalBoostPath(NormalTexturePath);
+	boost::filesystem::path rmTextureBoostPath(RMTexturePath);
+
+	boost::filesystem::path sourceFolder = boost::filesystem::path(sourcePath).root_directory();
+
+	if (HasAlbedoTexture() && !albedoBoostPath.is_absolute())
+	{
+		AlbedoTexturePath = (sourceFolder / albedoBoostPath).wstring();
+	}
+
+	if (HasNormalTexture() && !normalBoostPath.is_absolute())
+	{
+		NormalTexturePath = (sourceFolder / normalBoostPath).wstring();
+	}
+
+	if (HasRMTexture() && !rmTextureBoostPath.is_absolute())
+	{
+		RMTexturePath = (sourceFolder / rmTextureBoostPath).wstring();
+	}
 }
 
 bool VolumeRaytracer::VMaterial::HasAlbedoTexture() const

@@ -26,9 +26,9 @@ std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Scene::
 	return res;
 }
 
-void VolumeRaytracer::Scene::VSpotLight::Deserialize(std::shared_ptr<VSerializationArchive> archive)
+void VolumeRaytracer::Scene::VSpotLight::Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive)
 {
-	VLight::Deserialize(archive);
+	VLight::Deserialize(sourcePath, archive);
 
 	AttenuationLinear = archive->Properties["AttL"]->To<float>();
 	AttenuationExp = archive->Properties["AttExp"]->To<float>();
