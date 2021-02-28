@@ -20,6 +20,11 @@ std::weak_ptr<VolumeRaytracer::Scene::VScene> VolumeRaytracer::Scene::VLevelObje
 	return Scene;
 }
 
+VolumeRaytracer::VAABB VolumeRaytracer::Scene::VLevelObject::GetBounds() const
+{
+	return VAABB();
+}
+
 void VolumeRaytracer::Scene::VLevelObject::SetScene(std::weak_ptr<VScene> scene)
 {
 	if (Scene.expired())

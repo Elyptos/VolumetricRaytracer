@@ -39,6 +39,9 @@ namespace VolumeRaytracer
 
 			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
 
+
+			VAABB GetBounds() const override;
+
 		private:
 			VObjectPtr<Voxel::VVoxelVolume> VoxelVolume;
 		protected:

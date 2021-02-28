@@ -129,6 +129,8 @@ namespace VolumeRaytracer
 
 			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
 
+			VAABB GetSceneBounds() const;
+
 		protected:
 			void Initialize() override;
 

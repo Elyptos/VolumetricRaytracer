@@ -543,6 +543,18 @@ void VolumeRaytracer::Scene::VScene::Deserialize(std::shared_ptr<VSerializationA
 	}
 }
 
+VolumeRaytracer::VAABB VolumeRaytracer::Scene::VScene::GetSceneBounds() const
+{
+	VAABB res;
+
+	for (auto& elem : PlacedObjects)
+	{
+		res = VAABB::Combine(res, elem->GetBounds());
+	}
+
+	return res;
+}
+
 void VolumeRaytracer::Scene::VScene::Initialize()
 {
 	

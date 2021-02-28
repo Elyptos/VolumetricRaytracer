@@ -15,6 +15,7 @@
 #pragma once
 
 #include "Vector.h"
+#include "Quat.h"
 
 namespace VolumeRaytracer
 {
@@ -33,6 +34,9 @@ namespace VolumeRaytracer
 
 		VVector GetExtends() const;
 		VVector GetCenterPosition() const;
+
+		static VAABB Combine(const VAABB& a, const VAABB& b);
+		static VAABB Transform(const VAABB& bounds, const VVector& position, const VVector& scale, const VQuat& rotation);
 
 	private:
 		VVector Position;
