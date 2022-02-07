@@ -1,0 +1,4 @@
+
+#include "../Public/Win32Resources.h"
+
+IDI_APPICON   ICON    "AppIcon.ico"
