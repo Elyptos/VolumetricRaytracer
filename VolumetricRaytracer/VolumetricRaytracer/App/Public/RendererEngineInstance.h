@@ -17,6 +17,7 @@
 #include "IEngineInstance.h"
 #include "Object.h"
 #include "Vector.h"
+#include "Material.h"
 #include <boost/signals2/connection.hpp>
 #include <boost/bind.hpp>
 
@@ -56,10 +57,7 @@ namespace VolumeRaytracer
 
 			void InitScene();
 
-			void InitSnowmanObject();
-			void InitFloor();
-			void InitSphere();
-			void InitCube();
+			VObjectPtr<Scene::VVoxelObject> InitSphere(const float& radius, const VMaterial& material);
 
 			void LoadSceneFromFile(const std::wstring& filePath);
 
@@ -71,15 +69,19 @@ namespace VolumeRaytracer
 			VObjectPtr<Scene::VCamera> Camera = nullptr;
 			VObjectPtr<Scene::VLight> DirectionalLight = nullptr;
 			
-			VObjectPtr<Scene::VVoxelObject> Snowman = nullptr;
-			VObjectPtr<Scene::VVoxelObject> Floor = nullptr;
-			VObjectPtr<Scene::VVoxelObject> Sphere = nullptr;
-			VObjectPtr<Scene::VVoxelObject> Cube = nullptr;
+			VObjectPtr<Scene::VVoxelObject> Sphere1 = nullptr;
+			VObjectPtr<Scene::VVoxelObject> Sphere2 = nullptr;
 
 			boost::signals2::connection OnWindowClosedHandle;
 			boost::signals2::connection OnKeyDownHandle;
 			boost::signals2::connection OnKeyPressedHandle;
 			boost::signals2::connection OnAxisInpuHandle;
+
+			float Sphere1Rotation = 0.f;
+			float Sphere2Rotation = 0.f;
+
+			VVector Sphere1RelPosition;
+			VVector Sphere2relPosition;
 
 			bool CubeMode = false; 
 			bool ShowTextures = true;
