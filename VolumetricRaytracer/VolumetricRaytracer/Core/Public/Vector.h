@@ -34,7 +34,9 @@ namespace VolumeRaytracer
 
 		VVector Abs() const;
 		static VVector Max(const VVector& vec, const float& scalar);
+		static VVector Max(const VVector& vec1, const VVector& vec2);
 		static VVector Min(const VVector& vec, const float& scalar);
+		static VVector Min(const VVector& vec1, const VVector& vec2);
 
 		void Normalize();
 		VVector GetNormalized() const;
@@ -134,6 +136,10 @@ namespace VolumeRaytracer
 
 		bool operator==(const VIntVector& other) const;
 		bool operator!=(const VIntVector& other) const;
+		bool operator>=(const VIntVector& other) const;
+		bool operator<=(const VIntVector& other) const;
+		bool operator>(const VIntVector& other) const;
+		bool operator<(const VIntVector& other) const;
 
 	public:
 		static const VIntVector ZERO;

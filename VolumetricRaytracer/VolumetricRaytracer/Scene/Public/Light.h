@@ -16,22 +16,27 @@
 
 #include "LevelObject.h"
 #include "Color.h"
+#include "ISerializable.h"
 
 namespace VolumeRaytracer
 {
 	namespace Scene
 	{
-		class VLight : public VLevelObject
+		class VLight : public VLevelObject, public IVSerializable
 		{
 		public:
-			float IlluminationStrength;
-			VColor Color;
+			float IlluminationStrength = 1.f;
+			VColor Color = VColor::WHITE;
+
 		protected:
 			void Initialize() override;
 
 
 			void BeginDestroy() override;
 
+
+			std::shared_ptr<VSerializationArchive> Serialize() const override;
+			void Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive) override;
 		};
 	}
 }

@@ -43,12 +43,16 @@ namespace VolumeRaytracer
 				}
 			}
 
-			struct VD3DBuffer
+			struct VD3DConstantBuffer
 			{
 			public:
+				~VD3DConstantBuffer();
+
 				CPtr<ID3D12Resource> Resource = nullptr;
 				D3D12_CPU_DESCRIPTOR_HANDLE CPUDescHandle;
 				D3D12_GPU_DESCRIPTOR_HANDLE GPUDescHandle;
+				uint8_t* DataPtr = nullptr;
+				size_t BufferSize = 0;
 
 				void Release();
 			};

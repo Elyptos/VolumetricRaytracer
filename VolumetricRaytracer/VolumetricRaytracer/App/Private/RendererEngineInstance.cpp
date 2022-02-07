@@ -21,6 +21,8 @@
 #include "Renderer.h"
 #include "Camera.h"
 #include "Light.h"
+#include "PointLight.h"
+#include "SpotLight.h"
 #include "Quat.h"
 #include "Scene.h"
 #include "VoxelObject.h"
@@ -57,6 +59,7 @@ void VolumeRaytracer::App::RendererEngineInstance::OnEngineShutdown()
 
 		OnWindowClosedHandle.disconnect();
 		OnKeyDownHandle.disconnect();
+		OnKeyPressedHandle.disconnect();
 		OnAxisInpuHandle.disconnect();
 		Window = nullptr;
 	}
@@ -69,6 +72,62 @@ void VolumeRaytracer::App::RendererEngineInstance::OnEngineUpdate(const float& d
 	windowTitle << L"Volume Raytracer | FPS: " << Engine->GetFPS();
 	
 	Window->SetTitle(windowTitle.str());
+	
+	std::shared_ptr<Renderer::VRenderer> renderer = Engine->GetRenderer().lock();
+
+	if (!CubeMode && !Unlit && ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Interp);
+	}
+	else if (!CubeMode && Unlit && ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Interp_Unlit);
+	}
+	else if (!CubeMode && Unlit && !ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Interp_NoTex_Unlit);
+	}
+	else if (!CubeMode && !Unlit && !ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Interp_NoTex);
+	}
+	else if (CubeMode && !Unlit && ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Cube);
+	}
+	else if (CubeMode && Unlit && ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Cube_Unlit);
+	}
+	else if (CubeMode && Unlit && !ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Cube_NoTex_Unlit);
+	}
+	else if (CubeMode && !Unlit && !ShowTextures)
+	{
+		renderer->SetRendererMode(Renderer::EVRenderMode::Cube_NoTex);
+	}
+
+	Sphere1Rotation += (10.f * deltaTime);
+	Sphere2Rotation -= (50.f * deltaTime);
+
+	if (Sphere1Rotation > 360.f)
+	{
+		Sphere1Rotation = Sphere1Rotation - 360.f;
+	}
+
+	if (Sphere2Rotation < 0.f)
+	{
+		Sphere2Rotation = Sphere2Rotation + 360.f;
+	}
+
+	VQuat rotationQuat = VQuat::FromAxisAngle(VVector::UP, Sphere1Rotation * (M_PI / 180.f));
+
+	Sphere1->Position = rotationQuat * Sphere1RelPosition;
+
+	rotationQuat = VQuat::FromAxisAngle(VVector::UP, Sphere2Rotation * (M_PI / 180.f));
+
+	Sphere2->Position = rotationQuat * Sphere2relPosition;
 }
 
 void VolumeRaytracer::App::RendererEngineInstance::CreateRendererWindow()
@@ -77,6 +136,7 @@ void VolumeRaytracer::App::RendererEngineInstance::CreateRendererWindow()
 	OnWindowClosedHandle = Window->OnWindowClosed_Bind(boost::bind(&RendererEngineInstance::OnWindowClosed, this));
 
 	OnKeyDownHandle = Window->OnKeyDown_Bind(boost::bind(&RendererEngineInstance::OnKeyDown, this, boost::placeholders::_1));
+	OnKeyPressedHandle = Window->OnKeyPressed_Bind(boost::bind(&RendererEngineInstance::OnKeyPressed, this, boost::placeholders::_1));
 	OnAxisInpuHandle = Window->OnAxisInput_Bind(boost::bind(&RendererEngineInstance::OnAxisInput, this, boost::placeholders::_1, boost::placeholders::_2));
 }
 
@@ -126,6 +186,28 @@ void VolumeRaytracer::App::RendererEngineInstance::OnKeyDown(const VolumeRaytrac
 	Camera->Position = Camera->Position + velocity;
 }
 
+void VolumeRaytracer::App::RendererEngineInstance::OnKeyPressed(const VolumeRaytracer::UI::EVKeyType& key)
+{
+	switch (key)
+	{
+		case UI::EVKeyType::N1:
+		{
+			CubeMode = !CubeMode;
+		}
+		break;
+		case UI::EVKeyType::N2:
+		{
+			ShowTextures = !ShowTextures;
+		}
+		break;
+		case UI::EVKeyType::N3:
+		{
+			Unlit = !Unlit;
+		}
+		break;
+	}
+}
+
 void VolumeRaytracer::App::RendererEngineInstance::OnAxisInput(const VolumeRaytracer::UI::EVAxisType& axis, const float& delta)
 {
 	if (Scene != nullptr)
@@ -149,138 +231,64 @@ void VolumeRaytracer::App::RendererEngineInstance::OnAxisInput(const VolumeRaytr
 
 void VolumeRaytracer::App::RendererEngineInstance::InitScene()
 {
-	//Scene = VObject::CreateObject<Scene::VScene>();
+	Scene = VObject::CreateObject<Scene::VScene>();
 
-	LoadSceneFromFile("../Voxelizer/Monkey.vox");
+	LoadSceneFromFile(L"Resources/Model/Monkey.vox");
 	Camera = Scene->SpawnObject<Scene::VCamera>(VVector(300.f, 0.f, 100.f), VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 180.f * (M_PI / 180.f)), VVector::ONE);
 
-	DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, 45.f * (M_PI / 180.f))
-		* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 135.f * (M_PI / 180.f)), VVector::ONE);
-	DirectionalLight->IlluminationStrength = 5.f;
-
-	//Snowman = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-	Floor = Scene->SpawnObject<Scene::VVoxelObject>(VVector(0.f, 0.f, -80.f), VQuat::IDENTITY, VVector(10.f, 10.f, 0.25f));
-	Sphere = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-	Cube = Scene->SpawnObject<Scene::VVoxelObject>(VVector(100.f, 100.f, 0.f), VQuat::IDENTITY, VVector::ONE);
+	DirectionalLight = Scene->SpawnObject<Scene::VLight>(VVector::ZERO, VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 45.f * (M_PI / 180.f))
+		* VolumeRaytracer::VQuat::FromAxisAngle(VolumeRaytracer::VVector::RIGHT, -30.f * (M_PI / 180.f)), VVector::ONE);
+	DirectionalLight->IlluminationStrength = 6.f;
 
 	Scene->SetEnvironmentTexture(VolumeRaytracer::Renderer::VTextureFactory::LoadTextureCubeFromFile(Engine->GetRenderer(), L"Resources/Skybox/Skybox.dds"));
 	Scene->SetActiveSceneCamera(Camera);
 	Scene->SetActiveDirectionalLight(DirectionalLight);
 
-	//InitSnowmanObject();
-	//InitFloor();
-	//InitSphere();
-	//InitCube();
+	Sphere1RelPosition = VVector(200.f, 0.f, 100.f);
+	Sphere2relPosition = VVector(100.f, 0.f, 200.f);
+
+	VMaterial material;
+
+	material.AlbedoColor = VColor::RED;
+	material.Roughness = 0.1f;
+	material.Metallic = 0.6f;
+
+
+	Sphere1 = InitSphere(40.f, material);
+	Sphere1->Position = Sphere1RelPosition;
+
+	material.AlbedoColor = VColor::BLUE;
+
+	Sphere2 = InitSphere(20.f, material);
+	Sphere2->Position = Sphere2relPosition;
 }
 
-void VolumeRaytracer::App::RendererEngineInstance::InitSnowmanObject()
+VolumeRaytracer::VObjectPtr<VolumeRaytracer::Scene::VVoxelObject> VolumeRaytracer::App::RendererEngineInstance::InitSphere(const float& radius, const VMaterial& material)
 {
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(140, 200.f);
+	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(6, 100.f);
 
-	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
-
-	std::shared_ptr<Scene::VSphere> sphere = std::make_shared<Scene::VSphere>();
-	std::shared_ptr<Scene::VSphere> sphere2 = std::make_shared<Scene::VSphere>();
-	std::shared_ptr<Scene::VSphere> sphere3 = std::make_shared<Scene::VSphere>();
-	std::shared_ptr<Scene::VCylinder> cyliner1 = std::make_shared<Scene::VCylinder>();
-	std::shared_ptr<Scene::VCylinder> cylinder2 = std::make_shared<Scene::VCylinder>();
-
-	sphere->Radius = 70.f;
-	sphere2->Radius = 50.f;
-	sphere2->Position = VVector::FORWARD * 80.f;
-	sphere3->Radius = 35.f;
-	sphere3->Position = VVector::FORWARD * 70.f;
-	cyliner1->Radius = 50.f;
-	cyliner1->Height = 8.f;
-	cyliner1->Position = VVector::FORWARD * 30.f;
-	cyliner1->Rotation = VQuat::FromAxisAngle(VolumeRaytracer::VVector::UP, 90.f * (M_PI / 180.f));
-	cylinder2->Radius = 25.f;
-	cylinder2->Height = 30.f;
-	cylinder2->Position = VVector::RIGHT * -30.f;
-
-	densityObj->GetRootShape().AddChild(sphere)
-		.AddChild(sphere2)
-		.AddChild(sphere3)
-		.AddChild(cyliner1)
-		.AddChild(cylinder2);
-
-	std::shared_ptr<Scene::VBox> box = std::make_shared<Scene::VBox>();
-	box->Extends = VVector::ONE * 100.f;
-
-	densityObj->Position = VVector::FORWARD * -150.f;
-
-	#pragma omp parallel for collapse(3)
-	for (int x = 0; x < voxelVolume->GetSize(); x++)
-	{
-		for (int y = 0; y < voxelVolume->GetSize(); y++)
-		{
-			for (int z = 0; z < voxelVolume->GetSize(); z++)
-			{
-				VIntVector voxelIndex = VIntVector(x, y, z);
-
-				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
-
-				float density = densityObj->Evaluate(voxelPos);
-
-				Voxel::VVoxel voxel;
-
-				voxel.Material = density <= 0 ? 1 : 0;
-				voxel.Density = density;
-
-				voxelVolume->SetVoxel(voxelIndex, voxel);
-			}
-		}
-	}
-
-	Snowman->SetVoxelVolume(voxelVolume);
-}
-
-void VolumeRaytracer::App::RendererEngineInstance::InitFloor()
-{
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(2, 200.f);
-
-	#pragma omp parallel for collapse(3)
-	for (int x = 0; x < voxelVolume->GetSize(); x++)
-	{
-		for (int y = 0; y < voxelVolume->GetSize(); y++)
-		{
-			for (int z = 0; z < voxelVolume->GetSize(); z++)
-			{
-				VIntVector voxelIndex = VIntVector(x, y, z);
-
-				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
-
-				Voxel::VVoxel voxel;
-
-				voxel.Material = 1;
-				voxel.Density = -1.f;
-
-				voxelVolume->SetVoxel(voxelIndex, voxel);
-			}
-		}
-	}
-
-	Floor->SetVoxelVolume(voxelVolume);
-}
-
-void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
-{
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(50, 100.f);
+	Voxel::VVoxel voxel;
+	voxel.Material = 1;
+	voxel.Density = -10;
 
 	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
 
 	std::shared_ptr<Scene::VSphere> sphere = std::make_shared<Scene::VSphere>();
 
-	sphere->Radius = 40.f;
+	sphere->Radius = radius;
 
 	densityObj->GetRootShape().AddChild(sphere);
 
+	size_t voxelCount = voxelVolume->GetSize();
+
+	size_t volumeSize = voxelCount * voxelCount * voxelCount;
+
 #pragma omp parallel for collapse(3)
-	for (int x = 0; x < voxelVolume->GetSize(); x++)
+	for (int x = 0; x < voxelCount; x++)
 	{
-		for (int y = 0; y < voxelVolume->GetSize(); y++)
+		for (int y = 0; y < voxelCount; y++)
 		{
-			for (int z = 0; z < voxelVolume->GetSize(); z++)
+			for (int z = 0; z < voxelCount; z++)
 			{
 				VIntVector voxelIndex = VIntVector(x, y, z);
 
@@ -298,48 +306,16 @@ void VolumeRaytracer::App::RendererEngineInstance::InitSphere()
 		}
 	}
 
-	Sphere->SetVoxelVolume(voxelVolume);
+	voxelVolume->SetMaterial(material);
+
+	VObjectPtr<Scene::VVoxelObject> sphereObj = Scene->SpawnObject<Scene::VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+
+	sphereObj->SetVoxelVolume(voxelVolume);
+
+	return sphereObj;
 }
 
-void VolumeRaytracer::App::RendererEngineInstance::InitCube()
-{
-	VObjectPtr<Voxel::VVoxelVolume> voxelVolume = VObject::CreateObject<Voxel::VVoxelVolume>(50, 100.f);
-
-	VObjectPtr<Scene::VDensityGenerator> densityObj = VObject::CreateObject<Scene::VDensityGenerator>();
-
-	std::shared_ptr<Scene::VBox> box = std::make_shared<Scene::VBox>();
-
-	box->Extends = VVector::ONE * 40.f;
-
-	densityObj->GetRootShape().AddChild(box);
-
-	#pragma omp parallel for collapse(3)
-	for (int x = 0; x < voxelVolume->GetSize(); x++)
-	{
-		for (int y = 0; y < voxelVolume->GetSize(); y++)
-		{
-			for (int z = 0; z < voxelVolume->GetSize(); z++)
-			{
-				VIntVector voxelIndex = VIntVector(x, y, z);
-
-				VVector voxelPos = voxelVolume->VoxelIndexToRelativePosition(voxelIndex);
-
-				float density = densityObj->Evaluate(voxelPos);
-
-				Voxel::VVoxel voxel;
-
-				voxel.Material = density <= 0 ? 1 : 0;
-				voxel.Density = density;
-
-				voxelVolume->SetVoxel(voxelIndex, voxel);
-			}
-		}
-	}
-
-	Cube->SetVoxelVolume(voxelVolume);
-}
-
-void VolumeRaytracer::App::RendererEngineInstance::LoadSceneFromFile(const std::string& filePath)
+void VolumeRaytracer::App::RendererEngineInstance::LoadSceneFromFile(const std::wstring& filePath)
 {
 	Scene = VSerializationManager::LoadFromFile<Scene::VScene>(filePath);
 }

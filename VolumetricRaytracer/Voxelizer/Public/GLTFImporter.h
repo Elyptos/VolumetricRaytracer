@@ -15,6 +15,7 @@
 #pragma once
 
 #include <memory>
+#include "SceneInfo.h"
 
 namespace Microsoft
 {
@@ -22,6 +23,7 @@ namespace Microsoft
 	{
 		class Document;
 		class GLTFResourceReader;
+		struct Node;
 	}
 }
 
@@ -35,6 +37,10 @@ namespace VolumeRaytracer
 		{
 		public:
 			static std::shared_ptr<VSceneInfo> ImportScene(const Microsoft::glTF::Document* document, const Microsoft::glTF::GLTFResourceReader* resourceReader);
+
+		private:
+			static bool IsLight(const Microsoft::glTF::Node* node);
+			static VLightInfo GetLightInfo(const Microsoft::glTF::Node* node);
 		};
 	}
 }

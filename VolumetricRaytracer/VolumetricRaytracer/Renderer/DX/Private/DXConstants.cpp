@@ -22,15 +22,21 @@ const DXGI_FORMAT VolumeRaytracer::Renderer::DX::VDXConstants::BACK_BUFFER_FORMA
 
 const unsigned int VolumeRaytracer::Renderer::DX::VDXConstants::BACK_BUFFER_COUNT = 3;
 
-const size_t VolumeRaytracer::Renderer::DX::VDXConstants::SRV_CV_UAV_HEAP_SIZE_PER_FRAME = 100;
+const size_t VolumeRaytracer::Renderer::DX::VDXConstants::SRV_CV_UAV_HEAP_SIZE_PER_FRAME = 200;
 
 const size_t VolumeRaytracer::Renderer::DX::VDXConstants::SAMPLER_HEAP_SIZE_PER_FRAME = 20;
+
+const size_t VolumeRaytracer::Renderer::DX::VDXConstants::STATIC_SCENERY_SRV_CV_UAV_COUNT = 4;
+
+const size_t VolumeRaytracer::Renderer::DX::VDXConstants::STATIC_SCENERY_SAMPLER_COUNT = 2;
 
 const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_RAYGEN(L"VRRaygen");
 
 const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_CLOSEST_HIT(L"VRClosestHit");
 
 const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_INTERSECTION(L"VRIntersection");
+
+const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_INTERSECTION_SHADOW(L"VRIntersectionShadowRay");
 
 const std::wstring VolumeRaytracer::Renderer::DX::VDXConstants::SHADER_NAME_MISS(L"VRMiss");
 

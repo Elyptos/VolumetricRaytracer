@@ -16,6 +16,7 @@ file(GLOB_RECURSE vox_private
 
 add_executable(Voxelizer ${vox_public} ${vox_private})
 add_dependencies (Voxelizer gltf)
+add_dependencies (Voxelizer rapidjson)
 
 target_include_directories(Voxelizer PUBLIC "Public")
 
@@ -26,6 +27,7 @@ endif()
 
 target_link_directories(Voxelizer PUBLIC ${gltfLibDir})
 target_include_directories(Voxelizer PUBLIC ${gltfIncludeDir})
+target_include_directories(Voxelizer PUBLIC ${rapidjsonIncludeDir})
 
 target_link_libraries(Voxelizer VScene)
 target_link_libraries(Voxelizer VVoxel)

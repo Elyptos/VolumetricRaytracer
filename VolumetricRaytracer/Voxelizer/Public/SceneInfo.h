@@ -19,11 +19,28 @@
 #include <string>
 #include <vector>
 #include <boost/unordered_map.hpp>
+#include <Color.h>
+#include "Material.h"
 
 namespace VolumeRaytracer
 {
 	namespace Voxelizer
 	{
+		struct VMaterialTextures
+		{
+		public:
+			VVector2D TextureTiling = VVector2D(100.f, 100.f);
+
+			std::wstring Albedo;
+			std::wstring Normal;
+			std::wstring RM;
+		};
+
+		struct VTextureLibrary
+		{
+			boost::unordered_map<std::string, VMaterialTextures> Materials;
+		};
+
 		struct VVertex
 		{
 			VVector Position;
@@ -32,9 +49,12 @@ namespace VolumeRaytracer
 
 		struct VMeshInfo
 		{
+			std::string MeshName;
 			std::vector<VVertex> Vertices;
 			std::vector<size_t> Indices;
 			VAABB Bounds;
+			std::string MaterialName;
+			VMaterial Material;
 		};
 
 		struct VObjectInfo
@@ -45,10 +65,32 @@ namespace VolumeRaytracer
 			VQuat Rotation;
 		};
 
+		enum class ELightType
+		{
+			DIRECTIONAL,
+			POINT,
+			SPOT
+		};
+
+		struct VLightInfo
+		{
+		public:
+			VVector Position;
+			VQuat Rotation;
+			ELightType LightType;
+			VColor Color = VColor::WHITE;
+			float Intensity = 0.f;
+			float AttL = 0.f;
+			float AttExp = 0.f;
+			float FalloffAngle = 0.f;
+			float Angle = 0.f;
+		};
+
 		struct VSceneInfo
 		{
 			boost::unordered_map<std::string, VMeshInfo> Meshes;
 			std::vector<VObjectInfo> Objects;
+			std::vector<VLightInfo> Lights;
 		};
 	}
 }

@@ -24,11 +24,18 @@ void VolumeRaytracer::Renderer::DX::SetDXDebugName(ID3D12DeviceChild* elem, cons
 	}
 }
 
-void VolumeRaytracer::Renderer::DX::VD3DBuffer::Release()
+VolumeRaytracer::Renderer::DX::VD3DConstantBuffer::~VD3DConstantBuffer()
+{
+	Release();
+}
+
+void VolumeRaytracer::Renderer::DX::VD3DConstantBuffer::Release()
 {
 	if (Resource != nullptr)
 	{
 		Resource.Reset();
 		Resource = nullptr;
 	}
+
+	DataPtr = nullptr;
 }

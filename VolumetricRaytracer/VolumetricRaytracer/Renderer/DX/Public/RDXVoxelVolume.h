@@ -23,22 +23,32 @@ namespace VolumeRaytracer
 	namespace Voxel
 	{
 		class VVoxelVolume;
+		class VVoxel;
 	}
 
 	namespace Renderer
 	{
 		namespace DX
 		{
-			class VDXTexture3DFloat;
+			class VDXTexture3D;
 			class VDXRenderer;
 
 			struct VDXVoxelVolumeDesc
 			{
 			public:
 				Voxel::VVoxelVolume* Volume;
-				D3D12_CPU_DESCRIPTOR_HANDLE ResourceHandle;
+				D3D12_CPU_DESCRIPTOR_HANDLE VolumeHandle;
+				D3D12_CPU_DESCRIPTOR_HANDLE TraversalHandle;
 				D3D12_CPU_DESCRIPTOR_HANDLE GeometryCBHandle;
 				size_t InstanceIndex;
+			};
+
+			struct VDXVoxelVolumeTextureIndices
+			{
+			public:
+				size_t AlbedoIndex = 0;
+				size_t NormalIndex = 1;
+				size_t RMIndex = 2;
 			};
 
 			class VDXVoxelVolume
@@ -48,6 +58,7 @@ namespace VolumeRaytracer
 				~VDXVoxelVolume();
 
 				void UpdateFromVoxelVolume(std::weak_ptr<VDXRenderer> renderer);
+				void SetTextures(const VDXVoxelVolumeTextureIndices& textureIndices);
 				bool NeedsUpdate() const;
 
 				const VDXVoxelVolumeDesc& GetDesc() const;
@@ -60,24 +71,31 @@ namespace VolumeRaytracer
 				void Cleanup();
 
 				void CreateBottomLevelAccelerationStructure(std::weak_ptr<VDXRenderer> renderer);
-				void AllocateVolumeTexture(std::weak_ptr<VDXRenderer> renderer);
+				void AllocateTraversalTexture(std::weak_ptr<VDXRenderer> renderer, const size_t& traversalNodeCount);
+				void AllocateVolumeTexture(std::weak_ptr<VDXRenderer> renderer, const size_t& volumeSize);
 				void AllocateAABBBuffer(std::weak_ptr<VDXRenderer> renderer);
 				void AllocateGeometryConstantBuffer(std::weak_ptr<VDXRenderer> renderer);
 
+				void UpdateTraversalTexture(std::weak_ptr<VDXRenderer> renderer);
 				void UpdateVolumeTexture(std::weak_ptr<VDXRenderer> renderer);
 				void UpdateAABBBuffer();
 				void UpdateGeometryDesc();
 				void UpdateGeometryConstantBuffer();
 
+				void EncodeVoxel(const Voxel::VVoxel& voxel, uint8_t& outR, uint8_t& outG, uint8_t& outB);
+
 			private:
-				VObjectPtr<VDXTexture3DFloat> VolumeTexture = nullptr;
+				VObjectPtr<VDXTexture3D> VolumeTexture = nullptr;
+				VObjectPtr<VDXTexture3D> TraversalTexture = nullptr;
 				CPtr<ID3D12Resource> AABBBuffer;
 				CPtr<ID3D12Resource> GeometryCB;
 				
 				VDXAccelerationStructureBuffers BLAS;
 
 				VDXVoxelVolumeDesc Desc;
+				VDXVoxelVolumeTextureIndices TextureIndices;
 				size_t LastVoxelCount;
+				size_t LastTraversalNodeCount;
 				float LastCellSize;
 
 				D3D12_RAYTRACING_GEOMETRY_DESC GeometryDesc;

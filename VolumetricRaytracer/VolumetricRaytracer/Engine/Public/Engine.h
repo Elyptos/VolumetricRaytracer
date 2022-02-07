@@ -49,7 +49,7 @@ namespace VolumeRaytracer
 		private:
 			void InitializeLogger();
 			void InitializeEngineInstance();
-			void InitializeRenderer();
+			bool InitializeRenderer();
 			void InitFPSCounter();
 
 			std::string GetCurrentDateTimeAsString() const;
@@ -71,6 +71,7 @@ namespace VolumeRaytracer
 
 		private:
 			bool IsRunning = false;
+			bool IsPendingStart = false;
 			float EngineDeltaTime = 0.f;
 
 			unsigned int FPS = 0;

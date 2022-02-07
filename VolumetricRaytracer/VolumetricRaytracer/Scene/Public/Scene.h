@@ -20,6 +20,7 @@
 #include <vector>
 #include <boost/unordered_set.hpp>
 #include <boost/unordered_map.hpp>
+#include "Material.h"
 
 namespace VolumeRaytracer
 {
@@ -40,6 +41,12 @@ namespace VolumeRaytracer
 		{
 		public:
 			boost::unordered_set<std::shared_ptr<IVRenderableObject>> Objects;
+		};
+
+		struct VTextureReference
+		{
+		public:
+			boost::unordered_set<std::shared_ptr<Voxel::VVoxelVolume>> Volumes;
 		};
 
 		class VScene : public VObject, public std::enable_shared_from_this<VScene>, public IVSerializable
@@ -104,6 +111,8 @@ namespace VolumeRaytracer
 			void UpdateVoxelVolumeReference(std::weak_ptr<Voxel::VVoxelVolume> prevVolume, std::weak_ptr<IVRenderableObject> renderableObject);
 			void RemoveVoxelVolumeReference(std::weak_ptr<Voxel::VVoxelVolume> volume, std::weak_ptr<IVRenderableObject> renderableObject);
 
+			void UpdateMaterialOfVolume(std::weak_ptr<Voxel::VVoxelVolume> volume, const VMaterial& materialBefore, const VMaterial& newMaterial);
+
 			std::vector<std::weak_ptr<VLevelObject>> GetAllPlacedObjects() const;
 			boost::unordered_set<VLevelObject*> GetObjectsAddedDuringFrame() const;
 			boost::unordered_set<VLevelObject*> GetObjectsRemovedDuringFrame() const;
@@ -113,11 +122,14 @@ namespace VolumeRaytracer
 			boost::unordered_set<Voxel::VVoxelVolume*> GetVolumesAddedDuringFrame() const;
 			boost::unordered_set<Voxel::VVoxelVolume*> GetVolumesRemovedDuringFrame() const;
 
+			boost::unordered_set<std::wstring> GetAllReferencedGeometryTextures() const;
 
 			std::shared_ptr<VSerializationArchive> Serialize() const override;
 
 
-			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
+			void Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive) override;
+
+			VAABB GetSceneBounds() const;
 
 		protected:
 			void Initialize() override;
@@ -139,6 +151,8 @@ namespace VolumeRaytracer
 			boost::unordered_map<VObjectPtr<Voxel::VVoxelVolume>, VRenderableObjectContainer> ReferencedVolumes;
 			boost::unordered_set<Voxel::VVoxelVolume*> FrameAddedVolumes;
 			boost::unordered_set<Voxel::VVoxelVolume*> FrameRemovedVolumes;
+
+			boost::unordered_map<std::wstring, VTextureReference> ReferencedTextures;
 
 			std::weak_ptr<VCamera> ActiveCamera;
 			std::weak_ptr<VLight> ActiveDirectionalLight;

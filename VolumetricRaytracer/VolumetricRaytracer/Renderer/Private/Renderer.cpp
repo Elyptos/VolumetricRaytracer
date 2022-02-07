@@ -18,3 +18,8 @@ void VolumeRaytracer::Renderer::VRenderer::SetSceneToRender(VObjectPtr<Scene::VS
 {
 	SceneRef = scene;
 }
+
+void VolumeRaytracer::Renderer::VRenderer::SetRendererMode(const EVRenderMode& renderMode)
+{
+	RenderMode = renderMode;
+}

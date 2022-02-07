@@ -16,6 +16,7 @@
 #include "Object.h"
 #include "Vector.h"
 #include "Quat.h"
+#include "AABB.h"
 
 namespace VolumeRaytracer
 {
@@ -29,6 +30,8 @@ namespace VolumeRaytracer
 
 		public:
 			std::weak_ptr<VScene> GetScene() const;
+
+			virtual VAABB GetBounds() const;
 
 		protected:
 			virtual void OnSceneSet(){}

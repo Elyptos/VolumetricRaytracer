@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include "Voxel.h"
+#include "Octree.h"
 #include "Object.h"
 #include "ISerializable.h"
 #include "Material.h"
@@ -34,34 +34,10 @@ namespace VolumeRaytracer
 
 	namespace Voxel
 	{
-		struct VVoxelIteratorElement
-		{
-		public:
-			VVoxel Voxel;
-			VIntVector Index3D;
-			size_t Index;
-		};
-
 		class VVoxelVolume : public VObject, public IVSerializable
 		{
-		private:
-			class VVoxelVolumeIterator : public std::iterator<std::output_iterator_tag, VVoxelIteratorElement>
-			{
-			public:
-				explicit VVoxelVolumeIterator(VVoxelVolume& scene, size_t index = 0);
-
-				VVoxelIteratorElement operator*() const;
-				VVoxelVolumeIterator& operator++();
-				VVoxelVolumeIterator operator++(int);
-				bool operator!=(const VVoxelVolumeIterator& other) const;
-
-			private:
-				size_t Index = 0;
-				VVoxelVolume& Volume;
-			};
-
 		public:
-			VVoxelVolume(const unsigned int& size, const float& volumeExtends);
+			VVoxelVolume(const uint8_t& resolution, const float& volumeExtends);
 
 			unsigned int GetSize() const;
 			size_t GetVoxelCount() const;
@@ -78,10 +54,7 @@ namespace VolumeRaytracer
 			void SetMaterial(const VMaterial& material);
 			VMaterial GetMaterial() const;
 
-			VVoxelVolumeIterator begin();
-			VVoxelVolumeIterator end();
-
-
+			void FillVolume(const VVoxel& voxel);
 			void PostRender() override;
 
 
@@ -100,7 +73,11 @@ namespace VolumeRaytracer
 			std::shared_ptr<VSerializationArchive> Serialize() const override;
 
 
-			void Deserialize(std::shared_ptr<VSerializationArchive> archive) override;
+			void Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive) override;
+
+			void GenerateGPUOctreeStructure(std::vector<VCellGPUOctreeNode>& outNodes, size_t& outNodeAxisCount) const;
+
+			uint8_t GetResolution() const;
 
 		protected:
 			void Initialize() override;
@@ -109,10 +86,13 @@ namespace VolumeRaytracer
 			void ClearDirtyFlag();
 
 		private:
-			unsigned int Size = 0;
 			float VolumeExtends = 0;
 			float CellSize = 0;
-			VVoxel* VoxelArr = nullptr;
+			
+			uint8_t Resolution = 0;
+			size_t VoxelCountAlongAxis = 0;
+
+			std::vector<VVoxel> Voxels;
 
 			VMaterial GeometryMaterial;
 

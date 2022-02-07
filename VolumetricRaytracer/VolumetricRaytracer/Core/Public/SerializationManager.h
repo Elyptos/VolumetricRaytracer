@@ -23,11 +23,11 @@ namespace VolumeRaytracer
 	class VSerializationManager
 	{
 	private:
-		static bool LoadObjectFromFile(std::shared_ptr<IVSerializable> obj, const std::string& filePath);
+		static bool LoadObjectFromFile(std::shared_ptr<IVSerializable> obj, const std::wstring& filePath);
 
 	public:
 		template<typename T>
-		static VObjectPtr<T> LoadFromFile(const std::string& filePath)
+		static VObjectPtr<T> LoadFromFile(const std::wstring& filePath)
 		{
 			VObjectPtr<T> obj = VObject::CreateObject<T>();
 

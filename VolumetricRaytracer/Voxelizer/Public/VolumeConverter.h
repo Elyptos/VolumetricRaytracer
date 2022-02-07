@@ -15,6 +15,7 @@
 #pragma once
 #include "Object.h"
 #include "SceneInfo.h"
+#include "AABB.h"
 
 namespace VolumeRaytracer
 {
@@ -41,17 +42,55 @@ namespace VolumeRaytracer
 			VVector Mid;
 		};
 
+		struct VTriangleRegions
+		{
+		public:
+			VVector ANorm;
+			float BLength;
+			VVector BNorm;
+			float CLength;
+			VVector CNorm;
+			float DLength;
+			VVector DNorm;
+			VVector ENorm;
+			VVector FNorm;
+			VVector GNorm;
+		};
+
+		struct VTriangleRegionalVoxelDistances
+		{
+		public:
+			float A;
+			float B;
+			float C;
+			float D;
+			float E;
+			float F;
+			float G;
+		};
+
+		enum class EVTriangleRegion
+		{
+			R1,
+			R2,
+			R3,
+			R4,
+			R5,
+			R6,
+			R7
+		};
+
 		class VVolumeConverter
 		{
 		public:
-			static VObjectPtr<Voxel::VVoxelVolume> ConvertMeshInfoToVoxelVolume(const VMeshInfo& meshInfo);
+			static VObjectPtr<Voxel::VVoxelVolume> ConvertMeshInfoToVoxelVolume(const VMeshInfo& meshInfo, const VTextureLibrary& textureLib);
 
 		private:
 			static void VoxelizeVertex(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v);
 			static void VoxelizeEdge(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v1, const VVertex& v2);
-			static void VoxelizeFace(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v1, const VVertex& v2, const VVertex& v3);
+			static void VoxelizeFace(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v1, const VVertex& v2, const VVertex& v3, const float& surfaceThreshold);
 
-			static void VoxelizeTriangle(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v1, const VVertex& v2, const VVertex& v3);
+			static void VoxelizeTriangle(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v1, const VVertex& v2, const VVertex& v3, const float& surfaceThreshold);
 
 			static VIntVector GetCellIndex(std::shared_ptr<Voxel::VVoxelVolume> volume, const VVertex& v);
 
@@ -70,6 +109,16 @@ namespace VolumeRaytracer
 
 			static void UpdateCellDensityWithEdgeIntersection(std::shared_ptr<Voxel::VVoxelVolume> volume, const VIntVector& voxelIndex, const VVector& edgeStart, const VVector& edgeEnd);
 			static void UpdateCellDensityWithTriangleIntersection(std::shared_ptr<Voxel::VVoxelVolume> volume, const VIntVector& voxelIndex, const VTriangle& triangle);
+
+			static bool ExtractResolutionFromName(const std::string& name, uint8_t& outResolution);
+
+			static VAABB GetTriangleBoundingBox(const VTriangle& triangle, const float& threshold);
+			static void GetVoxelizedBoundingBox(std::shared_ptr<Voxel::VVoxelVolume> volume, const VAABB& aabb, VIntVector& outMin, VIntVector& outMax, const float& threshold);
+
+			static VTriangleRegions CalculateTriangleRegionVectors(const VTriangle& triangle);
+			static VTriangleRegionalVoxelDistances CalculateTriangleRegionDistances(const VTriangleRegions& regions, const VTriangle& triangle, const VVector& point);
+
+			static EVTriangleRegion GetTriangleRegion(const VTriangleRegions& regions, const VTriangleRegionalVoxelDistances& distances);
 		};
 	}
 }

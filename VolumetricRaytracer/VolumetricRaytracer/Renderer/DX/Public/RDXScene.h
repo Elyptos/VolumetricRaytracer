@@ -22,6 +22,7 @@
 #include <boost/lockfree/queue.hpp>
 
 struct D3D12_GPU_DESCRIPTOR_HANDLE;
+struct D3D12_CPU_DESCRIPTOR_HANDLE;
 struct ID3D12Resource;
 struct ID3D12DescriptorHeap;
 struct ID3D12Device5;
@@ -31,6 +32,8 @@ namespace VolumeRaytracer
 	namespace Scene
 	{
 		class IVRenderableObject;
+		class VPointLight;
+		class VSpotLight;
 	}
 
 	namespace Renderer
@@ -43,6 +46,7 @@ namespace VolumeRaytracer
 			class VDXTexture3DFloat;
 			class VDXVoxelVolume;
 			class VDXLevelObject;
+			class VDXTexture2D;
 
 			struct VRDXSceneObjectDescriptorHandles
 			{
@@ -51,6 +55,15 @@ namespace VolumeRaytracer
 				D3D12_GPU_DESCRIPTOR_HANDLE VoxelVolumeHandleGPU;
 				D3D12_CPU_DESCRIPTOR_HANDLE GeometryHandleCPU;
 				D3D12_GPU_DESCRIPTOR_HANDLE GeometryHandleGPU;
+				D3D12_CPU_DESCRIPTOR_HANDLE GeometryTraversalCPU;
+				D3D12_GPU_DESCRIPTOR_HANDLE GeometryTraversalGPU;
+			};
+
+			struct VDRXGeometryTextureReference
+			{
+			public:
+				VObjectPtr<VDXTexture2D> Texture;
+				size_t DescriptorIndex;
 			};
 
 			class VRDXSceneObjectResourcePool
@@ -63,12 +76,14 @@ namespace VolumeRaytracer
 
 				CPtr<ID3D12DescriptorHeap> GetVoxelVolumeHeap() const;
 				CPtr<ID3D12DescriptorHeap> GetGeometryHeap() const;
+				CPtr<ID3D12DescriptorHeap> GetGeometryTraversalHeap() const;
 
 				size_t GetMaxObjectsAllowed() const;
 
 			private:
 				VDXDescriptorHeap* VoxelVolumeHeap = nullptr;
 				VDXDescriptorHeap* GeometryHeap = nullptr;
+				VDXDescriptorHeap* GeometryTraversalHeap = nullptr;
 
 				size_t MaxObjects;
 			};
@@ -79,7 +94,7 @@ namespace VolumeRaytracer
 				void InitFromScene(std::weak_ptr<VRenderer> renderer, std::weak_ptr<Scene::VScene> scene) override;
 				void Cleanup() override;
 
-				void BuildStaticResources(VDXRenderer* renderer);
+				void BuildStaticResources(VObjectPtr<VDXRenderer> renderer);
 
 				D3D12_GPU_VIRTUAL_ADDRESS CopySceneConstantBufferToGPU(const UINT& backBufferIndex);
 
@@ -90,17 +105,23 @@ namespace VolumeRaytracer
 				VDXDescriptorHeap* GetSceneDescriptorHeapSamplers() const;
 				CPtr<ID3D12DescriptorHeap> GetGeometrySRVDescriptorHeap() const;
 				CPtr<ID3D12DescriptorHeap> GetGeometryCBDescriptorHeap() const;
+				CPtr<ID3D12DescriptorHeap> GetGeometryTraversalDescriptorHeap() const;
 
 				CPtr<ID3D12Resource> GetSceneVolume() const;
 
 
 				void PrepareForRendering(std::weak_ptr<VRenderer> renderer, const unsigned int& backBufferIndex) override;
 
+				D3D12_CPU_DESCRIPTOR_HANDLE GetSceneLightsHeapStart(const unsigned int& backBufferIndex) const;
+
 			private:
 				void InitEnvironmentMap(VDXRenderer* renderer);
 				void InitSceneGeometry(std::weak_ptr<VDXRenderer> renderer, std::weak_ptr<Scene::VScene> scene);
 				void InitSceneObjects(std::weak_ptr<VDXRenderer> renderer, std::weak_ptr<Scene::VScene> scene);
 
+				void AllocateDefaultTextures(std::weak_ptr<VDXRenderer> renderer);
+
+				void AllocLightConstantBuffers(VDXRenderer* renderer);
 				void AllocSceneConstantBuffer(VDXRenderer* renderer);
 				void CleanupStaticResources();
 
@@ -112,18 +133,32 @@ namespace VolumeRaytracer
 				void AddLevelObject(std::weak_ptr<VDXRenderer> renderer, Scene::VLevelObject* levelObject);
 				void RemoveLevelObject(Scene::VLevelObject* levelObject);
 
+				void AddPointLight(Scene::VPointLight* pointLight);
+				void RemovePointLight(Scene::VPointLight* pointLight);
+
+				void AddSpotLight(Scene::VSpotLight* spotLight);
+				void RemoveSpotLight(Scene::VSpotLight* spotLight);
+
 				void ClearInstanceIDPool();
 				void FillInstanceIDPool();
 
+				void ClearTextureInstanceIDPool();
+				void FillTextureInstanceIDPool();
+
 				void UpdateSceneConstantBuffer(std::weak_ptr<Scene::VScene> scene);
+				void UpdateLights(const unsigned int& backBufferIndex);
+
 				void UpdateSceneGeometry(std::weak_ptr<VDXRenderer> renderer, std::weak_ptr<Scene::VScene> scene);
 				void UpdateSceneObjects(std::weak_ptr<VDXRenderer> renderer, std::weak_ptr<Scene::VScene> scene);
 
 				bool ContainsLevelObject(Scene::VLevelObject* levelObject) const;
 
+				void SyncGeometryTextures(std::weak_ptr<VDXRenderer> renderer, std::weak_ptr<Scene::VScene> scene);
+
 			private:
 				VDXDescriptorHeap* DXSceneDescriptorHeap = nullptr;
 				VDXDescriptorHeap* DXSceneDescriptorHeapSamplers = nullptr;
+				VDXDescriptorHeap* DXSceneLightsDescriptorHeap = nullptr;
 
 				VRDXSceneObjectResourcePool* ObjectResourcePool = nullptr;
 
@@ -131,6 +166,9 @@ namespace VolumeRaytracer
 
 				std::vector<CPtr<ID3D12Resource>> SceneConstantBuffers;
 				std::vector<uint8_t*> SceneConstantBufferDataPtrs;
+
+				std::vector<std::vector<std::shared_ptr<VD3DConstantBuffer>>> ScenePointLightBuffers;
+				std::vector<std::vector<std::shared_ptr<VD3DConstantBuffer>>> SceneSpotLightBuffers;
 
 				DirectX::XMMATRIX ViewMatrix;
 				DirectX::XMMATRIX ProjectionMatrix;
@@ -140,13 +178,21 @@ namespace VolumeRaytracer
 				DirectX::XMFLOAT3 DirectionalLightDirection;
 
 				VObjectPtr<VDXTextureCube> EnvironmentMap = nullptr;
+				VObjectPtr<VDXTexture2D> DefaultAlbedoTexture;
+				VObjectPtr<VDXTexture2D> DefaultNormalTexture;
+				VObjectPtr<VDXTexture2D> DefaultRMTexture;
 
 				boost::unordered_map<Voxel::VVoxelVolume*, std::shared_ptr<VDXVoxelVolume>> VoxelVolumes;
 				std::vector<std::shared_ptr<VDXLevelObject>> ObjectsInScene;
+				std::vector<Scene::VPointLight*> PointLights;
+				std::vector<Scene::VSpotLight*> SpotLights;
 
 				std::vector<size_t> NumObjectsInSceneLastFrame;
 
 				boost::lockfree::queue<size_t> GeometryInstancePool{0};
+				boost::lockfree::queue<size_t> GeometryTextureInstancePool{0};
+
+				boost::unordered_map<std::wstring, VDRXGeometryTextureReference> GeometryTextures;
 
 				bool UpdateBLAS = false;
 			};

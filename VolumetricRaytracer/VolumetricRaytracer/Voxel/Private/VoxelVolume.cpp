@@ -16,20 +16,24 @@
 #include "MathHelpers.h"
 #include <cmath>
 
-VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolume(const unsigned int& size, const float& volumeExtends) :Size(size),
-	VolumeExtends(volumeExtends)
+VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolume(const uint8_t& resolution, const float& volumeExtends) :
+	VolumeExtends(volumeExtends),
+	Resolution(resolution)
 {
-	CellSize = (volumeExtends * 2) / ((float)size - 1.f);
+	VoxelCountAlongAxis = 2 + (std::pow(2, Resolution) - 1);
+	CellSize = (volumeExtends * 2) / (VoxelCountAlongAxis - 1.f);
+
+	Voxels.resize(GetVoxelCount(), VVoxel());
 }
 
 unsigned int VolumeRaytracer::Voxel::VVoxelVolume::GetSize() const
 {
-	return Size;
+	return VoxelCountAlongAxis;
 }
 
 size_t VolumeRaytracer::Voxel::VVoxelVolume::GetVoxelCount() const
 {
-	return Size * Size * Size;
+	return VoxelCountAlongAxis * VoxelCountAlongAxis * VoxelCountAlongAxis;
 }
 
 float VolumeRaytracer::Voxel::VVoxelVolume::GetVolumeExtends() const
@@ -56,11 +60,9 @@ void VolumeRaytracer::Voxel::VVoxelVolume::SetVoxel(const VIntVector& voxelIndex
 {
 	if (IsValidVoxelIndex(voxelIndex))
 	{
-		size_t index = VMathHelpers::Index3DTo1D(voxelIndex, GetSize(), GetSize());
+		size_t index = VMathHelpers::Index3DTo1D(voxelIndex, VoxelCountAlongAxis, VoxelCountAlongAxis);
 
-		VoxelArr[index] = voxel;
-
-		MakeDirty();
+		Voxels[index] = voxel;
 	}
 }
 
@@ -68,9 +70,9 @@ VolumeRaytracer::Voxel::VVoxel VolumeRaytracer::Voxel::VVoxelVolume::GetVoxel(co
 {
 	if (IsValidVoxelIndex(voxelIndex))
 	{
-		size_t index = VMathHelpers::Index3DTo1D(voxelIndex, GetSize(), GetSize());
+		size_t index = VMathHelpers::Index3DTo1D(voxelIndex, VoxelCountAlongAxis, VoxelCountAlongAxis);
 
-		return VoxelArr[index];
+		return Voxels[index];
 	}
 
 	return VVoxel();
@@ -78,7 +80,10 @@ VolumeRaytracer::Voxel::VVoxel VolumeRaytracer::Voxel::VVoxelVolume::GetVoxel(co
 
 VolumeRaytracer::Voxel::VVoxel VolumeRaytracer::Voxel::VVoxelVolume::GetVoxel(const size_t& voxelIndex) const
 {
-	return VoxelArr[voxelIndex];
+	if(voxelIndex < GetVoxelCount())
+		return Voxels[voxelIndex];
+	else
+		return VVoxel();
 }
 
 bool VolumeRaytracer::Voxel::VVoxelVolume::IsValidVoxelIndex(const VIntVector& voxelIndex) const
@@ -87,13 +92,6 @@ bool VolumeRaytracer::Voxel::VVoxelVolume::IsValidVoxelIndex(const VIntVector& v
 			voxelIndex.Y >= 0 && voxelIndex.Y < GetSize() &&
 			voxelIndex.Z >= 0 && voxelIndex.Z < GetSize();
 }
-
-//VolumeRaytracer::VVector VolumeRaytracer::Voxel::VVoxelVolume::VoxelIndexToWorldPosition(const unsigned int& xPos, const unsigned int& yPos, const unsigned int& zPos) const
-//{
-//	VVector volumeOrigin = VVector::ONE * -VolumeExtends;
-//
-//	return VVector(xPos, yPos, zPos) * CellSize + volumeOrigin;
-//}
 
 void VolumeRaytracer::Voxel::VVoxelVolume::SetMaterial(const VMaterial& material)
 {
@@ -105,14 +103,12 @@ VolumeRaytracer::VMaterial VolumeRaytracer::Voxel::VVoxelVolume::GetMaterial() c
 	return GeometryMaterial;
 }
 
-VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolumeIterator VolumeRaytracer::Voxel::VVoxelVolume::begin()
+void VolumeRaytracer::Voxel::VVoxelVolume::FillVolume(const VVoxel& voxel)
 {
-	return VVoxelVolumeIterator(*this, 0);
-}
+	Voxels.clear();
+	Voxels.resize(GetVoxelCount(), voxel);
 
-VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolumeIterator VolumeRaytracer::Voxel::VVoxelVolume::end()
-{
-	return VVoxelVolumeIterator(*this, GetVoxelCount());
+	MakeDirty();
 }
 
 void VolumeRaytracer::Voxel::VVoxelVolume::PostRender()
@@ -182,120 +178,86 @@ VolumeRaytracer::VIntVector VolumeRaytracer::Voxel::VVoxelVolume::RelativePositi
 std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Voxel::VVoxelVolume::Serialize() const
 {
 	std::shared_ptr<VSerializationArchive> res = std::make_shared<VSerializationArchive>();
-	res->BufferSize = GetVoxelCount() * sizeof(VVoxel);
+	res->BufferSize = Voxels.size() * sizeof(VVoxel);
 	res->Buffer = new char[res->BufferSize];
 
-	memcpy(res->Buffer, VoxelArr, res->BufferSize);
+	memcpy(res->Buffer, Voxels.data(), res->BufferSize);
 
-	std::shared_ptr<VSerializationArchive> size = std::make_shared<VSerializationArchive>();
-	std::shared_ptr<VSerializationArchive> extends = std::make_shared<VSerializationArchive>();
+	std::shared_ptr<VSerializationArchive> resolution = VSerializationArchive::From<uint8_t>(&Resolution);
+	std::shared_ptr<VSerializationArchive> extends = VSerializationArchive::From<float>(&VolumeExtends);
 
-	size->BufferSize = sizeof(unsigned int);
-	extends->BufferSize = sizeof(float);
-
-	size->Buffer = new char[sizeof(unsigned int)];
-	extends->Buffer = new char[sizeof(float)];
-
-	memcpy(size->Buffer, &Size, sizeof(unsigned int));
-	memcpy(extends->Buffer, &VolumeExtends, sizeof(float));
-
-	res->Properties["Size"] = size;
+	res->Properties["Resolution"] = resolution;
 	res->Properties["Extends"] = extends;
+
+	VMaterial material = GetMaterial();
+
+	//res->Properties["Material"] = VSerializationArchive::From<VMaterial>(&material);
+	res->Properties["Material"] = material.Serialize();
 
 	return res;
 }
 
-void VolumeRaytracer::Voxel::VVoxelVolume::Deserialize(std::shared_ptr<VSerializationArchive> archive)
+void VolumeRaytracer::Voxel::VVoxelVolume::Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive)
 {
-	memcpy(&Size, archive->Properties["Size"]->Buffer, sizeof(unsigned int));
-	memcpy(&VolumeExtends, archive->Properties["Extends"]->Buffer, sizeof(float));
+	Resolution = archive->Properties["Resolution"]->To<uint8_t>();
+	VolumeExtends = archive->Properties["Extends"]->To<float>();
+	//SetMaterial(archive->Properties["Material"]->To<VMaterial>());
 
-	if (VoxelArr != nullptr)
-	{
-		delete[] VoxelArr;
-	}
+	VMaterial mat;
+	mat.Deserialize(sourcePath, archive->Properties["Material"]);
 
-	VoxelArr = new VVoxel[GetVoxelCount()];
-	memcpy(VoxelArr, archive->Buffer, GetVoxelCount() * sizeof(VVoxel));
+	SetMaterial(mat);
 
-	CellSize = (VolumeExtends * 2) / ((float)Size - 1.f);
+	VoxelCountAlongAxis = 2 + (std::pow(2, Resolution) - 1);
+	CellSize = (VolumeExtends * 2) / (VoxelCountAlongAxis - 1.f);
+
+	Voxels.resize(GetVoxelCount(), VVoxel());
+
+	memcpy(Voxels.data(), archive->Buffer, GetVoxelCount() * sizeof(VVoxel));
 
 	MakeDirty();
 }
 
+void VolumeRaytracer::Voxel::VVoxelVolume::GenerateGPUOctreeStructure(std::vector<VCellGPUOctreeNode>& outNodes, size_t& outNodeAxisCount) const
+{
+	VCellOctree octree(Resolution, Voxels);
+
+	octree.CollapseTree();
+	octree.GetGPUOctreeStructure(outNodes, outNodeAxisCount);
+}
+
+uint8_t VolumeRaytracer::Voxel::VVoxelVolume::GetResolution() const
+{
+	return Resolution;
+}
+
 void VolumeRaytracer::Voxel::VVoxelVolume::Initialize()
 {
-	if (GetSize() > 0)
-	{
-		VoxelArr = new VVoxel[GetVoxelCount()];
+	//if (GetSize() > 0)
+	//{
+	//	VoxelArr = new VVoxel[GetVoxelCount()];
 
-		for (unsigned int i = 0; i < GetVoxelCount(); i++)
-		{
-			VoxelArr[i].Material = 0u;
-			VoxelArr[i].Density = 1;
-		}
+	//	for (unsigned int i = 0; i < GetVoxelCount(); i++)
+	//	{
+	//		VoxelArr[i].Material = 0u;
+	//		VoxelArr[i].Density = 1;
+	//	}
 
-		MakeDirty();
-	}
-	else
-	{
-		VoxelArr = nullptr;
-	}
+	//	MakeDirty();
+	//}
+	//else
+	//{
+	//	VoxelArr = nullptr;
+	//}
+
+	MakeDirty();
 }
 
 void VolumeRaytracer::Voxel::VVoxelVolume::BeginDestroy()
 {
-	if (VoxelArr != nullptr)
-	{
-		delete[] VoxelArr;
-		VoxelArr = nullptr;
-	}
 }
 
 void VolumeRaytracer::Voxel::VVoxelVolume::ClearDirtyFlag()
 {
 	DirtyFlag = false;
-}
-
-VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolumeIterator::VVoxelVolumeIterator(VVoxelVolume& scene, size_t index /*= 0*/)
-	:Volume(scene),
-	Index(index)
-{
-
-}
-
-VolumeRaytracer::Voxel::VVoxelIteratorElement VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolumeIterator::operator*() const
-{
-	if (Index < 0 || Index >= Volume.GetVoxelCount())
-	{
-		return VVoxelIteratorElement();
-	}
-
-	VVoxelIteratorElement elem;
-
-	elem.Voxel = Volume.VoxelArr[Index];
-	elem.Index = Index;
-	
-	elem.Index3D = VMathHelpers::Index1DTo3D(Index, Volume.GetSize(), Volume.GetSize());
-
-	return elem;
-}
-
-VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolumeIterator& VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolumeIterator::operator++()
-{
-	++Index;
-	return *this;
-}
-
-bool VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolumeIterator::operator!=(const VVoxelVolumeIterator& other) const
-{
-	return Index != other.Index;
-}
-
-VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolumeIterator VolumeRaytracer::Voxel::VVoxelVolume::VVoxelVolumeIterator::operator++(int)
-{
-	VVoxelVolumeIterator res(*this);
-	operator++();
-
-	return res;
 }

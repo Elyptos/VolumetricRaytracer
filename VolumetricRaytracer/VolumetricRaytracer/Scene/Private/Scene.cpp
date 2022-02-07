@@ -20,6 +20,8 @@
 #include <algorithm>
 #include "VoxelObject.h"
 #include "VoxelVolume.h"
+#include "PointLight.h"
+#include "SpotLight.h"
 
 void VolumeRaytracer::Scene::VScene::Tick(const float& deltaSeconds)
 {
@@ -178,6 +180,76 @@ void VolumeRaytracer::Scene::VScene::RemoveVoxelVolumeReference(std::weak_ptr<Vo
 	}
 }
 
+void VolumeRaytracer::Scene::VScene::UpdateMaterialOfVolume(std::weak_ptr<Voxel::VVoxelVolume> volume, const VMaterial& materialBefore, const VMaterial& newMaterial)
+{
+	std::shared_ptr<Voxel::VVoxelVolume> volumePtr = volume.lock();
+
+	if (ReferencedVolumes.find(volumePtr) != ReferencedVolumes.end())
+	{
+		if (materialBefore.HasAlbedoTexture() && ReferencedTextures.find(materialBefore.AlbedoTexturePath) != ReferencedTextures.end())
+		{
+			ReferencedTextures[materialBefore.AlbedoTexturePath].Volumes.erase(volumePtr);
+
+			if (ReferencedTextures[materialBefore.AlbedoTexturePath].Volumes.size() == 0)
+			{
+				ReferencedTextures.erase(materialBefore.AlbedoTexturePath);
+			}
+		}
+
+		if (newMaterial.HasAlbedoTexture())
+		{
+			if (ReferencedTextures.find(newMaterial.AlbedoTexturePath) == ReferencedTextures.end())
+			{
+				ReferencedTextures[newMaterial.AlbedoTexturePath] = VTextureReference();
+			}
+
+			ReferencedTextures[newMaterial.AlbedoTexturePath].Volumes.insert(volumePtr);
+		}
+
+
+		if (materialBefore.HasNormalTexture() && ReferencedTextures.find(materialBefore.NormalTexturePath) != ReferencedTextures.end())
+		{
+			ReferencedTextures[materialBefore.NormalTexturePath].Volumes.erase(volumePtr);
+
+			if (ReferencedTextures[materialBefore.NormalTexturePath].Volumes.size() == 0)
+			{
+				ReferencedTextures.erase(materialBefore.NormalTexturePath);
+			}
+		}
+
+		if (newMaterial.HasNormalTexture())
+		{
+			if (ReferencedTextures.find(newMaterial.NormalTexturePath) == ReferencedTextures.end())
+			{
+				ReferencedTextures[newMaterial.NormalTexturePath] = VTextureReference();
+			}
+
+			ReferencedTextures[newMaterial.NormalTexturePath].Volumes.insert(volumePtr);
+		}
+
+
+		if (materialBefore.HasRMTexture() && ReferencedTextures.find(materialBefore.RMTexturePath) != ReferencedTextures.end())
+		{
+			ReferencedTextures[materialBefore.RMTexturePath].Volumes.erase(volumePtr);
+
+			if (ReferencedTextures[materialBefore.RMTexturePath].Volumes.size() == 0)
+			{
+				ReferencedTextures.erase(materialBefore.RMTexturePath);
+			}
+		}
+
+		if (newMaterial.HasRMTexture())
+		{
+			if (ReferencedTextures.find(newMaterial.RMTexturePath) == ReferencedTextures.end())
+			{
+				ReferencedTextures[newMaterial.RMTexturePath] = VTextureReference();
+			}
+
+			ReferencedTextures[newMaterial.RMTexturePath].Volumes.insert(volumePtr);
+		}
+	}
+}
+
 std::vector<std::weak_ptr<VolumeRaytracer::Scene::VLevelObject>> VolumeRaytracer::Scene::VScene::GetAllPlacedObjects() const
 {
 	std::vector<std::weak_ptr<VLevelObject>> res;
@@ -227,6 +299,18 @@ boost::unordered_set<VolumeRaytracer::Voxel::VVoxelVolume*> VolumeRaytracer::Sce
 	return FrameRemovedVolumes;
 }
 
+boost::unordered_set<std::wstring> VolumeRaytracer::Scene::VScene::GetAllReferencedGeometryTextures() const
+{
+	boost::unordered_set<std::wstring> texturePaths;
+
+	for (auto& elem : ReferencedTextures)
+	{
+		texturePaths.insert(elem.first);
+	}
+
+	return texturePaths;
+}
+
 std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Scene::VScene::Serialize() const
 {
 	std::shared_ptr<VSerializationArchive> res = std::make_shared<VSerializationArchive>();
@@ -262,11 +346,48 @@ std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Scene::
 		}
 	}
 
+	std::vector<std::shared_ptr<VLight>> directionalLights;
+	std::vector<std::shared_ptr<VPointLight>> pointLights;
+	std::vector<std::shared_ptr<VSpotLight>> spotLights;
+
+	for (auto& object : PlacedObjects)
+	{
+		std::shared_ptr<VLight> dirLight;
+		std::shared_ptr<VPointLight> pointLight;
+		std::shared_ptr<VSpotLight> spotLight;
+
+		pointLight = std::dynamic_pointer_cast<VPointLight>(object);
+		spotLight = std::dynamic_pointer_cast<VSpotLight>(object);
+		dirLight = std::dynamic_pointer_cast<VLight>(object);
+
+		if (pointLight != nullptr)
+		{
+			pointLights.push_back(pointLight);
+		}
+		else if (spotLight != nullptr)
+		{
+			spotLights.push_back(spotLight);
+		}
+		else if (dirLight != nullptr)
+		{
+			directionalLights.push_back(dirLight);
+		}
+	}
+
 	size_t num = volumesList.size();
 	std::shared_ptr<VSerializationArchive> volumeCount = VSerializationArchive::From(&num);
 
 	num = sceneObjects.size();
 	std::shared_ptr<VSerializationArchive> sceneObjectsCount = VSerializationArchive::From(&num);
+
+	num = pointLights.size();
+	std::shared_ptr<VSerializationArchive> pointLightCount = VSerializationArchive::From(&num);
+
+	num = spotLights.size();
+	std::shared_ptr<VSerializationArchive> spotLightCount = VSerializationArchive::From(&num);
+
+	num = directionalLights.size();
+	std::shared_ptr<VSerializationArchive> dirLightCount = VSerializationArchive::From(&num);
 
 	res->Properties["VCount"] = volumeCount;
 
@@ -279,7 +400,7 @@ std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Scene::
 
 		res->Properties[ss.str()] = volumeArchive;
 	}
-	
+
 	res->Properties["OCount"] = sceneObjectsCount;
 
 	for (size_t i = 0; i < sceneObjects.size(); i++)
@@ -300,13 +421,67 @@ std::shared_ptr<VolumeRaytracer::VSerializationArchive> VolumeRaytracer::Scene::
 		res->Properties[ss.str()] = objectArchive;
 	}
 
+	res->Properties["LDCount"] = dirLightCount;
+
+	for (size_t i = 0; i < directionalLights.size(); i++)
+	{
+		std::shared_ptr<VSerializationArchive> lightArchive = std::static_pointer_cast<IVSerializable>(directionalLights[i])->Serialize();
+
+		std::stringstream ss;
+		ss << "LD_" << i;
+
+		res->Properties[ss.str()] = lightArchive;
+	}
+
+	res->Properties["LPCount"] = pointLightCount;
+
+	for (size_t i = 0; i < pointLights.size(); i++)
+	{
+		std::shared_ptr<VSerializationArchive> lightArchive = std::static_pointer_cast<IVSerializable>(pointLights[i])->Serialize();
+
+		std::stringstream ss;
+		ss << "LP_" << i;
+
+		res->Properties[ss.str()] = lightArchive;
+	}
+
+	res->Properties["LSCount"] = spotLightCount;
+
+	for (size_t i = 0; i < spotLights.size(); i++)
+	{
+		std::shared_ptr<VSerializationArchive> lightArchive = std::static_pointer_cast<IVSerializable>(spotLights[i])->Serialize();
+
+		std::stringstream ss;
+		ss << "LS_" << i;
+
+		res->Properties[ss.str()] = lightArchive;
+	}
+
 	return res;
 }
 
-void VolumeRaytracer::Scene::VScene::Deserialize(std::shared_ptr<VSerializationArchive> archive)
+void VolumeRaytracer::Scene::VScene::Deserialize(const std::wstring& sourcePath, std::shared_ptr<VSerializationArchive> archive)
 {
 	size_t volumesCount = archive->Properties["VCount"]->To<size_t>();
 	size_t objectsCount = archive->Properties["OCount"]->To<size_t>();
+	size_t dirLightCount = 0;
+	size_t spotLightCount = 0;
+	size_t pointLightCount = 0;
+
+	if (archive->Properties.find("LDCount") != archive->Properties.end())
+	{
+		dirLightCount = archive->Properties["LDCount"]->To<size_t>();
+	}
+
+	if (archive->Properties.find("LPCount") != archive->Properties.end())
+	{
+		pointLightCount = archive->Properties["LPCount"]->To<size_t>();
+	}
+
+	if (archive->Properties.find("LSCount") != archive->Properties.end())
+	{
+		spotLightCount = archive->Properties["LSCount"]->To<size_t>();
+	}
 
 	std::vector<VObjectPtr<Voxel::VVoxelVolume>> volumes;
 
@@ -316,7 +491,7 @@ void VolumeRaytracer::Scene::VScene::Deserialize(std::shared_ptr<VSerializationA
 		ss << "V_" << i;
 
 		VObjectPtr<Voxel::VVoxelVolume> volume = VObject::CreateObject<Voxel::VVoxelVolume>(1, 1);
-		std::static_pointer_cast<IVSerializable>(volume)->Deserialize(archive->Properties[ss.str()]);
+		std::static_pointer_cast<IVSerializable>(volume)->Deserialize(sourcePath, archive->Properties[ss.str()]);
 
 		volumes.push_back(volume);
 	}
@@ -333,10 +508,51 @@ void VolumeRaytracer::Scene::VScene::Deserialize(std::shared_ptr<VSerializationA
 		ss << "O_" << i;
 
 		VObjectPtr<VVoxelObject> obj = SpawnObject<VVoxelObject>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
-		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(archive->Properties[ss.str()]);
+		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(sourcePath, archive->Properties[ss.str()]);
 
 		obj->SetVoxelVolume(volumes[volumeIndex]);
 	}
+
+	for (size_t i = 0; i < dirLightCount; i++)
+	{
+		std::stringstream ss;
+		ss << "LD_" << i;
+
+		VObjectPtr<VLight> obj = SpawnObject<VLight>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(sourcePath, archive->Properties[ss.str()]);
+
+		SetActiveDirectionalLight(obj);
+	}
+
+	for (size_t i = 0; i < pointLightCount; i++)
+	{
+		std::stringstream ss;
+		ss << "LP_" << i;
+
+		VObjectPtr<VPointLight> obj = SpawnObject<VPointLight>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(sourcePath, archive->Properties[ss.str()]);
+	}
+
+	for (size_t i = 0; i < spotLightCount; i++)
+	{
+		std::stringstream ss;
+		ss << "LS_" << i;
+
+		VObjectPtr<VSpotLight> obj = SpawnObject<VSpotLight>(VVector::ZERO, VQuat::IDENTITY, VVector::ONE);
+		std::static_pointer_cast<IVSerializable>(obj)->Deserialize(sourcePath, archive->Properties[ss.str()]);
+	}
+}
+
+VolumeRaytracer::VAABB VolumeRaytracer::Scene::VScene::GetSceneBounds() const
+{
+	VAABB res;
+
+	for (auto& elem : PlacedObjects)
+	{
+		res = VAABB::Combine(res, elem->GetBounds());
+	}
+
+	return res;
 }
 
 void VolumeRaytracer::Scene::VScene::Initialize()
@@ -382,6 +598,8 @@ void VolumeRaytracer::Scene::VScene::AddVolumeReference_Internal(std::weak_ptr<I
 
 		FrameRemovedVolumes.erase(volumePtr.get());
 		FrameAddedVolumes.insert(volumePtr.get());
+
+		UpdateMaterialOfVolume(volume, VMaterial(), volumePtr->GetMaterial());
 	}
 }
 
@@ -400,6 +618,8 @@ void VolumeRaytracer::Scene::VScene::RemoveVolumeReference_Internal(std::weak_pt
 
 			if (objects.size() == 0)
 			{
+				UpdateMaterialOfVolume(volume, volumePtr->GetMaterial(), VMaterial());
+
 				FrameRemovedVolumes.insert(volumePtr.get());
 				FrameAddedVolumes.erase(volumePtr.get());
 			}

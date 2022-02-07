@@ -29,6 +29,8 @@
 #include <sstream>
 #include <algorithm>
 
+#include "MessageBox.h"
+
 
 VolumeRaytracer::Engine::VEngine::~VEngine()
 {
@@ -37,19 +39,29 @@ VolumeRaytracer::Engine::VEngine::~VEngine()
 
 void VolumeRaytracer::Engine::VEngine::Start()
 {
-	if (IsEngineActive() == false)
+	if (IsEngineActive() == false && !IsPendingStart)
 	{
+		IsPendingStart = true;
+
 		InitFPSCounter();
 		InitializeLogger();
-		InitializeRenderer();
-		InitializeEngineInstance();
-		StartEngineLoop();
+
+		if (InitializeRenderer())
+		{
+			InitializeEngineInstance();
+			StartEngineLoop();
+		}
+		else
+		{
+			UI::VMessageBox::ShowOk(L"Renderer Initialization Error", L"Renderer failed to initialize!\nPlease make sure your system meets the required system specifications:\n\nGPU: NVIDIA RTX 20xx or newer\nOS: Windows 10", UI::EVMessageBoxType::Error);
+			Shutdown();
+		}
 	}
 }
 
 void VolumeRaytracer::Engine::VEngine::Shutdown()
 {
-	if (IsEngineActive())
+	if (IsEngineActive() || IsPendingStart)
 	{
 		StopEngineLoop();
 	}
@@ -88,10 +100,10 @@ void VolumeRaytracer::Engine::VEngine::InitializeEngineInstance()
 	}
 }
 
-void VolumeRaytracer::Engine::VEngine::InitializeRenderer()
+bool VolumeRaytracer::Engine::VEngine::InitializeRenderer()
 {
 	Renderer = Renderer::VRendererFactory::NewRenderer();
-	Renderer->Start();
+	return Renderer->Start();
 }
 
 void VolumeRaytracer::Engine::VEngine::InitFPSCounter()
@@ -157,11 +169,16 @@ void VolumeRaytracer::Engine::VEngine::ExecuteRenderCommand()
 
 void VolumeRaytracer::Engine::VEngine::StartEngineLoop()
 {
-	IsRunning = true;
+	if (IsPendingStart == true)
+	{
+		IsRunning = true;
 
-	V_LOG("Starting engine");
+		IsPendingStart = false;
 
-	EngineLoop();
+		V_LOG("Starting engine");
+
+		EngineLoop();
+	}
 }
 
 void VolumeRaytracer::Engine::VEngine::StopEngineLoop()
@@ -169,6 +186,7 @@ void VolumeRaytracer::Engine::VEngine::StopEngineLoop()
 	V_LOG("Stopping engine");
 
 	IsRunning = false;
+	IsPendingStart = false;
 }
 
 void VolumeRaytracer::Engine::VEngine::StopRenderer()

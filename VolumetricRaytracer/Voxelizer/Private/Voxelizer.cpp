@@ -27,15 +27,17 @@
 #include "SceneInfo.h"
 #include "SceneConverter.h"
 #include "GLTFImporter.h"
+#include "TextureLibraryImporter.h"
 #include "FileStreamReader.h"
 #include "VolumeConverter.h"
 #include "SerializationManager.h"
 
+
 int main(int argc, char** args)
 {
-	if (argc != 2)
+	if (argc < 2)
 	{
-		std::cout << "Usage: Voxelizer.exe path/to/gltf/file" << std::endl;
+		std::cout << "Usage: Voxelizer.exe path/to/gltf/file [path/to/texture/lib]" << std::endl;
 		return 0;
 	}
 
@@ -46,6 +48,13 @@ int main(int argc, char** args)
 	{
 		std::cerr << "GLTF file not found! Path: " << filePath << std::endl;
 		return 1;
+	}
+
+	VolumeRaytracer::Voxelizer::VTextureLibrary textureLib;
+
+	if (argc > 2)
+	{
+		textureLib = VolumeRaytracer::Voxelizer::VTextureLibraryImporter::Import(std::string(args[2]));
 	}
 
 	std::shared_ptr<std::istream> fileStream = fileStreamReader->GetInputStream(filePath);
@@ -93,7 +102,7 @@ int main(int argc, char** args)
 		return 1;
 	}
 
-	VolumeRaytracer::VObjectPtr<VolumeRaytracer::Scene::VScene> scene = VolumeRaytracer::Voxelizer::VSceneConverter::ConvertSceneInfoToScene(*sceneInfo);
+	VolumeRaytracer::VObjectPtr<VolumeRaytracer::Scene::VScene> scene = VolumeRaytracer::Voxelizer::VSceneConverter::ConvertSceneInfoToScene(*sceneInfo, textureLib);
 
 	std::stringstream outputFileName;
 	outputFileName << boost::filesystem::path(filePath).stem().string() << ".vox";
